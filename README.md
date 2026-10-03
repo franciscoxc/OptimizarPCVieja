@@ -1,6 +1,8 @@
 # Optimizar PC Vieja
 
-Scripts para exprimir PCs viejas con **Windows 10 de 64 bits, disco mecánico (HDD) y 2 GB de RAM**.
+Scripts para exprimir PCs viejas con **Windows 10, disco mecánico (HDD) y 2 GB de RAM**, incluidas las
+netbooks de Conectar Igualdad con procesador Atom (ver [su sección](#netbooks-de-conectar-igualdad-con-atom)).
+Funcionan en Windows 10 de 64 y de 32 bits.
 Objetivo: la mayor velocidad posible y el menor consumo de RAM, **sin apagar la seguridad**.
 
 > Advertencia honesta: ningún script convierte una PC de 2 GB con disco mecánico en una gamer.
@@ -14,14 +16,15 @@ Objetivo: la mayor velocidad posible y el menor consumo de RAM, **sin apagar la 
 | `OptimizarPC.bat` | La optimización (v2). Ya incluye las correcciones del script original. | Sí |
 | `DeshacerPerjudiciales.bat` | Deshace **solo** lo dañino del script original (v1), para PCs donde ya lo corriste. | Sí, poco |
 | `RevertirOptimizacion.bat` | Vuelve a los valores de fábrica lo que cambia `OptimizarPC.bat` (por si algo sale mal). | Sí |
-| `VerificarEstado.bat` | Muestra el estado actual de todo lo que tocan los scripts. Ideal para comparar antes/después. | **No** (solo lee) |
+| `VerificarEstado.bat` | Muestra el hardware (procesador, video, RAM), el antirrobo de Conectar Igualdad si lo hay, y el estado de todo lo que tocan los scripts. Ideal para comparar antes/después. | **No** (solo lee) |
 
 ## Cómo usarlo
 
 1. Copiá la carpeta a la PC (pendrive, red, lo que sea). Si la bajaste como ZIP, **descomprimila primero**:
    el script funciona igual desde adentro del ZIP, pero avisa, porque Windows lo corre desde una carpeta temporal.
 2. Doble clic en `OptimizarPC.bat`. Si no tiene permisos, los pide solo (aparece el cartel de UAC).
-3. Respondé las 4 preguntas (impresora, compartir en red, OneDrive y apps preinstaladas).
+3. Leé los avisos de hardware si aparece alguno (poca RAM, video sin driver, antirrobo de Conectar Igualdad)
+   y respondé las 5 preguntas: impresora, compartir en red, OneDrive, apps preinstaladas y clásicos de Windows 7.
 4. Esperá. En un disco mecánico puede tardar 10 a 20 minutos. Paciencia, mate y facturas.
 5. **Reiniciá** con *Reiniciar*, no con *Apagar* y prender.
    Con el inicio rápido activado, "Apagar" no recarga todo y algunos cambios no se aplican.
@@ -178,6 +181,7 @@ No se agregan exclusiones: son lo primero que buscan los virus.
 | ¿Compartís carpetas o impresora en red? | `LanmanServer` en Manual |
 | ¿Usás OneDrive? | Se saca OneDrive del inicio (no se desinstala; si lo abrís, vuelve) |
 | ¿Quitar apps preinstaladas? (si respondés "Sí") | Se desinstalan para todos los usuarios: Xbox, Solitario, Candy Crush, Noticias, Clima, Tu Teléfono, Skype, Personas, Mapas, Correo y Calendario (Microsoft los discontinuó en 2024), Paint 3D, Visor 3D, Portal de realidad mixta, OneNote para Win10, Obtener ayuda, Sugerencias, Centro de comentarios, Cortana y Copilot. **No** se tocan la Store, Calculadora, Fotos, Cámara, Recortes, Notas rápidas, Alarmas, Grabadora ni los reproductores. Todo se puede reinstalar desde la Store. |
+| ¿Usar los clásicos de Windows 7? (si respondés "Sí") | Vuelve el **Visualizador de fotos de Windows** en lugar de la app Fotos, y el **Alt+Tab clásico**. Ver [Clásicos de Windows 7](#clásicos-de-windows-7). |
 
 ### 10. Limpieza
 
@@ -186,6 +190,69 @@ No se agregan exclusiones: son lo primero que buscan los virus.
 Al final muestra el estado de Defender y los programas que arrancan con Windows (revisalos en *Administrador de tareas > Inicio*), y ofrece reiniciar.
 
 ---
+
+## Clásicos de Windows 7
+
+Windows 10 todavía trae escondidas algunas piezas de Windows 7 que en una PC lenta andan mucho más rápido.
+
+| Clásico | Qué hace el script |
+|---|---|
+| **Visualizador de fotos de Windows** | Sigue instalado, pero Windows 10 le sacó las fotos comunes y solo lo dejó para TIFF. El script se las devuelve (JPG, PNG, GIF y BMP), cada una con su nombre y su ícono de siempre, y lo registra en "Abrir con" y en Aplicaciones predeterminadas. Además desinstala la app Fotos nueva, que en un Atom tarda varios segundos en abrir una imagen. |
+| **Alt+Tab clásico** | Muestra íconos en lugar de miniaturas en vivo de cada ventana. Si la placa de video no tiene driver, cada miniatura la dibuja el procesador. |
+
+**El único paso manual:** Windows 10 no deja que un programa elija las aplicaciones predeterminadas por vos.
+Después de reiniciar, andá a *Configuración > Aplicaciones > Aplicaciones predeterminadas > Visor de fotos* y elegí
+*Visualizador de fotos de Windows*. O abrí una foto y, cuando pregunte con qué abrirla, elegilo y marcá *Usar siempre esta aplicación*.
+
+Otros clásicos que ya están y no hace falta tocar:
+
+- **Reproductor de Windows Media**, para música y video: elegilo en el mismo lugar de *Aplicaciones predeterminadas*.
+- Paint, Bloc de notas, WordPad y la Herramienta Recortes de siempre: en Windows 10 siguen siendo los de Windows 7.
+
+Lo que **no** se puede:
+
+- **La calculadora de Windows 7** no viene en Windows 10. Las que circulan son de terceros.
+- **Batería, reloj y volumen "clásicos"** (`UseWin32BatteryFlyout`, `UseWin32TrayClockExperience`, `EnableMtcUvc`): las guías son de 2015 a 2017
+  y no hay evidencia de que sigan funcionando en Windows 10 22H2, así que no entran.
+
+## Netbooks de Conectar Igualdad con Atom
+
+Lo que dicen los foros y la documentación sobre estas máquinas, generación por generación:
+
+| Generación | Procesador | RAM de fábrica | Video | Windows 10 |
+|---|---|---|---|---|
+| G1 | Atom N450 (1 núcleo + HT) | 1 GB DDR2 | GMA 3150 | Windows Update instala un driver que anda bien. |
+| G2 | Atom N455 | 1 GB DDR3 | GMA 3150 | Igual que G1. |
+| G3 / G4 | Atom N2600 (2 núcleos) | 2 GB DDR3 | **GMA 3600** | **Sin driver.** Intel nunca lo hizo para Windows 10, ni de 32 ni de 64 bits. |
+| G5 | Celeron N2806 / N2807 | 2 GB | Intel HD | Tiene drivers. |
+
+**1. El video de las G3/G4 es el verdadero cuello de botella.** Sin driver, Windows usa el *Adaptador de pantalla
+básico de Microsoft*: no hay aceleración, puede no estar la resolución nativa y no se controla el brillo.
+Todo lo dibuja el procesador. Por eso en estas netbooks apagar efectos visuales y transparencias no es un lujo:
+es lo que más se nota. Aun así, los videos (YouTube) van a ir mal. El driver de Windows 7 instalado a la fuerza
+suele terminar en pantalla negra o pantalla azul (`VIDEO_TDR_FAILURE`). No lo recomiendo.
+El script detecta esta situación y te avisa.
+
+**2. RAM.** Las G1 y G2 traen 1 GB, y Windows 10 de 64 bits pide 2 GB como mínimo. Intel especifica 2 GB como
+máximo para estos Atom: un módulo de 2 GB (DDR2 en la G1, DDR3 en las demás) es la mejora más barata que hay.
+
+**3. ¿32 o 64 bits?** Con 2 GB o menos, Windows 10 de 32 bits usa alrededor de un 10% menos de RAM y unos 3,5 GB
+menos de disco. Cambiar implica reinstalar, así que ningún script lo puede hacer. Si vas a reinstalar una
+netbook, conviene la de 32 bits.
+
+**4. El antirrobo (Theft Deterrent).** Las netbooks del programa traen un sistema de bloqueo de ANSES/Intel:
+el agente (*Theft Deterrent Agent*) renueva un certificado con el servidor de la escuela, y si no lo hace se
+bloquea en una fecha o tras una cantidad de arranques. Si la netbook **no está liberada**:
+- No desinstales ni saques del inicio el agente: sin él, la netbook se bloquea.
+- Si la formateaste, perdiste el agente; existe un instalador para Windows 10, pero lo tiene que gestionar la escuela.
+
+El script **no toca** el agente (no modifica servicios ni programas de terceros). Si lo detecta, avisa al
+empezar, y en la lista final de programas de inicio lo marca con "NO lo desactives".
+
+**5. Disco.** Un SSD SATA barato le cambia la vida a cualquiera de estas netbooks, más que todo lo demás junto.
+
+**6. Alternativa.** Para las G3/G4 sin driver de video, los foros recomiendan un Linux liviano (Lubuntu, Linux Mint XFCE)
+si no hace falta Windows sí o sí.
 
 ## Lo que NO hace (mitos y tweaks descartados)
 
@@ -232,8 +299,11 @@ Desde acá no hay un Windows real, así que se validó todo lo que se puede vali
   Se simuló el estado que deja el script original (y políticas que apagan Defender y Windows Update)
   y se verificó en el registro que cada valor quedara corregido y escrito en `HKEY_USERS\<SID>` del usuario.
   También se probó el ciclo completo optimizar, revertir y verificar.
-- **PowerShell:** los 25 bloques de PowerShell pasan el parser oficial. La lógica de apps en segundo plano y la de
+- **PowerShell:** los 27 bloques de PowerShell pasan el parser oficial. La lógica de apps en segundo plano y la de
   limpieza de temporales se probaron con datos simulados.
+- **Netbook simulada:** una G4 (Atom N2600, 1 GB, video sin driver, con antirrobo) muestra los tres avisos.
+  El registro del Visualizador de fotos se verificó valor por valor contra el `.reg` de referencia, incluidos los
+  íconos con `%SystemRoot%`, con comillas o inexistentes.
 - **Formato:** ASCII puro y fin de línea CRLF (con LF, `cmd` puede fallar al saltar a etiquetas).
 
 Lo que **no** se pudo probar acá: los servicios, Defender, la energía, las apps y el punto de restauración.
@@ -256,6 +326,7 @@ Wine no los implementa, así que falta la prueba en un Windows 10 real. Para eso
    - [ ] *Seguridad de Windows*: protección en tiempo real encendida y firmas actualizadas.
    - [ ] Sonido, red, hora correcta y el portapapeles (Ctrl+C y Ctrl+V).
    - [ ] Edge abre y navega.
+   - [ ] Con los clásicos: una foto JPG abre con el Visualizador de fotos (después de elegirlo en Aplicaciones predeterminadas) y Alt+Tab muestra íconos.
    - [ ] Existe el punto de restauración "Antes de OptimizarPC v2" (`rstrui.exe`).
 8. Probá `RevertirOptimizacion.bat` y verificá que todo vuelva a la normalidad.
 
@@ -293,4 +364,9 @@ lo mismo que se recomienda ahí, contrastadas con documentación de Microsoft:
 - **WpnService:** [batcmd](https://batcmd.com/windows/10/services/wpnservice/).
 - **CompactOS en HDD:** [TenForums](https://www.tenforums.com/performance-maintenance/131696-compression-os-experiment.html).
 - **Precarga de apps (MMAgent):** [Microsoft Learn](https://learn.microsoft.com/en-us/powershell/module/mmagent/disable-mmagent).
+- **Netbooks de Conectar Igualdad:** generaciones y hardware en [netbookdelgobierno.com](https://www.netbookdelgobierno.com/2015/08/modelos-de-netbook-de-conectar-igualdad.html) y [Utiltecnico](https://www.utiltecnico.com/2021/08/todo-sobre-las-netbooks-conectar-igualdad-del-gobierno-argentino/). Windows 10 en estas netbooks: [Underc0de](https://underc0de.org/foro/dudas-generales-121/problemas-netbook-conectar-igualdad/).
+- **GMA 3600 sin driver para Windows 10:** [Intel Community](https://community.intel.com/t5/Graphics/Intel-GMA-3600-amp-Windows-10/m-p/460312), [Intel Community (32 bits)](https://community.intel.com/t5/Graphics/Windows-10-Intel-Graphics-Adapter-3600/m-p/486688). GMA 3150 con driver de Windows Update: [Intel Community](https://community.intel.com/t5/Graphics/Intel-GMA-3150-drivers-for-Windows-8-1-10/m-p/398142).
+- **RAM máxima del N2600:** [Intel](https://www.intel.com/content/www/us/en/products/sku/58916/intel-atom-processor-n2600-1m-cache-1-6-ghz/specifications.html). 32 contra 64 bits con 2 GB: [TenForums](https://www.tenforums.com/general-support/71501-32bit-vs-64bit-2gb-ram.html).
+- **Antirrobo Theft Deterrent:** [manual del referente (Neuquén)](https://educaciondigital.neuquen.gov.ar/wp-content/uploads/2018/04/ManualdelReferente2016-1.pdf), [instalador para Windows 10 (técnicos Conectar)](https://groups.google.com/g/tecnicosconectar/c/24jhzaqOYKA), [configuración del agente](http://itibonzi.blogspot.com/2014/05/como-activar-y-configurar-el-agente-tda.html).
+- **Visualizador de fotos:** registro de referencia del [códec JPEG-LS de CharLS](https://github.com/team-charls/jpegls-wic-codec/blob/main/restore-windows-photo-viewer.reg) y [gist con las asociaciones](https://gist.github.com/ebrasha/02e5c6fa895e0e3f8c65103c89440092). Alt+Tab clásico: [Winaero](https://winaero.com/how-to-get-the-old-alt-tab-dialog-in-windows-10/).
 - **ESU extendido a 2027:** [BleepingComputer](https://www.bleepingcomputer.com/news/microsoft/microsoft-quietly-extends-free-windows-10-esu-support-to-october-2027/), [Help Net Security](https://www.helpnetsecurity.com/2026/06/26/microsoft-windows-10-free-security-updates-esu-program/).

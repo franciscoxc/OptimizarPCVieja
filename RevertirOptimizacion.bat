@@ -125,9 +125,10 @@ call :dword "%_adv%" Start_TrackProgs 1
 call :borrar "%_adv%" LaunchTo
 call :dword "%UHIVE%\Software\Microsoft\Windows\DWM" EnableAeroPeek 1
 call :dword "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" EnableTransparency 1
+call :borrar "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Explorer" AltTabSettings
 reg delete "%UCLS%\Local Settings\Software\Microsoft\Windows\Shell\BagMRU" /f >nul 2>&1
 reg delete "%UCLS%\Local Settings\Software\Microsoft\Windows\Shell\Bags" /f >nul 2>&1
-echo   [OK] Efectos visuales, menus, animaciones y Explorador como de fabrica.
+echo   [OK] Efectos visuales, menus, animaciones, Alt+Tab y Explorador como de fabrica.
 
 call :titulo "Energia"
 powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Get-CimInstance Win32_Battery) { exit 1 } else { exit 0 }" >nul 2>&1
@@ -151,6 +152,8 @@ echo.
 echo   Para recuperar lo que no se revierte solo:
 echo    - OneDrive: abrilo una vez y vuelve a arrancar con Windows.
 echo    - Apps quitadas: se reinstalan gratis desde la Microsoft Store.
+echo    - App Fotos: buscala en la Store como "Microsoft Fotos". El Visualizador de
+echo      fotos clasico queda disponible: no molesta y no ocupa nada.
 echo.
 echo ==========================================================================
 echo   LISTO. Hay que REINICIAR la PC. Usa "Reiniciar", no "Apagar".

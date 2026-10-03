@@ -74,6 +74,19 @@ for /f "tokens=2,*" %%a in ('reg query "HKLM\SOFTWARE\Microsoft\Windows NT\Curre
 set "BUILD=0"
 for /f "tokens=3" %%b in ('reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion" /v CurrentBuildNumber 2^>nul ^| findstr /i "CurrentBuildNumber"') do set "BUILD=%%b"
 
+:: Hardware: RAM, placa de video sin driver y antirrobo de Conectar Igualdad
+:: (Theft Deterrent). El driver basico de Microsoft se instala como display.inf.
+set "RAM_MB=9999"
+set "GPU_BASICA=0"
+set "ANTIRROBO=0"
+set "CPU_NOMBRE=desconocido"
+for /f "usebackq tokens=1-3,* delims=|" %%a in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "$r=[math]::Round((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory/1MB); $g=0; Get-CimInstance Win32_VideoController | ForEach-Object { if ($_.InfFilename -eq 'display.inf' -or $_.Name -match 'Basic Display') { $g=1 } }; $t=0; foreach ($d in $env:ProgramFiles, ${env:ProgramFiles(x86)}) { if ($d -and (Test-Path -LiteralPath (Join-Path $d 'Intel Learning Series\Theft Deterrent'))) { $t=1 } }; if (Get-Service | Where-Object { ($_.Name + ' ' + $_.DisplayName) -match 'Theft|Deterrent|TDAgent' }) { $t=1 }; foreach ($k in 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run','HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Run') { $i=Get-Item -LiteralPath $k -ErrorAction SilentlyContinue; if ($i -and ($i.Property -match 'Theft|Deterrent|TDAgent')) { $t=1 } }; $c=(Get-CimInstance Win32_Processor | Select-Object -First 1).Name -replace '\s+',' '; [string]$r + '|' + $g + '|' + $t + '|' + $c.Trim()"`) do (
+    set "RAM_MB=%%a"
+    set "GPU_BASICA=%%b"
+    set "ANTIRROBO=%%c"
+    set "CPU_NOMBRE=%%d"
+)
+
 :: -------------------------------------------------------------------------
 :: Presentacion y preguntas
 :: -------------------------------------------------------------------------
@@ -87,6 +100,23 @@ if not defined USID echo   AVISO: no se detecto la sesion abierta; se usa la cue
 echo   Compilacion de Windows: %BUILD%
 if %BUILD% GEQ 22000 echo   AVISO: esto parece Windows 11. El script esta pensado para Windows 10.
 if %BUILD% LSS 19041 echo   AVISO: Windows 10 muy viejo. Conviene actualizar a 22H2 primero.
+echo   Procesador: %CPU_NOMBRE%
+if not "%RAM_MB%"=="9999" echo   RAM: %RAM_MB% MB
+if %RAM_MB% GEQ 1500 goto :ram_ok
+echo   AVISO: tiene menos de 2 GB de RAM. Windows 10 de 64 bits pide 2 GB como minimo.
+echo          Estos Atom aceptan hasta 2 GB: ampliarla es la mejora mas barata que hay.
+:ram_ok
+if not "%GPU_BASICA%"=="1" goto :gpu_ok
+echo   AVISO: la placa de video anda con el driver basico de Microsoft, sin aceleracion.
+echo          Es lo tipico de los Atom N2600 y N2800 (GMA 3600): Intel nunca hizo driver
+echo          para Windows 10. Windows dibuja todo con el procesador, asi que los videos y
+echo          las animaciones van a ir lentos igual. Detalles en README.md.
+:gpu_ok
+if not "%ANTIRROBO%"=="1" goto :antirrobo_ok
+echo   AVISO: se detecto el antirrobo de Conectar Igualdad (Theft Deterrent).
+echo          Este script NO lo toca. Si la netbook no esta liberada, no lo saques del
+echo          inicio de Windows: sin el, la netbook se bloquea.
+:antirrobo_ok
 set "_aqui=%~dp0"
 if /i "%_aqui:\AppData\Local\Temp\=%"=="%_aqui%" goto :zip_ok
 echo   AVISO: parece que lo estas abriendo desde adentro de un ZIP. Funciona igual,
@@ -113,10 +143,16 @@ echo.
 echo   4. Quitar apps preinstaladas que no se usan: Xbox, Solitario, Candy Crush,
 echo      Noticias, Clima, Tu Telefono, Skype, Personas, Mapas, Correo y Calendario,
 echo      Paint 3D, OneNote para Win10, Cortana, Copilot y similares.
-echo      NO se tocan: Store, Calculadora, Fotos, Camara, Recortes, Notas, Alarmas,
-echo      Grabadora ni los reproductores. Todo se puede reinstalar desde la Store.
+echo      NO se tocan: Store, Calculadora, Camara, Recortes, Notas, Alarmas, Grabadora
+echo      ni los reproductores. Fotos va en la pregunta 5. Todo se reinstala desde la Store.
 choice /c SN /n /m "     Quitarlas? [S/N]: "
 if errorlevel 2 (set "QUITARAPPS=N") else (set "QUITARAPPS=S")
+echo.
+echo   5. Volver a los clasicos de Windows 7 que siguen escondidos en Windows 10:
+echo      el Visualizador de fotos en vez de la app Fotos, que en PCs lentas tarda
+echo      en abrir, y el Alt+Tab clasico, sin miniaturas.
+choice /c SN /n /m "     Usarlos? [S/N]: "
+if errorlevel 2 (set "CLASICOS=N") else (set "CLASICOS=S")
 
 :: =========================================================================
 call :titulo "1/12  Punto de restauracion"
@@ -424,6 +460,28 @@ echo   Quitando apps preinstaladas para todos los usuarios, puede tardar...
 powershell -NoProfile -ExecutionPolicy Bypass -Command "$apps='Microsoft.549981C3F5F10','Microsoft.BingNews','Microsoft.BingWeather','Microsoft.BingSearch','Microsoft.Copilot','Microsoft.GetHelp','Microsoft.Getstarted','Microsoft.Messaging','Microsoft.Microsoft3DViewer','Microsoft.MicrosoftOfficeHub','Microsoft.MicrosoftSolitaireCollection','Microsoft.MixedReality.Portal','Microsoft.MSPaint','Microsoft.Office.OneNote','Microsoft.OneConnect','Microsoft.People','Microsoft.Print3D','Microsoft.SkypeApp','Microsoft.Wallet','Microsoft.WindowsFeedbackHub','Microsoft.WindowsMaps','microsoft.windowscommunicationsapps','Microsoft.YourPhone','Microsoft.GamingApp','Microsoft.XboxApp','Microsoft.Xbox.TCUI','Microsoft.XboxGameOverlay','Microsoft.XboxGamingOverlay','Microsoft.XboxIdentityProvider','Microsoft.XboxSpeechToTextOverlay','Clipchamp.Clipchamp','MicrosoftTeams','king.com.*'; $prov=Get-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue; foreach ($a in $apps) { Get-AppxPackage -AllUsers -Name $a -ErrorAction SilentlyContinue | Sort-Object PackageFullName -Unique | ForEach-Object { Write-Output ('    - ' + $_.Name); Remove-AppxPackage -Package $_.PackageFullName -AllUsers -ErrorAction SilentlyContinue }; $prov | Where-Object { $_.DisplayName -like $a } | ForEach-Object { Remove-AppxProvisionedPackage -Online -PackageName $_.PackageName -ErrorAction SilentlyContinue | Out-Null } }"
 echo   [OK] Apps preinstaladas quitadas.
 :apps_listo
+if "%CLASICOS%"=="N" goto :clasicos_listo
+:: Visualizador de fotos de Windows, el de Windows 7: sigue instalado, pero
+:: Windows 10 le saco las fotos comunes. Se le devuelven con su nombre y su
+:: icono de siempre, y se registra en "Abrir con" y en Aplicaciones predeterminadas.
+call :visor_tipo Jpeg jpegfile "Imagen JPEG" .jpg .jpeg .jpe .jfif
+call :visor_tipo Png pngfile "Imagen PNG" .png
+call :visor_tipo Gif giffile "Imagen GIF" .gif
+call :visor_tipo Bitmap Paint.Picture "Imagen de mapa de bits" .bmp .dib
+reg add "HKLM\SOFTWARE\RegisteredApplications" /v "Windows Photo Viewer" /t REG_SZ /d "Software\Microsoft\Windows Photo Viewer\Capabilities" /f >nul 2>&1
+set "_app=HKLM\SOFTWARE\Classes\Applications\photoviewer.dll"
+reg add "%_app%\shell\open" /v MuiVerb /t REG_SZ /d "@photoviewer.dll,-3043" /f >nul 2>&1
+reg add "%_app%\shell\open\command" /ve /t REG_EXPAND_SZ /d "%%SystemRoot%%\System32\rundll32.exe \"%%ProgramFiles%%\Windows Photo Viewer\PhotoViewer.dll\", ImageView_Fullscreen %%1" /f >nul 2>&1
+reg add "%_app%\shell\open\DropTarget" /v Clsid /t REG_SZ /d "{FFE2A43C-56B9-4bf5-9A79-CC6D4285608A}" /f >nul 2>&1
+for %%e in (.jpg .jpeg .jpe .jfif .png .gif .bmp .dib .tif .tiff) do reg add "%_app%\SupportedTypes" /v %%e /t REG_SZ /d "" /f >nul 2>&1
+echo   [OK] Visualizador de fotos de Windows recuperado para JPG, PNG, GIF y BMP.
+:: La app Fotos nueva, para todos los usuarios.
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-AppxPackage -AllUsers -Name Microsoft.Windows.Photos -ErrorAction SilentlyContinue | ForEach-Object { Remove-AppxPackage -Package $_.PackageFullName -AllUsers -ErrorAction SilentlyContinue }; Get-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -eq 'Microsoft.Windows.Photos' } | ForEach-Object { Remove-AppxProvisionedPackage -Online -PackageName $_.PackageName -ErrorAction SilentlyContinue | Out-Null }"
+echo   [OK] App Fotos quitada. Si algun dia hace falta, se reinstala desde la Store.
+:: Alt+Tab clasico: iconos en vez de miniaturas en vivo de cada ventana.
+call :dword "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Explorer" AltTabSettings 1
+echo   [OK] Alt+Tab clasico activado.
+:clasicos_listo
 
 :: =========================================================================
 call :titulo "12/12  Limpieza de temporales"
@@ -441,7 +499,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command "Update-MpSignature -Erro
 echo.
 echo   Programas que arrancan con Windows. Desactiva los que no uses en
 echo   Administrador de tareas, pestana Inicio, desde la sesion del usuario:
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$ks='%UPS%\Software\Microsoft\Windows\CurrentVersion\Run','Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Run','Registry::HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Run'; foreach ($k in $ks) { $i=Get-Item -LiteralPath $k -ErrorAction SilentlyContinue; if ($i) { $i.Property | ForEach-Object { Write-Output ('    - ' + $_) } } }"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$ks='%UPS%\Software\Microsoft\Windows\CurrentVersion\Run','Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Run','Registry::HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Run'; foreach ($k in $ks) { $i=Get-Item -LiteralPath $k -ErrorAction SilentlyContinue; if ($i) { $i.Property | ForEach-Object { $m=''; if ($_ -match 'Theft|Deterrent|TDAgent') { $m='   <-- antirrobo de Conectar Igualdad: NO lo desactives' }; Write-Output ('    - ' + $_ + $m) } } }"
 echo.
 echo ==========================================================================
 echo   LISTO. Hay que REINICIAR la PC para aplicar todo.
@@ -449,6 +507,12 @@ echo   Usa "Reiniciar", no "Apagar": con el inicio rapido, apagar no recarga tod
 echo.
 echo   Seguridad: Windows 10 recibe parches gratis hasta el 12/10/2027 si la PC
 echo   esta inscripta en ESU. Revisalo en Configuracion, Windows Update.
+if "%CLASICOS%"=="N" goto :final_sin_clasicos
+echo.
+echo   Fotos: despues de reiniciar, en Configuracion, Aplicaciones, Aplicaciones
+echo   predeterminadas, Visor de fotos, elegi "Visualizador de fotos de Windows".
+echo   O abri una foto y, cuando pregunte con que, elegilo y marca "Usar siempre".
+:final_sin_clasicos
 echo ==========================================================================
 choice /c SN /n /m "  Reiniciar ahora? [S/N]: "
 if errorlevel 2 goto :fin
@@ -560,6 +624,23 @@ if /i "%~2"=="demand" set "_t=Manual"
 echo   [REPARADO] %~1 estaba deshabilitado: vuelve a %_t%
 call :servicio %~1 %~2
 goto :eof
+
+:: Registra un tipo de imagen para el Visualizador de fotos de Windows.
+:: Uso: call :visor_tipo Tipo ProgIdOriginal "Nombre" .ext1 .ext2 ...
+:: El icono se copia tal cual del tipo original de Windows, asi no se ve como TIFF.
+:visor_tipo
+set "_dst=HKLM\SOFTWARE\Classes\PhotoViewer.FileAssoc.%~1"
+set "_tipo=%~1"
+reg add "%_dst%" /v FriendlyTypeName /t REG_SZ /d "%~3" /f >nul 2>&1
+reg add "%_dst%\shell\open" /v MuiVerb /t REG_SZ /d "@photoviewer.dll,-3043" /f >nul 2>&1
+reg add "%_dst%\shell\open\command" /ve /t REG_EXPAND_SZ /d "%%SystemRoot%%\System32\rundll32.exe \"%%ProgramFiles%%\Windows Photo Viewer\PhotoViewer.dll\", ImageView_Fullscreen %%1" /f >nul 2>&1
+reg add "%_dst%\shell\open\DropTarget" /v Clsid /t REG_SZ /d "{FFE2A43C-56B9-4bf5-9A79-CC6D4285608A}" /f >nul 2>&1
+reg copy "HKCR\%~2\DefaultIcon" "%_dst%\DefaultIcon" /f >nul 2>&1
+:visor_extension
+if "%~4"=="" goto :eof
+reg add "HKLM\SOFTWARE\Microsoft\Windows Photo Viewer\Capabilities\FileAssociations" /v %~4 /t REG_SZ /d "PhotoViewer.FileAssoc.%_tipo%" /f >nul 2>&1
+shift /4
+goto :visor_extension
 
 :: Igual que :asegurar, pero recibe "servicio:tipo".
 :asegurar_par

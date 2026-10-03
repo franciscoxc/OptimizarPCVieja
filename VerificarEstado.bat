@@ -72,6 +72,12 @@ Get-PhysicalDisk | ForEach-Object { L ('Disco:            ' + $_.FriendlyName + 
 $c = Get-PSDrive -Name $env:SystemDrive.Substring(0, 1)
 L ('Libre en ' + $env:SystemDrive + '       ' + [Math]::Round($c.Free / 1GB, 1) + ' GB')
 if (Get-CimInstance Win32_Battery) { L 'Tipo:             Notebook (tiene bateria)' } else { L 'Tipo:             Escritorio' }
+L ('Procesador:       ' + ((Get-CimInstance Win32_Processor | Select-Object -First 1).Name -replace '\s+', ' ').Trim())
+Get-CimInstance Win32_VideoController | ForEach-Object {
+    $basica = ($_.InfFilename -eq 'display.inf' -or $_.Name -match 'Basic Display')
+    $nota = if ($basica) { '  <-- driver basico de Microsoft: sin aceleracion (tipico de GMA 3600)' } else { '' }
+    L ('Video:            ' + $_.Name + ' (' + $_.InfFilename + ', ' + $_.CurrentHorizontalResolution + 'x' + $_.CurrentVerticalResolution + ')' + $nota)
+}
 
 # --- Usuario de la sesion -----------------------------------------------------
 Titulo 'Usuario de la sesion'
@@ -87,6 +93,17 @@ if ($ex) {
 }
 L ('Ejecutado por:    ' + [Security.Principal.WindowsIdentity]::GetCurrent().Name)
 if ($sid -and (Test-Path -LiteralPath ('Registry::HKEY_USERS\' + $sid))) { $U = 'HKEY_USERS\' + $sid } else { $U = 'HKEY_CURRENT_USER' }
+
+# --- Antirrobo de Conectar Igualdad -------------------------------------------
+Titulo 'Antirrobo de Conectar Igualdad (Theft Deterrent)'
+$tda = @()
+foreach ($d in $env:ProgramFiles, ${env:ProgramFiles(x86)}) { if ($d) { $r = Join-Path $d 'Intel Learning Series\Theft Deterrent'; if (Test-Path -LiteralPath $r) { $tda += ('carpeta ' + $r) } } }
+Get-Service | Where-Object { ($_.Name + ' ' + $_.DisplayName) -match 'Theft|Deterrent|TDAgent' } | ForEach-Object { $tda += ('servicio ' + $_.Name + ' (' + $_.Status + ')') }
+foreach ($k in 'HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Run', 'HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Run') {
+    $i = Get-Item -LiteralPath ('Registry::' + $k)
+    if ($i) { $i.Property | Where-Object { $_ -match 'Theft|Deterrent|TDAgent' } | ForEach-Object { $tda += ('inicio ' + $_) } }
+}
+if ($tda) { $tda | ForEach-Object { L ('Detectado: ' + $_) }; L 'Si la netbook no esta liberada, NO lo desactives: sin el agente se bloquea.' } else { L 'No detectado.' }
 
 # --- Seguridad ----------------------------------------------------------------
 Titulo 'Seguridad'
@@ -243,6 +260,15 @@ powercfg /query SCHEME_CURRENT SUB_DISK DISKIDLE | Select-Object -Last 3 | Where
 Titulo 'Puntos de restauracion (ultimos 3)'
 $rp = Get-ComputerRestorePoint | Select-Object -Last 3
 if ($rp) { $rp | ForEach-Object { L ([Management.ManagementDateTimeConverter]::ToDateTime($_.CreationTime).ToString('yyyy-MM-dd HH:mm') + '  ' + $_.Description) } } else { L '(ninguno)' }
+
+# --- Clasicos de Windows 7 -----------------------------------------------------
+Titulo 'Clasicos de Windows 7'
+$fotos = Get-AppxPackage -AllUsers -Name Microsoft.Windows.Photos
+L ('App Fotos nueva instalada:      ' + [bool]$fotos)
+$fa = 'HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows Photo Viewer\Capabilities\FileAssociations'
+L ('Visualizador clasico para .jpg / .png / .gif / .bmp: ' + (Leer $fa '.jpg') + ' / ' + (Leer $fa '.png') + ' / ' + (Leer $fa '.gif') + ' / ' + (Leer $fa '.bmp'))
+L ('Programa predeterminado del usuario para .jpg: ' + (Leer ($U + '\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.jpg\UserChoice') 'ProgId'))
+L ('Alt+Tab clasico (AltTabSettings): ' + (Leer ($U + '\Software\Microsoft\Windows\CurrentVersion\Explorer') 'AltTabSettings'))
 
 # --- Apps preinstaladas -------------------------------------------------------
 Titulo 'Apps preinstaladas que la v2 puede quitar (presentes)'
