@@ -11,7 +11,7 @@ title Optimizar PC Vieja v2
 ::  Un solo archivo, con menu:
 ::    1. Optimizar la PC.
 ::    2. Verificar el estado: solo mira, no cambia nada.
-::    3. Limpiar restos de Windows Update (DISM).
+::    3. Limpiar restos de Windows Update (DISM /ResetBase, irreversible).
 ::    4. Desfragmentar a fondo.
 ::    5. Revertir la optimizacion.
 ::    6. Deshacer lo perjudicial del script original (v1).
@@ -61,7 +61,7 @@ if "%REINICIO_PENDIENTE%"=="1" echo   Falta REINICIAR para que se apliquen los c
 echo.
 echo     1. Optimizar la PC
 echo     2. Verificar el estado (solo mira, no cambia nada)
-echo     3. Limpiar restos de Windows Update (de vez en cuando, hasta 1 hora)
+echo     3. Limpiar restos de Windows Update (avanzado, irreversible, hasta 1 h)
 echo     4. Desfragmentar a fondo (de vez en cuando, puede tardar horas)
 echo     5. Revertir la optimizacion
 echo     6. Deshacer lo perjudicial del script original (v1)
@@ -160,7 +160,8 @@ echo          pero conviene descomprimir la carpeta primero.
 echo.
 echo   - No crea punto de restauracion: Restaurar sistema se desactiva. Si algo
 echo     sale mal, la vuelta atras es la opcion 5 del menu.
-echo   - En un disco mecanico puede tardar entre 10 y 20 minutos.
+echo   - En un disco mecanico puede tardar entre 10 y 20 minutos. La primera vez,
+echo     bastante mas: quitar las caracteristicas opcionales es lento.
 echo   - Al terminar hay que REINICIAR la PC.
 echo.
 choice /c SN /n /m "  Continuar? [S/N]: "
@@ -176,11 +177,12 @@ if errorlevel 2 (set "COMPARTIR=N") else (set "COMPARTIR=S")
 choice /c SN /n /m "  3. Usas OneDrive? [S/N]: "
 if errorlevel 2 (set "ONEDRIVE=N") else (set "ONEDRIVE=S")
 echo.
-echo   4. Quitar apps preinstaladas: Xbox, Solitario, Candy Crush, Noticias, Tu Telefono,
-echo      Skype, Contactos, Mapas, Correo y Calendario, Outlook nuevo, OneNote, Notas
-echo      rapidas, Alarmas, Groove, Peliculas y TV, Paint 3D, Cortana, Copilot y
-echo      similares. Quedan: Store, Calculadora, Camara, Grabadora de sonidos, Clima y
-echo      Recortes y anotacion. Todo se reinstala de la Store.
+echo   4. Quitar apps preinstaladas: Xbox, Solitario, Candy Crush, Noticias, Skype,
+echo      Enlace Movil, Obtener ayuda, Sugerencias, Contactos, Mapas, Correo y
+echo      Calendario, Outlook nuevo, OneNote, Notas rapidas, Alarmas, Groove,
+echo      Peliculas y TV, Paint 3D, Cortana, Copilot y similares. Quedan: Store,
+echo      Calculadora, Camara, Grabadora de sonidos, Clima y Recortes y anotacion.
+echo      Todo se reinstala de la Store.
 choice /c SN /n /m "     Quitarlas? [S/N]: "
 if errorlevel 2 (set "QUITARAPPS=N") else (set "QUITARAPPS=S")
 
@@ -423,6 +425,16 @@ if "%_minanim%"=="0" echo   [OK] Animacion al minimizar y maximizar: apagada, el
 echo   [OK] Menus mas rapidos, sin transparencias, animaciones ni desenfoque al iniciar sesion.
 echo   [OK] Explorador: abre en Este equipo, muestra iconos en vez de miniaturas y no
 echo        adivina el tipo de cada carpeta.
+:: Ubicacion: la luz nocturna la usa para saber a que hora anochece. Se borran
+:: las politicas que la apagan y se permite para el equipo y para el usuario.
+call :borrar "HKLM\SOFTWARE\Policies\Microsoft\Windows\LocationAndSensors" DisableLocation
+call :borrar "HKLM\SOFTWARE\Policies\Microsoft\Windows\LocationAndSensors" DisableLocationScripting
+call :sz "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\location" Value Allow
+call :sz "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\location" Value Allow
+echo   [OK] Ubicacion activada: la luz nocturna la usa para el horario del sol.
+:: Luz nocturna del anochecer al amanecer (seccion LUZ, al final del archivo).
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$t=[IO.File]::ReadAllText($env:OPT_RUTA); $i=$t.IndexOf('#LUZ-' + 'INICIO#'); $j=$t.IndexOf('#LUZ-' + 'FIN#'); if ($i -ge 0 -and $j -gt $i) { Invoke-Expression $t.Substring($i, $j - $i) }"
+if "%GPU_BASICA%"=="1" echo        Con el adaptador de video basico, Windows no ofrece la luz nocturna.
 
 :: =========================================================================
 call :titulo "8/11  Memoria, disco y energia"
@@ -564,6 +576,15 @@ echo   [OK] App Fotos quitada. Si algun dia hace falta, se reinstala desde la St
 :: Alt+Tab clasico: iconos en vez de miniaturas en vivo de cada ventana.
 call :dword "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Explorer" AltTabSettings 1
 echo   [OK] Alt+Tab clasico activado.
+:: Caracteristicas opcionales (Configuracion > Aplicaciones > Caracteristicas
+:: opcionales): no corren de fondo, pero ocupan disco. Quedan Paint, Bloc de
+:: notas, PowerShell ISE, los idiomas y, con impresora, Fax y Escaner y la
+:: Administracion de impresion. Windows Hello facial necesita camara infrarroja;
+:: el PIN y la huella no dependen de el.
+echo   Quitando caracteristicas opcionales, puede tardar varios minutos...
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$q=[ordered]@{'App.StepsRecorder'='Grabacion de acciones de usuario'; 'MathRecognizer'='Reconocedor matematico'; 'Microsoft.Windows.WordPad'='WordPad'; 'Media.WindowsMediaPlayer'='Reproductor de Windows Media'; 'Browser.InternetExplorer'='Internet Explorer 11'; 'App.Support.QuickAssist'='Asistencia rapida (la vieja)'; 'OpenSSH.Client'='Cliente OpenSSH'; 'Hello.Face.*'='Windows Hello: reconocimiento facial'; 'XPS.Viewer'='Visor de XPS'}; if ('%IMPRESORA%' -eq 'N') { $q['Print.Fax.Scan']='Fax y Escaner de Windows'; $q['Print.Management.Console']='Administracion de impresion' }; $todas=@(Get-WindowsCapability -Online -ErrorAction SilentlyContinue); if (-not $todas.Count) { Write-Output '    (Windows no devolvio la lista: se saltea)'; exit 0 }; $n=0; $vistas=@(); foreach ($c in @($todas | Where-Object { $_.State -eq 'Installed' })) { $base=$c.Name.Split('~')[0]; foreach ($k in $q.Keys) { if ($base -like $k) { if ($vistas -notcontains $k) { Write-Output ('    - ' + $q[$k]); $vistas+=$k }; Remove-WindowsCapability -Online -Name $c.Name -ErrorAction SilentlyContinue | Out-Null; $n++; break } } }; if ($n -eq 0) { Write-Output '    (ya no quedaba ninguna)' }"
+echo   [OK] Caracteristicas opcionales: quedan Paint, Bloc de notas, PowerShell ISE
+if "%IMPRESORA%"=="S" (echo        y las de impresion.) else (echo        y los idiomas.)
 :: Adobe Reader, si esta instalado: fuera todo lo que arranca solo con Windows,
 :: incluido su actualizador automatico (tarea y servicio). Los PDF quedan para
 :: Edge o Chrome. Reader sigue andando si alguien lo abre.
@@ -636,7 +657,7 @@ goto :menu
 ::  Cada actualizacion guarda la version anterior de lo que reemplaza, en
 ::  C:\Windows\WinSxS. Windows las borra solo recien a los 30 dias y con una
 ::  tarea que se corta a la hora. Aca se hace completo con DISM:
-::  /AnalyzeComponentStore, /StartComponentCleanup y, opcional, /ResetBase.
+::  /StartComponentCleanup /ResetBase, sin preguntas: opcion avanzada.
 ::  No usa /SPSuperseded: limpia restos de Service Packs, y Windows 10 no tiene.
 :: =========================================================================
 :op_limpiar_wu
@@ -646,17 +667,9 @@ echo ==========================================================================
 echo   LIMPIAR RESTOS DE WINDOWS UPDATE
 echo ==========================================================================
 echo.
-echo   Cada actualizacion guarda la version anterior de lo que reemplaza, por si
-echo   hay que desinstalarla. Windows las borra solo recien a los 30 dias; este
-echo   opcion lo hace ahora y completo, con DISM, la herramienta de Microsoft.
+echo   DISM /StartComponentCleanup /ResetBase: las actualizaciones instaladas ya
+echo   no se podran desinstalar. Puede tardar mas de una hora: no apagues la PC.
 echo.
-echo   - Libera espacio en el disco. No acelera la PC.
-echo   - En un Atom con disco mecanico puede tardar MAS DE UNA HORA. Enchufala.
-echo   - Mientras trabaja, NO la apagues ni la reinicies.
-echo   - Si Windows pide reiniciar por una actualizacion, reinicia antes.
-echo.
-choice /c SN /n /m "  Empezar con el analisis? [S/N]: "
-if errorlevel 2 goto :menu
 
 :: DISM trabaja con el Instalador de modulos de Windows. Si otra herramienta
 :: lo deshabilito, vuelve a su valor de fabrica: Manual.
@@ -667,29 +680,13 @@ if errorlevel 1 reg add "HKLM\SYSTEM\CurrentControlSet\Services\TrustedInstaller
 echo   [REPARADO] El Instalador de modulos de Windows estaba deshabilitado: vuelve a Manual.
 :wu_instalador_ok
 
-call :titulo "1/3  Analisis del almacen de componentes (WinSxS)"
-Dism.exe /Online /Cleanup-Image /AnalyzeComponentStore
-if not "%errorlevel%"=="0" goto :wu_error
-echo.
-echo   Fijate en la linea que dice si se recomienda limpiar: si dice que no, no
-echo   hay nada que valga la pena borrar.
-choice /c SN /n /m "  Limpiar ahora? [S/N]: "
-if errorlevel 2 goto :menu
-echo.
-echo   /ResetBase libera mas espacio, pero las actualizaciones que ya estan
-echo   instaladas no se van a poder desinstalar nunca mas. Las proximas, si.
-echo   Si cuando hay problemas reinstalas Windows, no perdes nada.
-set "RESETBASE="
-choice /c SN /n /m "  Usar tambien /ResetBase? [S/N]: "
-if not errorlevel 2 set "RESETBASE=/ResetBase"
-
-call :titulo "2/3  Limpieza de las versiones viejas"
+call :titulo "1/2  Limpieza de las versiones viejas (WinSxS)"
 call :libre LIBRE_ANTES
-Dism.exe /Online /Cleanup-Image /StartComponentCleanup %RESETBASE%
+Dism.exe /Online /Cleanup-Image /StartComponentCleanup /ResetBase
 if not "%errorlevel%"=="0" goto :wu_error
 call :libre LIBRE_DESPUES
 
-call :titulo "3/3  Resultado"
+call :titulo "2/2  Resultado"
 set /a LIBERADO=LIBRE_DESPUES-LIBRE_ANTES
 if %LIBERADO% LSS 0 set "LIBERADO=0"
 echo   Espacio liberado: %LIBERADO% MB.
@@ -853,8 +850,10 @@ call :borrar "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\BackgroundAccess
 call :borrar "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Search" BackgroundAppGlobalToggle
 call :borrar "HKLM\SOFTWARE\Policies\Microsoft\WindowsStore" AutoDownload
 call :borrar "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsStore\WindowsUpdate" AutoDownload
+reg delete "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\CloudStore\Store\DefaultAccount\Current\default$windows.data.bluelightreduction.settings" /f >nul 2>&1
 echo   [OK] Noticias e intereses, Cortana, destacados, informe de errores, precarga,
-echo        apps en segundo plano y actualizacion de la Store como de fabrica.
+echo        apps en segundo plano, actualizacion de la Store y luz nocturna como de
+echo        fabrica. La ubicacion queda activada.
 
 call :titulo "Interfaz y Explorador"
 set "_desk=%UHIVE%\Control Panel\Desktop"
@@ -918,6 +917,8 @@ echo.
 echo   Para recuperar lo que no se revierte solo:
 echo    - OneDrive: abrilo una vez y vuelve a arrancar con Windows.
 echo    - Apps quitadas: se reinstalan gratis desde la Microsoft Store.
+echo    - Caracteristicas opcionales: Configuracion, Aplicaciones, Caracteristicas
+echo      opcionales, Agregar una caracteristica.
 echo    - App Fotos: buscala en la Store como "Microsoft Fotos". El Visualizador de
 echo      fotos clasico queda disponible: no molesta y no ocupa nada.
 echo.
@@ -979,10 +980,12 @@ echo   [OK] Delivery Optimization reparado, sin compartir actualizaciones por P2
 reg add "%_mm%" /v DisablePagingExecutive /t REG_DWORD /d 0 /f >nul 2>&1
 echo   [OK] DisablePagingExecutive en 0.
 
-:: 5. Biometria: deshabilitada rompe Windows Hello con huella. En Manual no
-::    gasta nada si no hay lector.
+:: 5. Biometria y ubicacion: deshabilitadas rompen Windows Hello con huella y
+::    la luz nocturna. En Manual no gastan nada mientras no se usan.
 sc config WbioSrvc start= demand >nul 2>&1
 echo   [OK] Biometria en Manual, su valor de fabrica.
+sc config lfsvc start= demand >nul 2>&1
+echo   [OK] Ubicacion en Manual, su valor de fabrica: la usa la luz nocturna.
 
 :: 6. Placebos: Windows los ignora. Se borran para no dejar basura.
 reg delete "%_mm%" /v IOPageLockLimit /f >nul 2>&1
@@ -991,7 +994,7 @@ echo   [OK] IOPageLockLimit y DontVerifyRandomDrivers borrados.
 
 echo.
 echo   Se dejan como estaban, porque estaban bien: telemetria, Xbox, Bluetooth,
-echo   mapas, ubicacion, Retail Demo, NTFS y CompactOS desactivado.
+echo   mapas, Retail Demo, NTFS y CompactOS desactivado.
 echo.
 echo ==========================================================================
 echo   LISTO. Hay que REINICIAR la PC. Usa "Reiniciar", no "Apagar".
@@ -1276,8 +1279,9 @@ goto :eof
 :: =========================================================================
 ::  SECCIONES EN POWERSHELL. cmd nunca llega hasta aca: todo termina antes
 ::  con "exit /b", "goto :menu" o "goto :eof".
-::   - LIMPIEZA: vaciado de temporales (paso 12 de la opcion 1).
+::   - LIMPIEZA: vaciado de temporales (paso 11 de la opcion 1).
 ::   - VERIFICAR: el reporte de la opcion 2.
+::   - LUZ: luz nocturna del anochecer al amanecer (paso 7 de la opcion 1).
 :: =========================================================================
 #LIMPIEZA-INICIO#
 $ErrorActionPreference = 'SilentlyContinue'
@@ -1587,6 +1591,18 @@ L ('Apps en segundo plano apagadas: ' + $apagadas + ' de ' + @($bg).Count + '  (
 $cls = if ($U -eq 'HKEY_CURRENT_USER') { 'HKEY_CURRENT_USER\Software\Classes' } else { $U + '_Classes' }
 L ('Tipo de carpeta generico:       ' + (Leer ($cls + '\Local Settings\Software\Microsoft\Windows\Shell\Bags\AllFolders\Shell') 'FolderType'))
 L ('OneDrive al inicio:             ' + (Leer ($U + '\Software\Microsoft\Windows\CurrentVersion\Run') 'OneDrive'))
+$cam = '\Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\location'
+L ('Ubicacion (equipo / usuario):   ' + (Leer ('HKEY_LOCAL_MACHINE' + $cam) 'Value') + ' / ' + (Leer ($U + $cam) 'Value'))
+$nl = $null
+try { $nl = [byte[]](Get-ItemProperty -LiteralPath ('Registry::' + $U + '\Software\Microsoft\Windows\CurrentVersion\CloudStore\Store\DefaultAccount\Current\default$windows.data.bluelightreduction.settings\windows.data.bluelightreduction.settings') -Name Data -ErrorAction Stop).Data } catch { }
+$modo = 'sin configurar'
+if ($nl) {
+    $p = -1
+    for ($k = $nl.Length - 4; $k -ge 0; $k--) { if ($nl[$k] -eq 0x43 -and $nl[$k + 1] -eq 0x42 -and $nl[$k + 2] -eq 1 -and $nl[$k + 3] -eq 0) { $p = $k + 4; break } }
+    $modo = 'sin programar'
+    if ($p -ge 0 -and $nl[$p] -eq 2 -and $nl[$p + 1] -eq 1) { $modo = if ($nl[$p + 2] -eq 0xC2 -and $nl[$p + 3] -eq 0x0A) { 'horario fijo' } else { 'del anochecer al amanecer' } }
+}
+L ('Luz nocturna:                   ' + $modo)
 
 # --- Disco y energia ----------------------------------------------------------
 Titulo 'Disco y energia'
@@ -1707,6 +1723,11 @@ $apps = 'Microsoft.549981C3F5F10', 'Microsoft.BingNews', 'Microsoft.GetHelp', 'M
 $hay = foreach ($a in $apps) { Get-AppxPackage -AllUsers -Name $a | Select-Object -ExpandProperty Name -Unique }
 if ($hay) { L (($hay | Sort-Object -Unique) -join ', ') } else { L '(ninguna)' }
 
+# --- Caracteristicas opcionales -----------------------------------------------
+Titulo 'Caracteristicas opcionales instaladas'
+$caps = @(Get-WindowsCapability -Online -ErrorAction SilentlyContinue | Where-Object { $_.State -eq 'Installed' } | ForEach-Object { $_.Name.Split('~')[0] })
+if ($caps.Count) { L (($caps | Sort-Object -Unique) -join ', ') } else { L '(no se pudo leer)' }
+
 # --- Inicio de Windows --------------------------------------------------------
 Titulo 'Programas que arrancan con Windows'
 foreach ($k in @(($U + '\Software\Microsoft\Windows\CurrentVersion\Run'), 'HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Run', 'HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Run')) {
@@ -1721,3 +1742,75 @@ try { [IO.File]::WriteAllLines($destino, $lineas) } catch { $destino = Join-Path
 Write-Host ''
 Write-Host ('Reporte guardado en: ' + $destino) -ForegroundColor Green
 #VERIFICAR-FIN#
+#LUZ-INICIO#
+# Luz nocturna programada "del anochecer al amanecer". Windows la guarda en un
+# blob binario de CloudStore (Bond CompactBinary v1, sin documentar). Hay dos
+# envoltorios: el viejo (02 00 00 00 + FILETIME + 4 ceros) y el Bond (43 42 01 00
+# ...); se escribe en el que ya tenga el usuario, y si no hay ninguno, en el Bond.
+# Contenido: campo 0 = programacion activa; campo 10 presente = horario fijo
+# (ausente = anochecer a amanecer); 20/30 = horario fijo; 40 = temperatura (K);
+# 50/60 = puesta y salida del sol que calcula Windows.
+$ErrorActionPreference = 'Stop'
+$clave = $env:UPS + '\Software\Microsoft\Windows\CurrentVersion\CloudStore\Store\DefaultAccount\Current\default$windows.data.bluelightreduction.settings\windows.data.bluelightreduction.settings'
+function Varint([UInt64]$v) {
+    $r = @()
+    do { $b = [int]($v -band 0x7F); $v = $v -shr 7; if ($v -gt 0) { $b = $b -bor 0x80 }; $r += $b } while ($v -gt 0)
+    , $r
+}
+function Hora([int]$id, [int[]]$hm) {
+    $r = @(0xCA, $id)
+    if ($hm[0] -gt 0) { $r += 0x0E, $hm[0] }
+    if ($hm[1] -gt 0) { $r += 0x2E, $hm[1] }
+    , ($r + 0x00)
+}
+# Valores por defecto; si ya hay configuracion, se conservan los del usuario.
+$temp = 4000; $ini = @(21, 0); $fin = @(7, 0); $ocaso = @(19, 0); $alba = @(7, 0)
+$viejo = $null
+try { $viejo = [byte[]](Get-ItemProperty -LiteralPath $clave -Name Data).Data } catch { }
+$formato = 'bond'
+if ($viejo -and $viejo.Length -gt 20) {
+    if ($viejo[0] -eq 2) { $formato = 'viejo' }
+    # El contenido empieza en la ultima cabecera "CB" 01 00.
+    $p = -1
+    for ($k = $viejo.Length - 4; $k -ge 0; $k--) {
+        if ($viejo[$k] -eq 0x43 -and $viejo[$k + 1] -eq 0x42 -and $viejo[$k + 2] -eq 1 -and $viejo[$k + 3] -eq 0) { $p = $k + 4; break }
+    }
+    $k = $p
+    while ($p -ge 0 -and $k -lt $viejo.Length - 1) {
+        $c = $viejo[$k]
+        if ($c -eq 0) { break }
+        if (($c -band 0xE0) -eq 0xC0) { $id = $viejo[$k + 1]; $k += 2 } else { $id = $c -shr 5; $k += 1 }
+        $tipo = $c -band 0x1F
+        if ($tipo -eq 2) { $k += 1 }
+        elseif ($tipo -eq 15) {
+            $n = 0; $s = 0
+            do { $b = $viejo[$k]; $n = $n -bor (($b -band 0x7F) -shl $s); $s += 7; $k++ } while ($b -band 0x80)
+            if ($id -eq 40 -and ($n -shr 1) -ge 1200 -and ($n -shr 1) -le 6500) { $temp = $n -shr 1 }
+        }
+        elseif ($tipo -eq 10) {
+            $hm = @(0, 0)
+            while ($viejo[$k] -ne 0) {
+                if ($viejo[$k] -eq 0x0E) { $hm[0] = $viejo[$k + 1] } elseif ($viejo[$k] -eq 0x2E) { $hm[1] = $viejo[$k + 1] }
+                $k += 2
+            }
+            $k++
+            if ($id -eq 20) { $ini = $hm } elseif ($id -eq 30) { $fin = $hm } elseif ($id -eq 50) { $ocaso = $hm } elseif ($id -eq 60) { $alba = $hm }
+        }
+        else { break }
+    }
+}
+$dentro = @(0x43, 0x42, 0x01, 0x00, 0x02, 0x01) + (Hora 0x14 $ini) + (Hora 0x1E $fin) + @(0xCF, 0x28) + (Varint ([UInt64]($temp * 2))) + (Hora 0x32 $ocaso) + (Hora 0x3C $alba) + @(0x00)
+if ($formato -eq 'viejo') {
+    $blob = @(2, 0, 0, 0) + [BitConverter]::GetBytes([DateTime]::UtcNow.ToFileTimeUtc()) + @(0, 0, 0, 0) + $dentro
+} else {
+    $ts = [UInt64][DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+    $blob = @(0x43, 0x42, 0x01, 0x00, 0x0A, 0x02, 0x01, 0x00, 0x2A, 0x06) + (Varint $ts) + @(0x2A, 0x2B, 0x0E) + (Varint ([UInt64]$dentro.Count)) + $dentro + @(0, 0, 0)
+}
+try {
+    if (-not (Test-Path -LiteralPath $clave)) { New-Item -Path $clave -Force | Out-Null }
+    Set-ItemProperty -LiteralPath $clave -Name Data -Value ([byte[]]$blob) -Type Binary
+    Write-Output ('  [OK] Luz nocturna: del anochecer al amanecer, a ' + $temp + ' K.')
+} catch {
+    Write-Output '  [AVISO] No se pudo programar la luz nocturna: hacelo en Configuracion, Pantalla.'
+}
+#LUZ-FIN#

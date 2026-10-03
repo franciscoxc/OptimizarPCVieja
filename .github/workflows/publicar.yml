@@ -1,7 +1,8 @@
-name: Publicar OptimizarPC.zip
+name: Publicar OptimizarPC
 
-# Arma un ZIP con OptimizarPC.bat suelto, sin carpeta, y lo publica como la
-# ultima version. Asi el boton del README baja siempre "OptimizarPC.zip".
+# Publica OptimizarPC.bat (descarga directa) y OptimizarPC.zip (el .bat solo,
+# sin carpeta) como assets de la release "ultima". Los links del README usan
+# releases/latest/download/<archivo>, que no cambian entre versiones.
 on:
   push:
     paths:
@@ -30,8 +31,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release delete ultima --cleanup-tag --yes || true
-          gh release create ultima OptimizarPC.zip \
+          gh release create ultima OptimizarPC.bat OptimizarPC.zip \
             --target "$GITHUB_SHA" \
             --title "OptimizarPC (ultima version)" \
-            --notes "Baja OptimizarPC.zip, descomprimilo y hace doble clic en OptimizarPC.bat." \
+            --notes "OptimizarPC.bat: descarga directa. OptimizarPC.zip: el mismo .bat comprimido." \
             --latest
