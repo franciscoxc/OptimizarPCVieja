@@ -15,6 +15,7 @@ title Optimizar PC Vieja v2
 ::    4. Desfragmentar a fondo.
 ::    5. Revertir la optimizacion.
 ::    6. Deshacer lo perjudicial del script original (v1).
+::    7. Instalar Chrome, WinRAR y VLC (con winget).
 ::
 ::  - Se ejecuta con doble clic: si no tiene permisos, los pide.
 ::  - Los ajustes de usuario se aplican al usuario que tiene la sesion
@@ -64,6 +65,7 @@ echo     3. Limpiar restos de Windows Update (de vez en cuando, hasta 1 hora)
 echo     4. Desfragmentar a fondo (de vez en cuando, puede tardar horas)
 echo     5. Revertir la optimizacion
 echo     6. Deshacer lo perjudicial del script original (v1)
+echo     7. Instalar Chrome, WinRAR y VLC
 echo     0. Salir
 echo.
 set "OPC="
@@ -79,8 +81,9 @@ if "%OPC%"=="3" goto :op_limpiar_wu
 if "%OPC%"=="4" goto :op_desfragmentar
 if "%OPC%"=="5" goto :op_revertir
 if "%OPC%"=="6" goto :op_deshacer_v1
+if "%OPC%"=="7" goto :op_instalar
 if "%OPC%"=="0" goto :salir
-echo   Opcion no valida: elegi un numero del 0 al 6.
+echo   Opcion no valida: elegi un numero del 0 al 7.
 goto :menu
 
 :: Final de las opciones que cambian el sistema: ofrecer reiniciar. Si no,
@@ -981,6 +984,36 @@ echo ==========================================================================
 goto :fin_con_reinicio
 
 :: =========================================================================
+::  7. INSTALAR CHROME, WINRAR Y VLC
+::  Con winget, el instalador de programas que trae Windows 10, en silencio y
+::  sin preguntas. Del mas chico al mas grande: WinRAR, VLC y Chrome. A Chrome
+::  se le agrega uBlock Origin Lite con la politica oficial de instalacion
+::  forzada (ExtensionInstallForcelist): Chrome la baja sola de la Web Store.
+:: =========================================================================
+:op_instalar
+title Optimizar PC Vieja v2 - Instalar Chrome, WinRAR y VLC
+cls
+echo ==========================================================================
+echo   INSTALAR WINRAR, VLC Y CHROME
+echo ==========================================================================
+echo.
+echo   Se instalan con winget, en silencio y uno por uno. Hace falta internet.
+echo   Si alguno ya esta instalado, se saltea.
+call :buscar_winget
+if errorlevel 1 goto :menu
+call :instalar RARLab.WinRAR "WinRAR"
+call :instalar VideoLAN.VLC "VLC"
+:: La politica va antes que Chrome: asi la primera vez que se abre ya la encuentra.
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$k='HKLM:\SOFTWARE\Policies\Google\Chrome\ExtensionInstallForcelist'; $id='ddkjiahejlhfcafbddmgiahcphecmpfh'; if (-not (Test-Path -LiteralPath $k)) { New-Item -Path $k -Force | Out-Null }; $ya=$false; $n=1; foreach ($v in (Get-ItemProperty -LiteralPath $k).PSObject.Properties) { if ($v.Name -match '^[0-9]+$') { if ([string]$v.Value -like ($id + '*')) { $ya=$true }; if ([int]$v.Name -ge $n) { $n=[int]$v.Name + 1 } } }; if (-not $ya) { New-ItemProperty -LiteralPath $k -Name ([string]$n) -Value ($id + ';https://clients2.google.com/service/update2/crx') -PropertyType String -Force | Out-Null }; Write-Output '  [OK] uBlock Origin Lite: Chrome la instala sola desde la Chrome Web Store.'"
+call :instalar Google.Chrome "Google Chrome"
+echo.
+echo   LISTO. uBlock Origin Lite aparece en Chrome al minuto de abrirlo por primera
+echo   vez. Queda fija: desde Chrome no se puede quitar, por eso Chrome muestra
+echo   que lo administra tu organizacion. WinRAR queda en ingles: winget no ofrece
+echo   otro idioma.
+goto :menu
+
+:: =========================================================================
 ::  SUBRUTINAS
 :: =========================================================================
 
@@ -1155,6 +1188,63 @@ set "UPS=Registry::HKEY_USERS\%USID%"
 set "UPROFILE="
 for /f "tokens=2,*" %%a in ('reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\%USID%" /v ProfileImagePath 2^>nul ^| findstr /i "ProfileImagePath"') do call set "UPROFILE=%%b"
 :usuario_listo
+goto :eof
+
+:: Busca winget y deja como llamarlo en WINGET. Prueba que responda, no solo que
+:: exista. Si no esta registrado para esta cuenta (pasa al elevar con otro
+:: administrador), lo registra. Si no hay forma, avisa.
+:buscar_winget
+set "WINGET=winget"
+winget --version >nul 2>&1
+if not errorlevel 1 exit /b 0
+echo   Preparando winget...
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Add-AppxPackage -RegisterByFamilyName -MainPackage Microsoft.DesktopAppInstaller_8wekyb3d8bbwe -ErrorAction SilentlyContinue" >nul 2>&1
+winget --version >nul 2>&1
+if not errorlevel 1 exit /b 0
+set "WINGET="%LOCALAPPDATA%\Microsoft\WindowsApps\winget.exe""
+%WINGET% --version >nul 2>&1
+if not errorlevel 1 exit /b 0
+echo   [AVISO] winget no esta disponible. Viene con el "Instalador de aplicacion" de
+echo           la Microsoft Store: actualizalo ahi y volve a elegir esta opcion.
+start "" "ms-windows-store://pdp/?productid=9NBLGGH4NNS1"
+exit /b 1
+
+:: Instala un programa con winget, en silencio y sin preguntas. Si ya estaba, lo
+:: actualiza: install lo hace solo cuando sabe que version hay; si no puede
+:: saberlo, se sigue con upgrade --include-unknown, que actualiza igual.
+:: Uso: call :instalar Id.Exacto "Nombre"
+:instalar
+echo.
+echo   Instalando %~2...
+%WINGET% install --id %~1 -e --source winget --silent --accept-package-agreements --accept-source-agreements
+set "_rc=%errorlevel%"
+if "%_rc%"=="0" goto :instalar_ok
+:: 0x8A15002B: no hay actualizacion aplicable. 0x8A150061: ya estaba instalado.
+if "%_rc%"=="-1978335189" goto :instalar_actualizar
+if "%_rc%"=="-1978335135" goto :instalar_actualizar
+call :a_hex %_rc%
+echo   [AVISO] %~2 no se pudo instalar (error %_hex%). Revisa la conexion a internet.
+goto :eof
+:instalar_ok
+echo   [OK] %~2 instalado.
+goto :eof
+:instalar_actualizar
+echo   %~2 ya estaba instalado: buscando actualizacion, aunque no se sepa su version...
+%WINGET% upgrade --id %~1 -e --source winget --include-unknown --silent --accept-package-agreements --accept-source-agreements
+set "_rc=%errorlevel%"
+if "%_rc%"=="0" echo   [OK] %~2 actualizado a la ultima version.
+if "%_rc%"=="0" goto :eof
+if "%_rc%"=="-1978335189" echo   [OK] %~2 ya estaba en la ultima version.
+if "%_rc%"=="-1978335189" goto :eof
+call :a_hex %_rc%
+echo   [AVISO] %~2 ya estaba instalado, pero no se pudo actualizar (error %_hex%).
+goto :eof
+
+:: Pasa un codigo de error a hexadecimal, como lo publica Microsoft. Deja _hex.
+:a_hex
+set "_hex=%~1"
+set "_HEX_IN=%~1"
+for /f "usebackq delims=" %%h in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "'0x{0:X8}' -f [int]$env:_HEX_IN"`) do set "_hex=%%h"
 goto :eof
 
 :: Borra un valor si existe. Uso: call :borrar "clave" valor
@@ -1578,6 +1668,19 @@ if ($r) {
     L ('Tarea de actualizacion:         ' + $estadoTarea + '   (la v2 la deja Disabled)')
 } else { L 'No esta instalado.' }
 L ('Programa predeterminado para .pdf: ' + (Leer ($U + '\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.pdf\UserChoice') 'ProgId'))
+
+# --- Programas de la opcion 7 ---------------------------------------------------
+Titulo 'Programas de la opcion 7'
+foreach ($prog in 'WinRAR', 'VLC media player', 'Google Chrome') {
+    $r = Get-ItemProperty -Path $u | Where-Object { $_.DisplayName -like ($prog + '*') } | Select-Object -First 1
+    $ver = 'no instalado'
+    if ($r) { $ver = [string]$r.DisplayVersion }
+    L (($prog + ':').PadRight(32) + $ver)
+}
+$fl = Get-ItemProperty -LiteralPath 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Google\Chrome\ExtensionInstallForcelist'
+$ub = $false
+if ($fl) { $ub = [bool]($fl.PSObject.Properties | Where-Object { [string]$_.Value -like 'ddkjiahejlhfcafbddmgiahcphecmpfh*' }) }
+L ('uBlock Origin Lite (politica):  ' + $ub)
 
 # --- Apps preinstaladas -------------------------------------------------------
 Titulo 'Apps preinstaladas que la v2 puede quitar (presentes)'

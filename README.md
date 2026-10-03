@@ -1,8 +1,12 @@
 # Optimizar PC Vieja
 
+[![Descargar OptimizarPC.bat](https://img.shields.io/badge/Descargar-OptimizarPC.bat-2ea44f?style=for-the-badge)](https://github.com/franciscoxc/OptimizarPCVieja/archive/HEAD.zip)
+
+Baja un ZIP: descomprimilo y hacé doble clic en `OptimizarPC.bat`.
+
 Un script con menú para exprimir PCs viejas con **Windows 10, disco mecánico (HDD) y 2 GB de RAM**, incluidas las
 netbooks de Conectar Igualdad con procesador Atom (ver [su sección](#netbooks-de-conectar-igualdad-con-atom)).
-Funcionan en Windows 10 de 64 y de 32 bits.
+Funciona en Windows 10 de 64 y de 32 bits.
 Objetivo: la mayor velocidad posible y el menor consumo de RAM, **sin apagar la seguridad**.
 
 > Advertencia honesta: ningún script convierte una PC de 2 GB con disco mecánico en una gamer.
@@ -21,15 +25,17 @@ Todo está en **`OptimizarPC.bat`**. Al abrirlo pide permisos de administrador y
 | 4. Desfragmentar a fondo | De vez en cuando, para discos mecánicos: analiza, desfragmenta, junta el espacio libre y optimiza el arranque. En un SSD solo manda TRIM. Puede tardar horas. | Sí (solo ordena el disco) |
 | 5. Revertir la optimización | Vuelve a los valores de fábrica lo que cambia la opción 1, por si algo sale mal. | Sí |
 | 6. Deshacer lo perjudicial del script original (v1) | Deshace **solo** lo dañino del v1, para PCs donde ya lo corriste. | Sí, poco |
+| 7. Instalar Chrome, WinRAR y VLC | Con winget, en silencio: WinRAR, VLC y Chrome, del más chico al más grande. Chrome viene con uBlock Origin Lite. Ver [Opción 7](#opción-7-chrome-winrar-y-vlc). | Sí |
 | 0. Salir | | |
 
-Se responde con el número y Enter. Al terminar cada opción se vuelve al menú. Las que cambian el sistema (1, 5 y 6)
+Se responde con el número y Enter. Al terminar cada opción se vuelve al menú, así que la rutina completa es 1 y
+después 7. Las que cambian el sistema (1, 5 y 6)
 ofrecen reiniciar al final; si decís que no, el menú recuerda que falta reiniciar y lo vuelve a ofrecer al salir.
 
 ## Cómo usarlo
 
-1. Copiá `OptimizarPC.bat` a la PC (pendrive, red, lo que sea). Si lo bajaste en un ZIP, **descomprimilo primero**:
-   funciona igual desde adentro del ZIP, pero avisa, porque Windows lo corre desde una carpeta temporal.
+1. Bajalo con el botón de arriba, **descomprimí el ZIP** y copiá `OptimizarPC.bat` a la PC (pendrive, red, lo que
+   sea). Abierto desde adentro del ZIP funciona igual, pero avisa, porque Windows lo corre desde una carpeta temporal.
 2. Doble clic en `OptimizarPC.bat`. Si no tiene permisos, los pide solo (aparece el cartel de UAC).
    No hay que instalar nada: usa `cmd` y PowerShell, que vienen con Windows 10. Si lo bajaste de internet, Windows
    puede avisar una vez ("Windows protegió su PC": *Más información > Ejecutar de todas formas*). Para que no
@@ -312,6 +318,35 @@ Al terminar, el script muestra el estado de Defender y los programas que arranca
 
 ---
 
+## Opción 7: Chrome, WinRAR y VLC
+
+Instala los tres con **winget**, el instalador de programas que trae Windows 10, en este orden: WinRAR, VLC y Chrome,
+del más chico al más grande. Cada uno con:
+
+```
+winget install --id <ID> -e --source winget --silent --accept-package-agreements --accept-source-agreements
+```
+
+- `--id` con el ID exacto (`RARLab.WinRAR`, `VideoLAN.VLC`, `Google.Chrome`) y `-e`: con un nombre suelto, como
+  `videolan`, winget puede encontrar varios paquetes y frenarse a preguntar cuál.
+- `--silent` y los dos `--accept-...`: sin ventanas ni preguntas de "¿aceptás los términos?".
+- `--source winget`: no consulta la Microsoft Store, que pide otra aceptación aparte.
+- **Si ya estaba instalado**, `winget install` lo actualiza cuando sabe qué versión hay. Cuando no puede saberlo,
+  sigue con `winget upgrade --include-unknown`, que actualiza igual. (`--include-unknown` existe solo para
+  `upgrade`: puesto en `install`, winget rechaza el comando entero.)
+- Si winget no responde, intenta registrarlo para la cuenta actual. Si tampoco está instalado, abre la Store en el
+  *Instalador de aplicación*, que es el que lo trae.
+- WinRAR queda en inglés: el paquete de winget no ofrece otro idioma.
+
+**uBlock Origin Lite, preinstalada.** Chrome tiene una política oficial, `ExtensionInstallForcelist`, que instala sola
+una extensión de la Chrome Web Store ([Chrome Enterprise](https://chromeenterprise.google/policies/extension-install-forcelist/)).
+En una PC que no está en un dominio funciona con las extensiones de la Web Store, que es el caso. El script agrega
+uBlock Origin Lite (`ddkjiahejlhfcafbddmgiahcphecmpfh`) a esa lista antes de instalar Chrome, y Chrome la baja al
+minuto de abrirlo por primera vez. Al ser forzada, no se puede quitar desde Chrome, y Chrome muestra *Administrado
+por tu organización* (ya lo mostraba por las políticas de la opción 1). Para quitarla, se borra su valor en
+`HKLM\SOFTWARE\Policies\Google\Chrome\ExtensionInstallForcelist`. La opción 2 muestra las versiones instaladas y
+si la política está puesta.
+
 ## Clásicos de Windows 7
 
 Windows 10 todavía trae escondidas algunas piezas de Windows 7 que en una PC lenta andan mucho más rápido.
@@ -550,11 +585,13 @@ Desde acá no hay un Windows real, así que se validó todo lo que se puede vali
 - **Wine (el `cmd.exe` de Wine):** el menú y sus seis opciones corren de punta a punta, una tras otra, con distintas
   combinaciones de respuestas (por ejemplo: con y sin impresora, con y sin quitar apps).
   El menú se probó con entradas torpes: Enter solo, letras, números de más, comillas, `&` y `%PATH%`.
+  La opción 7 se probó con un winget simulado: instalación nueva, ya instalado y al día, ya instalado y
+  actualizado, y sin winget.
   Se simuló el estado que deja el script original (y políticas que apagan Defender y Windows Update)
   y se verificó en el registro que cada valor quedara corregido y escrito en `HKEY_USERS\<SID>` del usuario.
   También se probó el ciclo completo optimizar, revertir y verificar: el inicio rápido queda apagado, *Suspender* e
   *Hibernar* salen del menú de apagado, y la opción 5 los devuelve.
-- **PowerShell:** los 33 bloques de PowerShell pasan el parser oficial. La lógica de apps en segundo plano se probó con
+- **PowerShell:** los 36 bloques de PowerShell pasan el parser oficial. La lógica de apps en segundo plano se probó con
   nombres reales de paquetes.
 - **Limpieza:** la sección que vacía los temporales se **ejecutó de verdad** sobre un árbol de carpetas simulado, con
   trampas (y una carpeta Prefetch de mentira, donde solo se fueron las entradas de programas): un enlace a una carpeta valiosa (no la siguió), archivos de solo lectura (los borró), archivos imposibles de
@@ -602,6 +639,7 @@ Wine no los implementa, así que falta la prueba en un Windows 10 real. Para eso
    - [ ] La opción 2 muestra la paginación fija en el doble de la RAM, la caché de escritura activada y el vaciado del búfer
      desactivado.
    - [ ] En el menú, Enter solo elige la opción 1 y un número inválido vuelve al menú.
+   - [ ] La opción 7 instala WinRAR, VLC y Chrome sin preguntas, y al abrir Chrome aparece uBlock Origin Lite.
 8. Probá la opción 5 y verificá que todo vuelva a la normalidad.
 
 Pasame los reportes de la opción 2 y lo que haya fallado del checklist, y lo ajustamos.
@@ -663,6 +701,10 @@ lo mismo que se recomienda ahí, contrastadas con documentación de Microsoft:
 - **ReadyBoost:** [Wikipedia](https://en.wikipedia.org/wiki/ReadyBoost), [Microsoft](https://learn.microsoft.com/en-us/archive/blogs/tomarcher/readyboost-qa),
   [Digital Citizen](https://www.digitalcitizen.life/does-readyboost-work-does-it-improve-performance-slower-pcs/), [How-To Geek](https://www.howtogeek.com/123780/htg-explains-is-readyboost-worth-using/).
   Cabezal estacionado (APM): [Common Emitter](https://commonemitter.blogspot.com/2019/09/disabling-hdd-apm.html).
+- **winget:** opciones de [`install`](https://learn.microsoft.com/en-us/windows/package-manager/winget/install) y de
+  [`upgrade`](https://learn.microsoft.com/en-us/windows/package-manager/winget/upgrade) (`--include-unknown`),
+  [códigos de salida](https://github.com/microsoft/winget-cli/blob/master/doc/windows/package-manager/winget/returnCodes.md).
+  Extensión forzada en Chrome: [`ExtensionInstallForcelist`](https://chromeenterprise.google/policies/extension-install-forcelist/).
 - **Qué hay en la carpeta Prefetch:** [Prefetcher](https://en.wikipedia.org/wiki/Prefetcher), [ReadyBoot y SuperFetch](https://en.wikipedia.org/wiki/Windows_Vista_I/O_technologies).
 - **Restaurar sistema:** desactivarlo borra los puntos, según [TenForums](https://www.tenforums.com/tutorials/99782-enable-disable-system-restore-windows-3.html).
 - **Desfragmentador:** [límite de 64 MB](https://techcommunity.microsoft.com/blog/askperf/disk-fragmentation-and-system-performance/372921), [parámetros de `defrag`](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/defrag), [UltraDefrag](https://en.wikipedia.org/wiki/UltraDefrag).
