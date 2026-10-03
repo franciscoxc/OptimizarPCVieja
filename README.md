@@ -1,6 +1,6 @@
 # Optimizar PC Vieja
 
-Scripts para exprimir PCs viejas con **Windows 10, disco mecánico (HDD) y 2 GB de RAM**, incluidas las
+Un script con menú para exprimir PCs viejas con **Windows 10, disco mecánico (HDD) y 2 GB de RAM**, incluidas las
 netbooks de Conectar Igualdad con procesador Atom (ver [su sección](#netbooks-de-conectar-igualdad-con-atom)).
 Funcionan en Windows 10 de 64 y de 32 bits.
 Objetivo: la mayor velocidad posible y el menor consumo de RAM, **sin apagar la seguridad**.
@@ -9,32 +9,39 @@ Objetivo: la mayor velocidad posible y el menor consumo de RAM, **sin apagar la 
 > Lo que sí se puede lograr es que deje de arrastrarse. El resto lo hacen un SSD y otro módulo de RAM
 > (ver [Lo que ningún script puede hacer](#lo-que-ningún-script-puede-hacer)).
 
-## Archivos
+## Un archivo, un menú
 
-| Archivo | Qué hace | Cambia algo |
+Todo está en **`OptimizarPC.bat`**. Al abrirlo pide permisos de administrador y muestra un menú:
+
+| Opción | Qué hace | Cambia algo |
 |---|---|---|
-| `OptimizarPC.bat` | La optimización (v2). Ya incluye las correcciones del script original. | Sí |
-| `DeshacerPerjudiciales.bat` | Deshace **solo** lo dañino del script original (v1), para PCs donde ya lo corriste. | Sí, poco |
-| `RevertirOptimizacion.bat` | Vuelve a los valores de fábrica lo que cambia `OptimizarPC.bat` (por si algo sale mal). | Sí |
-| `DesfragmentarAFondo.bat` | Desfragmentación completa y opcional, para discos mecánicos: analiza, desfragmenta, junta el espacio libre y optimiza el arranque. En un SSD solo manda TRIM. Puede tardar horas. | Sí (solo ordena el disco) |
-| `LimpiarWindowsUpdate.bat` | Opcional, de vez en cuando: borra con DISM las versiones viejas que guardan las actualizaciones (WinSxS). Libera espacio, no acelera. Puede tardar más de una hora. Ver [Limpiar restos de Windows Update](#limpiar-restos-de-windows-update-vale-la-pena). | Sí (solo restos de actualizaciones) |
-| `VerificarEstado.bat` | Muestra el hardware (procesador, video, RAM), el antirrobo de Conectar Igualdad si lo hay, y el estado de todo lo que tocan los scripts. Ideal para comparar antes/después. | **No** (solo lee) |
+| **1. Optimizar la PC** (o solo Enter) | La optimización (v2). Ya incluye las correcciones del script original. | Sí |
+| 2. Verificar el estado | Muestra el hardware (procesador, video, RAM), el antirrobo de Conectar Igualdad si lo hay, y el estado de todo lo que toca el script. Lo guarda en un `.txt` al lado del script, para comparar antes y después. | **No** (solo lee) |
+| 3. Limpiar restos de Windows Update | De vez en cuando: borra con DISM las versiones viejas que guardan las actualizaciones (WinSxS). Libera espacio, no acelera. Puede tardar más de una hora. Ver [Limpiar restos de Windows Update](#limpiar-restos-de-windows-update-vale-la-pena). | Sí (solo restos de actualizaciones) |
+| 4. Desfragmentar a fondo | De vez en cuando, para discos mecánicos: analiza, desfragmenta, junta el espacio libre y optimiza el arranque. En un SSD solo manda TRIM. Puede tardar horas. | Sí (solo ordena el disco) |
+| 5. Revertir la optimización | Vuelve a los valores de fábrica lo que cambia la opción 1, por si algo sale mal. | Sí |
+| 6. Deshacer lo perjudicial del script original (v1) | Deshace **solo** lo dañino del v1, para PCs donde ya lo corriste. | Sí, poco |
+| 0. Salir | | |
+
+Se responde con el número y Enter. Al terminar cada opción se vuelve al menú. Las que cambian el sistema (1, 5 y 6)
+ofrecen reiniciar al final; si decís que no, el menú recuerda que falta reiniciar y lo vuelve a ofrecer al salir.
 
 ## Cómo usarlo
 
-1. Copiá la carpeta a la PC (pendrive, red, lo que sea). Si la bajaste como ZIP, **descomprimila primero**:
-   el script funciona igual desde adentro del ZIP, pero avisa, porque Windows lo corre desde una carpeta temporal.
+1. Copiá `OptimizarPC.bat` a la PC (pendrive, red, lo que sea). Si lo bajaste en un ZIP, **descomprimilo primero**:
+   funciona igual desde adentro del ZIP, pero avisa, porque Windows lo corre desde una carpeta temporal.
 2. Doble clic en `OptimizarPC.bat`. Si no tiene permisos, los pide solo (aparece el cartel de UAC).
-3. Leé los avisos de hardware si aparece alguno (poca RAM, video sin driver, antirrobo de Conectar Igualdad)
+3. En el menú, Enter (o 1): **Optimizar la PC**.
+4. Leé los avisos de hardware si aparece alguno (poca RAM, video sin driver, antirrobo de Conectar Igualdad)
    y respondé las 6 preguntas: impresora, compartir en red, OneDrive, apps preinstaladas, clásicos de Windows 7
    y Restaurar sistema. Después no pregunta más.
-4. Esperá. En un disco mecánico puede tardar 10 a 20 minutos. Paciencia, mate y facturas.
-5. **Reiniciá** la PC (el script lo ofrece al final). Como el script apaga el inicio rápido, desde ahora *Apagar*
+5. Esperá. En un disco mecánico puede tardar 10 a 20 minutos. Paciencia, mate y facturas.
+6. **Reiniciá** la PC (lo ofrece al final). Como el script apaga el inicio rápido, desde ahora *Apagar*
    también es un apagado completo: ya no hace falta acordarse de usar *Reiniciar*.
    **Ojo:** desde ahora, cerrar la tapa o apretar el botón de encendido **apaga** la PC, sin suspender. Guardá antes.
 
-Si en esa PC ya habías corrido el script original, no hace falta nada más: `OptimizarPC.bat` corrige lo que el original hizo mal.
-Si solo querés reparar el daño sin optimizar nada más, usá `DeshacerPerjudiciales.bat`.
+Si en esa PC ya habías corrido el script original, no hace falta nada más: la opción 1 corrige lo que el original hizo mal.
+Si solo querés reparar el daño sin optimizar nada más, usá la opción 6.
 
 ### ¿A qué usuario se le aplican los cambios?
 
@@ -44,11 +51,11 @@ Esto es típico cuando la PC tiene un usuario común y el técnico pone la clave
 Windows guarda la configuración de cada usuario en `HKEY_CURRENT_USER`. Si elevás con otra cuenta,
 `HKEY_CURRENT_USER` pasa a ser el del administrador y los cambios caen en el usuario equivocado.
 El script lo evita así: busca el `explorer.exe` de la sesión actual, obtiene el SID de su dueño y
-escribe directo en `HKEY_USERS\<SID>`. Al arrancar te muestra el nombre del usuario detectado para que lo confirmes.
+escribe directo en `HKEY_USERS\<SID>`. Al empezar la opción 1 te muestra el nombre del usuario detectado para que lo confirmes.
 
 ---
 
-## Qué hace `OptimizarPC.bat` (y por qué)
+## Qué hace la opción 1, Optimizar la PC (y por qué)
 
 Criterio general:
 
@@ -181,7 +188,9 @@ No se agregan exclusiones: son lo primero que buscan los virus.
 - **Archivo de paginación con tamaño propio:** 1,5 veces la RAM desde el arranque y hasta 3 veces la RAM o 4 GB.
   El automático arranca chico y crece de a pedazos, y en un disco lento eso trae errores y fragmentación
   (ver [Caché de disco](#caché-de-disco-readyboost-y-las-optimizaciones-de-windows)). Si alguien lo había configurado a mano, se respeta.
-- **Caché de escritura del disco:** se verifica que esté activada, y que nadie haya desactivado el vaciado del búfer.
+- **Caché de escritura del disco activada y sin vaciado del búfer** (salvo en un SSD): Windows deja de esperar a que
+  el disco confirme cada escritura. Se gana tiempo; el costo es el riesgo ante un corte de luz
+  (ver [Caché de disco](#caché-de-disco-readyboost-y-las-optimizaciones-de-windows)).
 - NTFS: sin registro de último acceso y sin nombres cortos 8.3 (como en el v1).
 - **Restaurar sistema, según la pregunta 6.** Mientras haya puntos de restauración, cada escritura en el disco puede
   costar una copia extra, y ocupan hasta un 10% del disco. Desactivarlo saca ese trabajo de fondo, pero borra **todos**
@@ -289,7 +298,7 @@ Los PDF quedan para Edge o Chrome. Adobe Reader sigue instalado y anda si alguie
 **El precio:** Reader deja de recibir parches de seguridad, y los PDF son una vía clásica de virus. Por eso:
 
 - Hacé que los PDF abran con el navegador: *Configuración > Aplicaciones > Aplicaciones predeterminadas > Elegir
-  aplicaciones predeterminadas por tipo de archivo > .pdf*. El script lo recuerda al final, y `VerificarEstado.bat`
+  aplicaciones predeterminadas por tipo de archivo > .pdf*. El script lo recuerda al final, y la opción 2
   muestra cuál quedó.
 - Si no usás Reader para nada, desinstalalo. Lo único que suele necesitarlo son los formularios PDF "dinámicos" (XFA),
   que los navegadores no abren.
@@ -373,8 +382,8 @@ Tu intuición es correcta en parte: el desfragmentador automático trabaja "por 
   ([Microsoft Tech Community](https://techcommunity.microsoft.com/blog/askperf/disk-fragmentation-and-system-performance/372921)).
 - La pasada semanal automática hace la desfragmentación normal, pero no junta el espacio libre.
 
-Para mantenimiento, la semanal alcanza, y `OptimizarPC.bat` se asegura de que esté activa. Para una pasada a fondo
-está **`DesfragmentarAFondo.bat`**, que usa la misma herramienta de Windows con todos sus parámetros
+Para mantenimiento, la semanal alcanza, y la opción 1 se asegura de que esté activa. Para una pasada a fondo
+está la **opción 4, *Desfragmentar a fondo***, que usa la misma herramienta de Windows con todos sus parámetros
 ([`defrag`, Microsoft Learn](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/defrag)):
 
 | Paso | Parámetro | Qué hace |
@@ -382,7 +391,7 @@ está **`DesfragmentarAFondo.bat`**, que usa la misma herramienta de Windows con
 | 1 | `/A /V` | Analiza y muestra el porcentaje de fragmentación. |
 | 2 | `/W` | Desfragmentación completa, incluidos los fragmentos de más de 64 MB. Si esa versión de Windows no acepta `/W`, hace la normal (`/D`). |
 | 3 | `/X` | Junta el espacio libre: los archivos nuevos se fragmentan menos. |
-| 4 | `/B` | Optimiza el arranque: junta los archivos que Windows lee al prender. Usa `Layout.ini`, el mapa de la carpeta Prefetch, que `OptimizarPC.bat` conserva al limpiar. |
+| 4 | `/B` | Optimiza el arranque: junta los archivos que Windows lee al prender. Usa `Layout.ini`, el mapa de la carpeta Prefetch, que la opción 1 conserva al limpiar. |
 | 5 | `/A /V` | Analiza otra vez, para comparar. |
 
 Usa `/H` (prioridad normal, termina antes) y `/U` (muestra el progreso). En un SSD no desfragmenta: manda TRIM.
@@ -408,17 +417,17 @@ desinstalarla. Los comandos que circulan para limpiar eso
 
 **Vale la pena de vez en cuando, pero aparte.** Libera espacio (desde nada hasta varios GB, según cuántas
 actualizaciones se acumularon), pero **no acelera nada**, y en un Atom con disco mecánico puede tardar más de una hora
-con el disco al 100%. Por eso no está dentro de `OptimizarPC.bat`, que en cambio se asegura de que la limpieza
+con el disco al 100%. Por eso no está dentro de la opción 1, que en cambio se asegura de que la limpieza
 automática de Windows esté activa.
 
-Para hacerla a mano está **`LimpiarWindowsUpdate.bat`**: primero analiza (`/AnalyzeComponentStore` dice si conviene
+Para hacerla a mano está la **opción 3, *Limpiar restos de Windows Update***: primero analiza (`/AnalyzeComponentStore` dice si conviene
 limpiar), después pregunta por `/ResetBase`, limpia y muestra cuánto liberó. Si hay una actualización esperando un
 reinicio, DISM se niega con el error `0x800F0806`
 ([Microsoft Q&A](https://learn.microsoft.com/en-us/answers/questions/2192270/dism-startcomponentcleanup-give-error-0x800f0806-t)):
 reiniciá y volvé a correrlo.
 
-Rutina de mantenimiento, cada tantos meses: `LimpiarWindowsUpdate.bat` y después `DesfragmentarAFondo.bat`, que con
-menos archivos tiene menos que mover.
+Rutina de mantenimiento, cada tantos meses: la opción 3 y después la 4, que con menos archivos tiene menos que
+mover.
 
 ## Caché de disco, ReadyBoost y las optimizaciones de Windows
 
@@ -447,8 +456,8 @@ a los programas, que terminarían en el archivo de paginación: justo lo que se 
 | `LargeSystemCache = 1` | Más caché de archivos | **No.** Es para servidores: le da prioridad a la caché por sobre los programas, y algunos drivers se portan mal con él ([TweakHound](https://www.tweakhound.com/2011/09/20/bad-tweaks/)). |
 | `fsutil behavior set memoryusage 2` | Más memoria para NTFS | **No.** Microsoft dice que ayuda cuando se abren muchísimos archivos *y sobra memoria*; si no, le quita memoria al resto ([Microsoft Learn](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/fsutil-behavior)). |
 | `IoPageLockLimit` | "Buffer para el disco" | **Mito:** Windows lo ignora. |
-| Caché de escritura del disco | Que Windows no espere a que el disco termine cada escritura | **Sí, y viene activada.** El script verifica que lo esté y avisa si alguien la apagó. |
-| Desactivar el vaciado del búfer de caché de escritura | Escribir todavía más rápido | **No.** Ante un corte de luz se corrompen archivos: el propio cartel de Windows dice que no se marque salvo que el disco tenga alimentación aparte ([Raymond Chen](https://devblogs.microsoft.com/oldnewthing/20130416-00/?p=4643)). Una netbook con la batería muerta es una PC sin UPS. El script avisa si está marcado. |
+| Caché de escritura del disco | Que Windows no espere a que el disco termine cada escritura | **Sí.** Viene activada; el script se asegura de que lo esté. |
+| Desactivar el vaciado del búfer de caché de escritura | Que Windows ni siquiera espere a que el disco confirme cada escritura | **Sí, por decisión.** Se gana tiempo en cada escritura. El costo: ante un corte de luz se pueden perder o corromper los últimos cambios, y el propio cartel de Windows pide no marcarlo salvo que el disco tenga alimentación aparte ([Raymond Chen](https://devblogs.microsoft.com/oldnewthing/20130416-00/?p=4643)). Acá importa más el tiempo que esos datos: quien mantiene este repo lo usa así hace años sin problemas. En un SSD no se toca, y la opción 5 lo revierte. |
 | Archivo de paginación con tamaño propio | Que no crezca de a pedazos | **Sí.** El automático arranca chico y crece cuando hace falta. En un disco lento, mientras crece, los programas pueden fallar por falta de memoria ([Microsoft Learn](https://learn.microsoft.com/en-us/troubleshoot/windows-client/performance/slow-page-file-growth-memory-allocation-errors)), y crecer y achicarse lo fragmenta ([Microsoft](https://techcommunity.microsoft.com/blog/askperf/disk-fragmentation-and-system-performance/372921)). El script lo deja en 1,5 veces la RAM desde el arranque, lo que recomienda Microsoft, y hasta 3 veces la RAM o 4 GB, como el automático ([Microsoft Learn](https://learn.microsoft.com/en-us/troubleshoot/windows-client/performance/how-to-determine-the-appropriate-page-file-size-for-64-bit-versions-of-windows)). Solo si estaba en automático. |
 | `fsutil behavior set mftzone` | Que la tabla de archivos (MFT) no se fragmente | **No.** Solo sirve en discos con muchísimos archivos chicos; la reserva ya existe. |
 
@@ -473,13 +482,12 @@ Por eso no está en el script: hace falta hardware y la ganancia es incierta. Si
    Si Windows dice que es lenta, no sirve: probá otra.
 3. Usala una semana. Si no notás diferencia, sacala: no se rompe nada.
 
-`OptimizarPC.bat` deja SysMain activo, que es lo que ReadyBoost necesita, y `VerificarEstado.bat` muestra si está en
-uso. Con un SSD, ReadyBoost no tiene sentido.
+La opción 1 deja SysMain activo, que es lo que ReadyBoost necesita, y la opción 2 muestra si está en uso. Con un SSD, ReadyBoost no tiene sentido.
 
 ### Lo que de verdad ataca los fragmentos
 
-1. **Desfragmentar:** la pasada semanal, que el script deja activa, y `DesfragmentarAFondo.bat` de vez en cuando.
-2. **Dejar al menos 15% libre:** con menos, defrag solo desfragmenta en parte. `DesfragmentarAFondo.bat` avisa.
+1. **Desfragmentar:** la pasada semanal, que el script deja activa, y la opción 4 de vez en cuando.
+2. **Dejar al menos 15% libre:** con menos, defrag solo desfragmenta en parte. La opción 4 avisa.
 3. **El archivo de paginación con tamaño propio**, que hace el script. Si ya está muy fragmentado, se desfragmenta al
    arranque con UltraDefrag (ver [Desfragmentar](#desfragmentar-sirve-el-de-windows)).
 4. **Revisar el cabezal del disco.** Muchos discos de notebook estacionan el cabezal a los pocos segundos sin uso, para
@@ -503,7 +511,6 @@ uso. Con un SSD, ReadyBoost no tiene sentido.
 | `StartupDelayInMSec = 0` | Hace que los programas de inicio arranquen todos juntos con el escritorio. En HDD eso empeora el arranque. |
 | Deshabilitar el archivo de paginación | Con 2 GB de RAM: cuelgues y programas que se cierran solos. |
 | `fsutil behavior set memoryusage 2`, `mftzone` | Más memoria para NTFS y más reserva para la MFT: con 2 GB y un disco de uso normal, no ayudan. Ver [Caché de disco](#caché-de-disco-readyboost-y-las-optimizaciones-de-windows). |
-| Desactivar el vaciado del búfer de caché de escritura | Ante un corte de luz se corrompen archivos. El script avisa si alguien lo hizo. |
 | Deshabilitar la desfragmentación | En HDD es necesaria. El script se asegura de que esté **activa**. Para una pasada a fondo, ver [Desfragmentar](#desfragmentar-sirve-el-de-windows). |
 | "Limpiadores de RAM" | Contraproducentes: Windows vuelve a cargar todo desde el disco lento. |
 | Vaciar `Prefetch` entero, o en cada arranque | Lo que hacen algunos "limpiadores": se lleva también el rastro de arranque, y los arranques siguientes son más lentos. El script borra solo las entradas de programas. |
@@ -534,13 +541,14 @@ uso. Con un SSD, ReadyBoost no tiene sentido.
 
 Desde acá no hay un Windows real, así que se validó todo lo que se puede validar sin uno:
 
-- **Wine (el `cmd.exe` de Wine):** los seis scripts corren de punta a punta con distintas combinaciones de respuestas
-  (por ejemplo: con y sin Restaurar sistema, con y sin los clásicos de Windows 7).
+- **Wine (el `cmd.exe` de Wine):** el menú y sus seis opciones corren de punta a punta, una tras otra, con distintas
+  combinaciones de respuestas (por ejemplo: con y sin Restaurar sistema, con y sin los clásicos de Windows 7).
+  El menú se probó con entradas torpes: Enter solo, letras, números de más, comillas, `&` y `%PATH%`.
   Se simuló el estado que deja el script original (y políticas que apagan Defender y Windows Update)
   y se verificó en el registro que cada valor quedara corregido y escrito en `HKEY_USERS\<SID>` del usuario.
   También se probó el ciclo completo optimizar, revertir y verificar: el inicio rápido queda apagado, *Suspender* e
-  *Hibernar* salen del menú, y `RevertirOptimizacion.bat` los devuelve.
-- **PowerShell:** los 39 bloques de PowerShell pasan el parser oficial. La lógica de apps en segundo plano se probó con
+  *Hibernar* salen del menú de apagado, y la opción 5 los devuelve.
+- **PowerShell:** los 34 bloques de PowerShell pasan el parser oficial. La lógica de apps en segundo plano se probó con
   nombres reales de paquetes.
 - **Limpieza:** la sección que vacía los temporales se **ejecutó de verdad** sobre un árbol de carpetas simulado, con
   trampas (y una carpeta Prefetch de mentira, donde solo se fueron las entradas de programas): un enlace a una carpeta valiosa (no la siguió), archivos de solo lectura (los borró), archivos imposibles de
@@ -551,7 +559,8 @@ Desde acá no hay un Windows real, así que se validó todo lo que se puede vali
   íconos con `%SystemRoot%`, con comillas o inexistentes.
 - **Formato:** ASCII puro y fin de línea CRLF (con LF, `cmd` puede fallar al saltar a etiquetas).
 
-Lo que **no** se pudo probar acá: los servicios, Defender, la energía, las apps y el punto de restauración.
+Lo que **no** se pudo probar acá: los servicios, Defender, la energía, la caché de escritura del disco, las apps y el
+punto de restauración.
 Wine no los implementa, así que falta la prueba en un Windows 10 real. Para eso está la sección siguiente.
 
 ## Cómo probarlo en UTM (Mac) antes de usarlo en una PC real
@@ -559,10 +568,10 @@ Wine no los implementa, así que falta la prueba en un Windows 10 real. Para eso
 1. Creá una VM de **Windows 10 x64 22H2** con **2 GB de RAM** y 2 núcleos, igual que la PC vieja.
    En una Mac con Apple Silicon, UTM emula x86_64: va a andar lento, pero para probar alcanza.
 2. Terminá la instalación, conectala a internet y dejala actualizar un rato.
-3. Corré `VerificarEstado.bat` y guardá la salida (botón derecho > "Ejecutar como administrador").
+3. Abrí `OptimizarPC.bat`, elegí la opción 2 y guardá el reporte (queda en un `.txt` al lado del script).
 4. **Sacá un snapshot de la VM.** Es el "deshacer" más confiable que existe.
-5. (Opcional) Corré el script original (v1), después `VerificarEstado.bat`, y probá `DeshacerPerjudiciales.bat`.
-6. Volvé al snapshot, corré `OptimizarPC.bat`, reiniciá y corré `VerificarEstado.bat` otra vez.
+5. (Opcional) Corré el script original (v1), después la opción 2, y probá la opción 6.
+6. Volvé al snapshot, elegí la opción 1, reiniciá y elegí la opción 2 otra vez.
 7. Checklist de cosas que **no** tienen que romperse:
    - [ ] Escribir en el menú Inicio y que la búsqueda encuentre apps (por ejemplo, "calc").
    - [ ] Escribir en Configuración y en alguna app de la Store (Calculadora).
@@ -578,17 +587,19 @@ Wine no los implementa, así que falta la prueba en un Windows 10 real. Para eso
    - [ ] Al arrastrar una ventana se ve su contenido, y las carpetas con fotos muestran íconos.
    - [ ] Con Adobe Reader instalado: no aparece en *Administrador de tareas > Inicio*, y el servicio *Adobe Acrobat
      Update Service* está deshabilitado.
-   - [ ] (Opcional) `LimpiarWindowsUpdate.bat` analiza, limpia y muestra lo liberado sin errores.
+   - [ ] (Opcional) La opción 3 analiza, limpia y muestra lo liberado sin errores.
    - [ ] El menú de apagado muestra *Apagar* y *Reiniciar*, sin *Suspender* ni *Hibernar*.
    - [ ] El botón de encendido apaga la PC por completo. En UTM se prueba con el botón de apagado de la ventana de la
      VM (el apagado normal, no el forzado), que le manda a Windows la misma señal que el botón físico.
    - [ ] En la netbook real: cerrar la tapa la apaga (la VM no tiene tapa).
    - [ ] Si desactivaste Restaurar sistema: *Propiedades del sistema > Protección del sistema* dice "Desactivado".
    - [ ] Existe el punto de restauración "Antes de OptimizarPC v2" (`rstrui.exe`).
-   - [ ] `VerificarEstado.bat` muestra la paginación en 1,5 veces la RAM y la caché de escritura del disco activada.
-8. Probá `RevertirOptimizacion.bat` y verificá que todo vuelva a la normalidad.
+   - [ ] La opción 2 muestra la paginación en 1,5 veces la RAM, la caché de escritura activada y el vaciado del búfer
+     desactivado.
+   - [ ] En el menú, Enter solo elige la opción 1 y un número inválido vuelve al menú.
+8. Probá la opción 5 y verificá que todo vuelva a la normalidad.
 
-Pasame las salidas de `VerificarEstado.bat` y lo que haya fallado del checklist, y lo ajustamos.
+Pasame los reportes de la opción 2 y lo que haya fallado del checklist, y lo ajustamos.
 
 ---
 

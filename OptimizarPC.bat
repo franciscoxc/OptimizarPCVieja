@@ -3,14 +3,19 @@ setlocal EnableExtensions DisableDelayedExpansion
 title Optimizar PC Vieja v2
 :: =========================================================================
 ::  OPTIMIZAR PC VIEJA v2
-::  Para Windows 10 de 64 bits con disco mecanico (HDD) y 2 GB de RAM.
+::  Para Windows 10 con disco mecanico (HDD) y 2 GB de RAM.
+::
+::  Un solo archivo, con menu:
+::    1. Optimizar la PC (opcion predeterminada: Enter).
+::    2. Verificar el estado: solo mira, no cambia nada.
+::    3. Limpiar restos de Windows Update (DISM).
+::    4. Desfragmentar a fondo.
+::    5. Revertir la optimizacion.
+::    6. Deshacer lo perjudicial del script original (v1).
 ::
 ::  - Se ejecuta con doble clic: si no tiene permisos, los pide.
 ::  - Los ajustes de usuario se aplican al usuario que tiene la sesion
 ::    abierta, aunque el script se eleve con OTRA cuenta de administrador.
-::  - Crea un punto de restauracion antes de tocar nada.
-::  - Repara la seguridad que otras herramientas pudieron haber apagado.
-::  - Corrige lo que el script original (v1) hacia mal.
 ::  - Cada cambio esta explicado en README.md.
 :: =========================================================================
 
@@ -37,38 +42,68 @@ pause
 exit /b 1
 :es_admin
 
-:: -------------------------------------------------------------------------
-:: Usuario de la sesion abierta (dueno del explorer.exe de esta sesion)
-:: -------------------------------------------------------------------------
-set "USID="
-set "UNAME="
-for /f "usebackq tokens=1,2 delims=|" %%a in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "$s=(Get-Process -Id $PID).SessionId; $p=Get-CimInstance Win32_Process -Filter 'Name=''explorer.exe''' | Where-Object { $_.SessionId -eq $s } | Select-Object -First 1; if ($p) { $o=Invoke-CimMethod -InputObject $p -MethodName GetOwner; $i=Invoke-CimMethod -InputObject $p -MethodName GetOwnerSid; $i.Sid + '|' + $o.Domain + '\' + $o.User }"`) do (
-    set "USID=%%a"
-    set "UNAME=%%b"
-)
-if defined USID if not "%USID:~0,4%"=="S-1-" set "USID="
-if not defined USID goto :usid_validado
-reg query "HKU\%USID%" >nul 2>&1
-if errorlevel 1 set "USID="
-:usid_validado
-if defined USID goto :usuario_detectado
-set "UHIVE=HKCU"
-set "UCLS=HKCU\Software\Classes"
-set "UPS=Registry::HKEY_CURRENT_USER"
-set "UNAME=%USERDOMAIN%\%USERNAME%"
-set "UPROFILE=%USERPROFILE%"
-goto :usuario_listo
-:usuario_detectado
-set "UHIVE=HKU\%USID%"
-:: Las clases del usuario viven en su propia colmena; si no estuviera cargada,
-:: Software\Classes del usuario es un enlace de Windows a esa misma colmena.
-set "UCLS=HKU\%USID%_Classes"
-reg query "%UCLS%" >nul 2>&1
-if errorlevel 1 set "UCLS=HKU\%USID%\Software\Classes"
-set "UPS=Registry::HKEY_USERS\%USID%"
-set "UPROFILE="
-for /f "tokens=2,*" %%a in ('reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\%USID%" /v ProfileImagePath 2^>nul ^| findstr /i "ProfileImagePath"') do call set "UPROFILE=%%b"
-:usuario_listo
+:: =========================================================================
+::  MENU
+:: =========================================================================
+set "REINICIO_PENDIENTE=0"
+cls
+:menu
+title Optimizar PC Vieja v2
+echo.
+echo ==========================================================================
+echo   OPTIMIZAR PC VIEJA v2 - Windows 10, disco mecanico, 2 GB de RAM
+echo ==========================================================================
+if "%REINICIO_PENDIENTE%"=="1" echo   Falta REINICIAR para que se apliquen los cambios.
+echo.
+echo     1. Optimizar la PC
+echo     2. Verificar el estado (solo mira, no cambia nada)
+echo     3. Limpiar restos de Windows Update (de vez en cuando, hasta 1 hora)
+echo     4. Desfragmentar a fondo (de vez en cuando, puede tardar horas)
+echo     5. Revertir la optimizacion
+echo     6. Deshacer lo perjudicial del script original (v1)
+echo     0. Salir
+echo.
+set "OPC="
+set /p "OPC=  Elegi un numero y Enter (solo Enter = 1): "
+:: Enter solo elige la 1. De lo escrito vale el primer caracter, sin comillas.
+if not defined OPC set "OPC=1"
+set "OPC=%OPC:"=%"
+if not defined OPC set "OPC=1"
+set "OPC=%OPC:~0,1%"
+if "%OPC%"=="1" goto :op_optimizar
+if "%OPC%"=="2" goto :op_verificar
+if "%OPC%"=="3" goto :op_limpiar_wu
+if "%OPC%"=="4" goto :op_desfragmentar
+if "%OPC%"=="5" goto :op_revertir
+if "%OPC%"=="6" goto :op_deshacer_v1
+if "%OPC%"=="0" goto :salir
+echo   Opcion no valida: elegi un numero del 0 al 6.
+goto :menu
+
+:: Final de las opciones que cambian el sistema: ofrecer reiniciar. Si no,
+:: se vuelve al menu y se recuerda que falta reiniciar.
+:fin_con_reinicio
+set "REINICIO_PENDIENTE=1"
+choice /c SN /n /m "  Reiniciar ahora? [S/N]: "
+if errorlevel 2 goto :menu
+shutdown /r /t 10 /c "Reiniciando para aplicar los cambios de OptimizarPC"
+exit /b 0
+
+:salir
+if not "%REINICIO_PENDIENTE%"=="1" exit /b 0
+echo.
+echo   Hay cambios que recien se aplican al reiniciar.
+choice /c SN /n /m "  Reiniciar ahora? [S/N]: "
+if errorlevel 2 exit /b 0
+shutdown /r /t 10 /c "Reiniciando para aplicar los cambios de OptimizarPC"
+exit /b 0
+
+:: =========================================================================
+::  1. OPTIMIZAR
+:: =========================================================================
+:op_optimizar
+title Optimizar PC Vieja v2 - Optimizar
+call :detectar_usuario
 
 :: Version de Windows
 set "BUILD=0"
@@ -128,7 +163,7 @@ echo   - En un disco mecanico puede tardar entre 10 y 20 minutos.
 echo   - Al terminar hay que REINICIAR la PC.
 echo.
 choice /c SN /n /m "  Continuar? [S/N]: "
-if errorlevel 2 exit /b 0
+if errorlevel 2 goto :menu
 
 echo.
 echo   Unas preguntas antes de empezar. Despues no molesta mas.
@@ -157,7 +192,7 @@ echo.
 echo   6. Restaurar sistema guarda puntos para volver atras. Desactivarlo libera hasta
 echo      un 10%% del disco y saca escrituras de fondo, pero borra TODOS los puntos,
 echo      incluido el que crearia este script. La vuelta atras queda en manos de
-echo      RevertirOptimizacion.bat o de reinstalar.
+echo      la opcion 5 del menu o de reinstalar.
 choice /c SN /n /m "     Desactivarlo? [S/N]: "
 if errorlevel 2 (set "SINRESTAURAR=N") else (set "SINRESTAURAR=S")
 
@@ -175,14 +210,14 @@ reg delete "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SystemRestore" /v 
 if "%RP_ERR%"=="0" goto :punto_ok
 echo   [!] No se pudo crear el punto de restauracion.
 choice /c SN /n /m "      Continuar igual? [S/N]: "
-if errorlevel 2 exit /b 1
+if errorlevel 2 goto :menu
 goto :punto_listo
 :punto_ok
 echo   [OK] Punto de restauracion "Antes de OptimizarPC v2" creado.
 goto :punto_listo
 :punto_salteado
 echo   Salteado: elegiste desactivar Restaurar sistema, que lo borraria igual.
-echo   Si algo sale mal, la vuelta atras es RevertirOptimizacion.bat.
+echo   Si algo sale mal, la vuelta atras es la opcion 5 del menu.
 :punto_listo
 
 :: =========================================================================
@@ -431,10 +466,11 @@ echo   [OK] NTFS sin registro de ultimo acceso ni nombres cortos 8.3.
 :: configuro a mano, se respeta. Se aplica al reiniciar.
 powershell -NoProfile -ExecutionPolicy Bypass -Command "$cs=Get-CimInstance Win32_ComputerSystem; if (-not $cs.AutomaticManagedPagefile) { Write-Output '  [OK] Archivo de paginacion configurado a mano: se respeta como esta.'; exit 0 }; $ram=[math]::Round($cs.TotalPhysicalMemory / 1MB); $ini=[int][math]::Round($ram * 1.5); $max=[int][math]::Max($ram * 3, 4096); $libre=[math]::Floor((Get-PSDrive -Name $env:SystemDrive.Substring(0,1)).Free / 1MB); if ($libre -lt ($ini + 2048)) { Write-Output '  [AVISO] Poco espacio libre: el archivo de paginacion sigue en automatico.'; exit 0 }; try { Set-CimInstance -InputObject $cs -Property @{AutomaticManagedPagefile=$false} -ErrorAction Stop; $nombre=$env:SystemDrive + '\pagefile.sys'; $pf=Get-CimInstance Win32_PageFileSetting | Where-Object { $_.Name -eq $nombre } | Select-Object -First 1; if ($pf) { Set-CimInstance -InputObject $pf -Property @{InitialSize=[uint32]$ini; MaximumSize=[uint32]$max} -ErrorAction Stop } else { New-CimInstance -ClassName Win32_PageFileSetting -Property @{Name=$nombre; InitialSize=[uint32]$ini; MaximumSize=[uint32]$max} -ErrorAction Stop | Out-Null }; Write-Output ('  [OK] Archivo de paginacion: ' + $ini + ' MB desde el arranque, hasta ' + $max + ' MB. Ya no crece de a pedazos.') } catch { Set-CimInstance -InputObject $cs -Property @{AutomaticManagedPagefile=$true} -ErrorAction SilentlyContinue; Write-Output '  [AVISO] No se pudo configurar el archivo de paginacion: sigue en automatico.' }"
 
-:: Cache de escritura del disco: viene activada y en un disco mecanico es clave.
-:: Si alguien la apago, se avisa. Tambien se avisa si alguien desactivo el vaciado
-:: del bufer, que ante un corte de luz puede corromper archivos.
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$n=(Get-Partition -DriveLetter $env:SystemDrive.Substring(0,1) -ErrorAction SilentlyContinue).DiskNumber; $d=Get-PhysicalDisk -ErrorAction SilentlyContinue | Where-Object { $_.DeviceId -eq [string]$n } | Select-Object -First 1; $p=$null; if ($d) { $p=$d | Get-StorageAdvancedProperty -ErrorAction SilentlyContinue }; if (-not $p) { Write-Output '  [OK] Cache de escritura del disco: Windows no informa su estado, queda como esta.'; exit 0 }; if ($p.IsDeviceCacheEnabled) { Write-Output '  [OK] Cache de escritura del disco: activada.' } else { Write-Output '  [AVISO] La cache de escritura del disco esta APAGADA: escribir es mucho mas lento.'; Write-Output '          Activala en Administrador de dispositivos, Unidades de disco, tu disco,'; Write-Output '          Directivas: Habilitar cache de escritura en el dispositivo.' }; if ($p.IsPowerProtected -and [string]$d.MediaType -eq 'HDD') { Write-Output '  [AVISO] Alguien desactivo el vaciado del bufer de escritura: ante un corte de luz'; Write-Output '          se pueden corromper archivos. Destilda esa opcion en el mismo lugar.' }"
+:: Cache de escritura del disco: activada y SIN vaciado del bufer. Asi Windows no
+:: espera a que el disco confirme cada escritura: se gana tiempo. El costo: ante
+:: un corte de luz se pueden perder o corromper los ultimos cambios. Decision
+:: tomada: aca importa el tiempo. En un SSD no se toca. Rige al reiniciar.
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$n=(Get-Partition -DriveLetter $env:SystemDrive.Substring(0,1) -ErrorAction SilentlyContinue).DiskNumber; $d=Get-PhysicalDisk -ErrorAction SilentlyContinue | Where-Object { $_.DeviceId -eq [string]$n } | Select-Object -First 1; $w=Get-CimInstance Win32_DiskDrive -ErrorAction SilentlyContinue | Where-Object { $_.Index -eq $n } | Select-Object -First 1; if ($d -and [string]$d.MediaType -eq 'SSD') { Write-Output '  [OK] Cache de escritura: el disco es un SSD, queda como esta.'; exit 0 }; if (-not $w -or -not $w.PNPDeviceID) { Write-Output '  [AVISO] No se encontro el disco del sistema: la cache de escritura queda como esta.'; exit 0 }; $k='Registry::HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Enum\' + $w.PNPDeviceID + '\Device Parameters\Disk'; try { if (-not (Test-Path -LiteralPath $k)) { New-Item -Path $k -Force -ErrorAction Stop | Out-Null }; Set-ItemProperty -LiteralPath $k -Name UserWriteCacheSetting -Value 1 -Type DWord -ErrorAction Stop; Set-ItemProperty -LiteralPath $k -Name CacheIsPowerProtected -Value 1 -Type DWord -ErrorAction Stop; Write-Output '  [OK] Cache de escritura del disco activada y sin vaciado del bufer: rige al reiniciar.' } catch { Write-Output '  [AVISO] No se pudo configurar la cache de escritura del disco.' }"
 
 :: CompactOS: en HDD conviene el sistema sin comprimir. Solo se descomprime si
 :: estaba comprimido y hay espacio; si no, se saltea: tarda varios minutos igual.
@@ -609,16 +645,379 @@ echo   por tipo de archivo, busca .pdf y elegi el navegador. Como Reader ya no s
 echo   actualiza solo, si no lo usas para nada conviene desinstalarlo.
 :final_sin_adobe
 echo ==========================================================================
-choice /c SN /n /m "  Reiniciar ahora? [S/N]: "
-if errorlevel 2 goto :fin
-shutdown /r /t 10 /c "Reiniciando para aplicar OptimizarPC v2"
-exit /b 0
-:fin
-echo.
-echo   Acordate de reiniciar antes de usar la PC.
-pause
-exit /b 0
+goto :fin_con_reinicio
 
+:: =========================================================================
+::  2. VERIFICAR ESTADO (solo lectura). El reporte esta en PowerShell, en la
+::  seccion VERIFICAR al final de este archivo, y se guarda en un .txt al lado.
+:: =========================================================================
+:op_verificar
+title Optimizar PC Vieja v2 - Verificar estado
+cls
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$env:VE_RUTA='%~f0'; $t=[IO.File]::ReadAllText($env:VE_RUTA); $i=$t.IndexOf('#VERIFICAR-' + 'INICIO#'); $j=$t.IndexOf('#VERIFICAR-' + 'FIN#'); if ($i -ge 0 -and $j -gt $i) { Invoke-Expression $t.Substring($i, $j - $i) }"
+goto :menu
+
+:: =========================================================================
+::  3. LIMPIAR RESTOS DE WINDOWS UPDATE
+::  Cada actualizacion guarda la version anterior de lo que reemplaza, en
+::  C:\Windows\WinSxS. Windows las borra solo recien a los 30 dias y con una
+::  tarea que se corta a la hora. Aca se hace completo con DISM:
+::  /AnalyzeComponentStore, /StartComponentCleanup y, opcional, /ResetBase.
+::  No usa /SPSuperseded: limpia restos de Service Packs, y Windows 10 no tiene.
+:: =========================================================================
+:op_limpiar_wu
+title Optimizar PC Vieja v2 - Limpiar restos de Windows Update
+cls
+echo ==========================================================================
+echo   LIMPIAR RESTOS DE WINDOWS UPDATE
+echo ==========================================================================
+echo.
+echo   Cada actualizacion guarda la version anterior de lo que reemplaza, por si
+echo   hay que desinstalarla. Windows las borra solo recien a los 30 dias; este
+echo   opcion lo hace ahora y completo, con DISM, la herramienta de Microsoft.
+echo.
+echo   - Libera espacio en el disco. No acelera la PC.
+echo   - En un Atom con disco mecanico puede tardar MAS DE UNA HORA. Enchufala.
+echo   - Mientras trabaja, NO la apagues ni la reinicies.
+echo   - Si Windows pide reiniciar por una actualizacion, reinicia antes.
+echo.
+choice /c SN /n /m "  Empezar con el analisis? [S/N]: "
+if errorlevel 2 goto :menu
+
+:: DISM trabaja con el Instalador de modulos de Windows. Si otra herramienta
+:: lo deshabilito, vuelve a su valor de fabrica: Manual.
+reg query "HKLM\SYSTEM\CurrentControlSet\Services\TrustedInstaller" /v Start 2>nul | find "0x4" >nul
+if errorlevel 1 goto :wu_instalador_ok
+sc config TrustedInstaller start= demand >nul 2>&1
+if errorlevel 1 reg add "HKLM\SYSTEM\CurrentControlSet\Services\TrustedInstaller" /v Start /t REG_DWORD /d 3 /f >nul 2>&1
+echo   [REPARADO] El Instalador de modulos de Windows estaba deshabilitado: vuelve a Manual.
+:wu_instalador_ok
+
+call :titulo "1/3  Analisis del almacen de componentes (WinSxS)"
+Dism.exe /Online /Cleanup-Image /AnalyzeComponentStore
+if not "%errorlevel%"=="0" goto :wu_error
+echo.
+echo   Fijate en la linea que dice si se recomienda limpiar: si dice que no, no
+echo   hay nada que valga la pena borrar.
+choice /c SN /n /m "  Limpiar ahora? [S/N]: "
+if errorlevel 2 goto :menu
+echo.
+echo   /ResetBase libera mas espacio, pero las actualizaciones que ya estan
+echo   instaladas no se van a poder desinstalar nunca mas. Las proximas, si.
+echo   Si cuando hay problemas reinstalas Windows, no perdes nada.
+set "RESETBASE="
+choice /c SN /n /m "  Usar tambien /ResetBase? [S/N]: "
+if not errorlevel 2 set "RESETBASE=/ResetBase"
+
+call :titulo "2/3  Limpieza de las versiones viejas"
+call :libre LIBRE_ANTES
+Dism.exe /Online /Cleanup-Image /StartComponentCleanup %RESETBASE%
+if not "%errorlevel%"=="0" goto :wu_error
+call :libre LIBRE_DESPUES
+
+call :titulo "3/3  Resultado"
+set /a LIBERADO=LIBRE_DESPUES-LIBRE_ANTES
+if %LIBERADO% LSS 0 set "LIBERADO=0"
+echo   Espacio liberado: %LIBERADO% MB.
+echo   La limpieza automatica de Windows sigue activa y se encarga del resto.
+echo   Si vas a desfragmentar (opcion 4), ahora es el momento: hay menos que mover.
+goto :menu
+
+:wu_error
+set "DISM_RC=%errorlevel%"
+set "DISM_HEX=%DISM_RC%"
+for /f "usebackq delims=" %%h in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "'0x{0:X8}' -f [int]$env:DISM_RC"`) do set "DISM_HEX=%%h"
+echo.
+echo   [!] DISM termino con el error %DISM_HEX%.
+if /i "%DISM_HEX%"=="0x800F0806" echo       Hay una actualizacion esperando un reinicio.
+echo       Lo mas comun: una actualizacion a medio instalar. Reinicia la PC, deja
+echo       que Windows Update termine y volve a elegir esta opcion.
+echo       El detalle queda en C:\Windows\Logs\DISM\dism.log.
+goto :menu
+
+:: =========================================================================
+::  4. DESFRAGMENTAR A FONDO (para discos mecanicos)
+::  El desfragmentador automatico trabaja "por encima" a proposito: ignora los
+::  fragmentos de mas de 64 MB y no junta el espacio libre. Aca se le pide el
+::  trabajo completo: analisis, desfragmentacion completa (/W, o /D si Windows
+::  no la acepta), consolidar el espacio libre (/X), optimizar el arranque (/B)
+::  y analisis final. En un SSD no desfragmenta: solo manda TRIM (/L).
+:: =========================================================================
+:op_desfragmentar
+title Optimizar PC Vieja v2 - Desfragmentar a fondo
+set "DISCO=%SystemDrive%"
+set "MEDIO=desconocido"
+for /f "usebackq delims=" %%m in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "$n=(Get-Partition -DriveLetter $env:SystemDrive.Substring(0,1)).DiskNumber; $d=Get-PhysicalDisk | Where-Object { $_.DeviceId -eq [string]$n } | Select-Object -First 1; if ($d) { [string]$d.MediaType } else { 'desconocido' }"`) do set "MEDIO=%%m"
+
+:: Con menos de 15% libre, defrag solo desfragmenta en parte: usa ese espacio
+:: para acomodar los pedazos.
+set "LIBRE_PCT=100"
+for /f "usebackq delims=" %%m in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "$v=Get-Volume -DriveLetter $env:SystemDrive.Substring(0,1); [string][math]::Floor(100 * $v.SizeRemaining / $v.Size)"`) do set "LIBRE_PCT=%%m"
+
+cls
+echo ==========================================================================
+echo   DESFRAGMENTAR A FONDO - disco %DISCO%
+echo ==========================================================================
+echo.
+echo   Tipo de disco detectado: %MEDIO%
+echo   Espacio libre: %LIBRE_PCT%%%
+if %LIBRE_PCT% LSS 15 echo   AVISO: con menos de 15%% libre, Windows solo desfragmenta en parte. Antes,
+if %LIBRE_PCT% LSS 15 echo   libera espacio: Papelera, opcion 3 del menu o el Liberador de espacio.
+if /i "%MEDIO%"=="SSD" goto :desfrag_ssd
+if /i not "%MEDIO%"=="HDD" echo   AVISO: no se pudo confirmar que sea un disco mecanico. Si es un SSD, cancela.
+echo.
+echo   Pasos: analisis, desfragmentacion completa, consolidar el espacio libre,
+echo   optimizar el arranque y analisis final.
+echo.
+echo   - En un Atom con disco lento puede tardar VARIAS HORAS. Dejala enchufada.
+echo   - Mientras tanto la PC va a andar lenta: mejor no usarla.
+echo   - Se puede cortar en cualquier momento con Ctrl+C. No se rompe nada.
+echo   - Conviene hacer antes las opciones 1 y 3: borran temporales y restos de
+echo     actualizaciones, y hay menos que mover.
+echo.
+choice /c SN /n /m "  Empezar? [S/N]: "
+if errorlevel 2 goto :menu
+
+call :titulo "1/5  Analisis inicial"
+defrag %DISCO% /A /V
+
+call :titulo "2/5  Desfragmentacion completa, incluidos los fragmentos grandes"
+defrag %DISCO% /W /H /U /V
+if "%errorlevel%"=="0" goto :desfrag_completa_ok
+echo.
+echo   Esta version de Windows no acepta la desfragmentacion completa (/W).
+echo   Se hace la normal, que deja los fragmentos de mas de 64 MB como estan.
+defrag %DISCO% /D /H /U /V
+:desfrag_completa_ok
+
+call :titulo "3/5  Consolidar el espacio libre"
+defrag %DISCO% /X /H /U /V
+
+call :titulo "4/5  Optimizar el arranque"
+:: Usa el mapa de arranque de la carpeta Prefetch (Layout.ini). La opcion 1 lo
+:: conserva al limpiar; si alguien vacio la carpeta entera, Windows tarda unos
+:: dias en rehacerlo y este paso no tiene con que trabajar.
+defrag %DISCO% /B /H /U /V
+
+call :titulo "5/5  Analisis final"
+defrag %DISCO% /A /V
+
+echo.
+echo ==========================================================================
+echo   LISTO. Compara el porcentaje de fragmentacion del analisis inicial y del
+echo   final. La optimizacion semanal automatica de Windows sigue activa.
+echo ==========================================================================
+goto :menu
+
+:desfrag_ssd
+echo.
+echo   Es un SSD: desfragmentarlo no lo acelera y le gasta escrituras.
+echo   Lo que necesita es TRIM, que avisa al disco que bloques estan libres.
+choice /c SN /n /m "  Mandar TRIM ahora? [S/N]: "
+if errorlevel 2 goto :menu
+defrag %DISCO% /L /U /V
+goto :menu
+
+:: =========================================================================
+::  5. REVERTIR LA OPTIMIZACION
+::  Vuelve a los valores de fabrica de Windows 10 lo que la opcion 1 cambia y
+::  que podria molestar. A proposito NO revierte la seguridad reparada, las
+::  correcciones del v1, la telemetria apagada ni las apps quitadas (se
+::  reinstalan desde la Store). Para volver EXACTAMENTE a como estaba todo,
+::  esta el punto de restauracion "Antes de OptimizarPC v2" (rstrui.exe).
+:: =========================================================================
+:op_revertir
+title Optimizar PC Vieja v2 - Revertir
+call :detectar_usuario
+cls
+echo ==========================================================================
+echo   REVERTIR LA OPTIMIZACION
+echo ==========================================================================
+echo.
+echo   Usuario: "%UNAME%"
+echo.
+echo   Vuelve a fabrica: servicios, apps en segundo plano, efectos visuales,
+echo   Explorador, energia, navegadores, recortes de Defender, tareas, cache de
+echo   escritura del disco y el actualizador de Adobe Reader.
+echo   NO apaga la seguridad ni vuelve a encender la telemetria.
+echo   Para volver todo exactamente como estaba: punto de restauracion.
+echo.
+choice /c SN /n /m "  Continuar? [S/N]: "
+if errorlevel 2 goto :menu
+
+call :titulo "Servicios: valores de fabrica de Windows 10"
+for %%s in (DiagTrack PcaSvc TrkWks iphlpsvc DPS WpnService Spooler LanmanServer SysMain) do call :servicio %%s auto
+for %%s in (WSearch CDPSvc MapsBroker edgeupdate BITS DoSvc) do call :servicio %%s delayed-auto
+for %%s in (dmwappushservice XblAuthManager XblGameSave XboxNetApiSvc XboxGipSvc xbgm bthserv BTAGService BthAvctpSvc lfsvc WbioSrvc RetailDemo TabletInputService) do call :servicio %%s demand
+echo   [OK] Servicios en sus valores de fabrica.
+
+call :titulo "Tareas programadas"
+for %%t in ("\Microsoft\Windows\Application Experience\Microsoft Compatibility Appraiser" "\Microsoft\Windows\Application Experience\ProgramDataUpdater" "\Microsoft\Windows\Autochk\Proxy" "\Microsoft\Windows\Customer Experience Improvement Program\Consolidator" "\Microsoft\Windows\Customer Experience Improvement Program\UsbCeip" "\Microsoft\Windows\DiskDiagnostic\Microsoft-Windows-DiskDiagnosticDataCollector" "\Microsoft\Windows\Feedback\Siuf\DmClient" "\Microsoft\Windows\Feedback\Siuf\DmClientOnScenarioDownload" "\Microsoft\Windows\Maps\MapsUpdateTask" "\Microsoft\Windows\Maps\MapsToastTask" "\Microsoft\Windows\Windows Error Reporting\QueueReporting" "\Microsoft\Windows\Maintenance\WinSAT" "\Microsoft\XblGameSave\XblGameSaveTask") do schtasks /change /tn %%t /enable >nul 2>&1
+echo   [OK] Tareas reactivadas.
+
+call :titulo "Defender"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Set-MpPreference -EnableLowCpuPriority $false -ErrorAction SilentlyContinue; Set-MpPreference -ScanAvgCPULoadFactor 50 -ErrorAction SilentlyContinue" >nul 2>&1
+call :borrar "HKLM\SOFTWARE\Policies\Microsoft\Windows Defender Security Center\Notifications" DisableEnhancedNotifications
+call :borrar "HKLM\SOFTWARE\Policies\Microsoft\Windows Defender Security Center\Systray" HideSystray
+call :borrar "HKLM\SOFTWARE\Policies\Microsoft\MRT" DontOfferThroughWUAU
+echo   [OK] Analisis, notificaciones, icono y MRT como de fabrica. El bloqueo de PUA queda.
+
+call :titulo "Procesos en segundo plano y busqueda"
+set "_pol=HKLM\SOFTWARE\Policies\Microsoft\Windows"
+call :borrar "%_pol%\Windows Feeds" EnableFeeds
+call :borrar "%_pol%\Windows Search" AllowCortana
+call :borrar "%_pol%\Windows Search" EnableDynamicContentInWSB
+call :borrar "%_pol%\GameDVR" AllowGameDVR
+call :borrar "%_pol%\Windows Error Reporting" Disabled
+call :borrar "%_pol%\DeliveryOptimization" DODownloadMode
+call :borrar "%_pol%\Device Metadata" PreventDeviceMetadataFromNetwork
+call :borrar "%UHIVE%\Software\Policies\Microsoft\Windows\Explorer" DisableSearchBoxSuggestions
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Enable-MMAgent -ApplicationPreLaunch -ErrorAction SilentlyContinue" >nul 2>&1
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$b='%UPS%\Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications'; Get-ChildItem -LiteralPath $b -ErrorAction SilentlyContinue | ForEach-Object { Remove-ItemProperty -LiteralPath $_.PSPath -Name Disabled,DisabledByUser -ErrorAction SilentlyContinue }"
+echo   [OK] Noticias e intereses, Cortana, destacados, informe de errores, precarga
+echo        y apps en segundo plano como de fabrica.
+
+call :titulo "Interfaz y Explorador"
+set "_desk=%UHIVE%\Control Panel\Desktop"
+set "_adv=%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced"
+reg add "%_desk%" /v UserPreferencesMask /t REG_BINARY /d 9E1E078012000000 /f >nul 2>&1
+call :sz "%_desk%" DragFullWindows 1
+call :sz "%_desk%" MenuShowDelay 400
+call :sz "%_desk%\WindowMetrics" MinAnimate 1
+call :dword "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects" VisualFXSetting 0
+call :dword "%_adv%" ListviewAlphaSelect 1
+call :dword "%_adv%" ListviewShadow 1
+call :dword "%_adv%" TaskbarAnimations 1
+call :dword "%_adv%" IconsOnly 0
+call :dword "%_adv%" Start_TrackProgs 1
+call :borrar "%_adv%" LaunchTo
+call :dword "%UHIVE%\Software\Microsoft\Windows\DWM" EnableAeroPeek 1
+call :dword "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" EnableTransparency 1
+call :borrar "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Explorer" AltTabSettings
+call :borrar "HKLM\SOFTWARE\Policies\Microsoft\Windows\System" DisableAcrylicBackgroundOnLogon
+reg delete "%UCLS%\Local Settings\Software\Microsoft\Windows\Shell\BagMRU" /f >nul 2>&1
+reg delete "%UCLS%\Local Settings\Software\Microsoft\Windows\Shell\Bags" /f >nul 2>&1
+echo   [OK] Efectos visuales, desenfoque al iniciar sesion, menus, animaciones, Alt+Tab
+echo        y Explorador como de fabrica.
+
+call :titulo "Cache de escritura del disco"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$n=(Get-Partition -DriveLetter $env:SystemDrive.Substring(0,1) -ErrorAction SilentlyContinue).DiskNumber; $d=Get-PhysicalDisk -ErrorAction SilentlyContinue | Where-Object { $_.DeviceId -eq [string]$n } | Select-Object -First 1; $w=Get-CimInstance Win32_DiskDrive -ErrorAction SilentlyContinue | Where-Object { $_.Index -eq $n } | Select-Object -First 1; if (-not $w -or -not $w.PNPDeviceID) { Write-Output '  No se encontro el disco del sistema: nada que revertir.'; exit 0 }; $k='Registry::HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Enum\' + $w.PNPDeviceID + '\Device Parameters\Disk'; Remove-ItemProperty -LiteralPath $k -Name CacheIsPowerProtected -ErrorAction SilentlyContinue; Write-Output '  [OK] El vaciado del bufer de escritura vuelve a estar activo, como de fabrica.'"
+
+call :titulo "Archivo de paginacion"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$cs=Get-CimInstance Win32_ComputerSystem; if ($cs.AutomaticManagedPagefile) { Write-Output '  [OK] El archivo de paginacion ya es automatico.'; exit 0 }; $ram=[math]::Round($cs.TotalPhysicalMemory / 1MB); $ini=[int][math]::Round($ram * 1.5); $max=[int][math]::Max($ram * 3, 4096); $pf=Get-CimInstance Win32_PageFileSetting | Where-Object { $_.Name -eq ($env:SystemDrive + '\pagefile.sys') } | Select-Object -First 1; if ($pf -and $pf.InitialSize -eq $ini -and $pf.MaximumSize -eq $max) { Set-CimInstance -InputObject $cs -Property @{AutomaticManagedPagefile=$true}; Write-Output '  [OK] El archivo de paginacion vuelve a ser automatico, como de fabrica.' } else { Write-Output '  [OK] El archivo de paginacion lo configuro alguien a mano: se deja como esta.' }"
+
+call :titulo "Energia"
+:: Herramienta oficial: vuelve los planes de Windows a fabrica, con sus botones,
+:: tapa, suspension y tiempos de disco, y deja activo el plan Equilibrado.
+powercfg -restoredefaultschemes >nul 2>&1
+powercfg /hibernate on >nul 2>&1
+call :dword "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Power" HiberbootEnabled 1
+call :borrar "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\FlyoutMenuSettings" ShowSleepOption
+call :borrar "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\FlyoutMenuSettings" ShowHibernateOption
+echo   [OK] Planes de energia de fabrica: Equilibrado, botones, tapa y suspension.
+echo   [OK] Hibernacion e inicio rapido activados; Suspender vuelve al menu de apagado.
+
+call :titulo "Restaurar sistema"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Enable-ComputerRestore -Drive ($env:SystemDrive + '\') -ErrorAction SilentlyContinue" >nul 2>&1
+schtasks /change /tn "\Microsoft\Windows\SystemRestore\SR" /enable >nul 2>&1
+echo   [OK] Restaurar sistema activado, como viene de fabrica.
+echo        Los puntos de restauracion borrados no vuelven: empiezan de cero.
+
+call :titulo "Navegadores"
+set "_edge=HKLM\SOFTWARE\Policies\Microsoft\Edge"
+for %%v in (StartupBoostEnabled BackgroundModeEnabled HubsSidebarEnabled WebWidgetAllowed ShowRecommendationsEnabled EdgeShoppingAssistantEnabled ShowMicrosoftRewards PersonalizationReportingEnabled DiagnosticData UserFeedbackAllowed HideFirstRunExperience) do call :borrar "%_edge%" %%v
+call :borrar "%_edge%\Recommended" SleepingTabsEnabled
+call :borrar "%_edge%\Recommended" SleepingTabsTimeout
+call :borrar "HKLM\SOFTWARE\Policies\Microsoft\EdgeUpdate" CreateDesktopShortcutDefault
+call :borrar "HKLM\SOFTWARE\Policies\Google\Chrome" BackgroundModeEnabled
+echo   [OK] Politicas de Edge y Chrome quitadas.
+
+call :titulo "Adobe Reader"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "if (-not (Get-Service -Name AdobeARMservice -ErrorAction SilentlyContinue)) { Write-Output '  Adobe Reader no esta instalado: nada que revertir.'; exit 0 }; Set-Service -Name AdobeARMservice -StartupType Automatic -ErrorAction SilentlyContinue; Start-Service -Name AdobeARMservice -ErrorAction SilentlyContinue; Get-ScheduledTask -TaskName 'Adobe Acrobat Update Task*' -ErrorAction SilentlyContinue | Enable-ScheduledTask -ErrorAction SilentlyContinue | Out-Null; Write-Output '  [OK] Adobe Reader: actualizacion automatica activada otra vez.'; Write-Output '       Las entradas de inicio viejas no vuelven: Reader no las necesita.'"
+
+echo.
+echo   Para recuperar lo que no se revierte solo:
+echo    - OneDrive: abrilo una vez y vuelve a arrancar con Windows.
+echo    - Apps quitadas: se reinstalan gratis desde la Microsoft Store.
+echo    - App Fotos: buscala en la Store como "Microsoft Fotos". El Visualizador de
+echo      fotos clasico queda disponible: no molesta y no ocupa nada.
+echo.
+echo ==========================================================================
+echo   LISTO. Hay que REINICIAR la PC. Usa "Reiniciar", no "Apagar".
+echo ==========================================================================
+goto :fin_con_reinicio
+
+:: =========================================================================
+::  6. DESHACER LO PERJUDICIAL DEL SCRIPT ORIGINAL (v1)
+::  Deshace SOLO lo que el "Optimizador Extremo" (v1) hacia mal con 2 GB de RAM
+::  y disco mecanico. No hace falta si se usa la opcion 1: ya lo incluye.
+:: =========================================================================
+:op_deshacer_v1
+title Optimizar PC Vieja v2 - Deshacer lo perjudicial del v1
+set "_mm=HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management"
+
+cls
+echo ==========================================================================
+echo   DESHACER LO PERJUDICIAL DEL SCRIPT ORIGINAL
+echo ==========================================================================
+echo.
+echo   Esto va a:
+echo    1. Volver a activar SysMain y la compresion de memoria.
+echo    2. Devolver el teclado tactil: sin el no se puede escribir en el Inicio.
+echo    3. Reparar Delivery Optimization para no romper Windows Update, y
+echo       apagar su P2P de la forma correcta.
+echo    4. Volver DisablePagingExecutive a 0.
+echo    5. Volver la biometria a Manual, por si la PC tiene lector de huellas.
+echo    6. Borrar los placebos IOPageLockLimit y DontVerifyRandomDrivers.
+echo.
+choice /c SN /n /m "  Continuar? [S/N]: "
+if errorlevel 2 goto :menu
+echo.
+
+:: 1. SysMain: maneja la compresion de memoria. Con 2 GB de RAM, comprimir en
+::    RAM es mucho mas rapido que paginar a un disco mecanico.
+sc config SysMain start= auto >nul 2>&1
+sc start SysMain >nul 2>&1
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Enable-MMAgent -MemoryCompression -ErrorAction SilentlyContinue" >nul 2>&1
+echo   [OK] SysMain en Automatico y compresion de memoria activada.
+
+:: 2. TabletInputService: en Windows 10 actual, de el depende escribir en el
+::    menu Inicio, en Configuracion y en las apps UWP. Valor de fabrica: Manual.
+sc config TabletInputService start= demand >nul 2>&1
+sc start TabletInputService >nul 2>&1
+echo   [OK] Servicio de teclado tactil en Manual, su valor de fabrica.
+
+:: 3. Delivery Optimization: deshabilitado puede romper Windows Update. Vuelve
+::    a su valor de fabrica, Automatico retrasado, y el P2P se apaga con la
+::    politica oficial, que era lo que buscaba el script original.
+reg add "HKLM\SYSTEM\CurrentControlSet\Services\DoSvc" /v Start /t REG_DWORD /d 2 /f >nul 2>&1
+reg add "HKLM\SYSTEM\CurrentControlSet\Services\DoSvc" /v DelayedAutostart /t REG_DWORD /d 1 /f >nul 2>&1
+reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\DeliveryOptimization" /v DODownloadMode /t REG_DWORD /d 0 /f >nul 2>&1
+echo   [OK] Delivery Optimization reparado, sin compartir actualizaciones por P2P.
+
+:: 4. DisablePagingExecutive=1 fija el kernel en RAM; con poca memoria eso
+::    empuja a tus programas al disco. Valor de fabrica: 0.
+reg add "%_mm%" /v DisablePagingExecutive /t REG_DWORD /d 0 /f >nul 2>&1
+echo   [OK] DisablePagingExecutive en 0.
+
+:: 5. Biometria: deshabilitada rompe Windows Hello con huella. En Manual no
+::    gasta nada si no hay lector.
+sc config WbioSrvc start= demand >nul 2>&1
+echo   [OK] Biometria en Manual, su valor de fabrica.
+
+:: 6. Placebos: Windows los ignora. Se borran para no dejar basura.
+reg delete "%_mm%" /v IOPageLockLimit /f >nul 2>&1
+reg delete "%_mm%" /v DontVerifyRandomDrivers /f >nul 2>&1
+echo   [OK] IOPageLockLimit y DontVerifyRandomDrivers borrados.
+
+echo.
+echo   Se dejan como estaban, porque estaban bien: telemetria, Xbox, Bluetooth,
+echo   mapas, ubicacion, Retail Demo, NTFS y CompactOS desactivado.
+echo.
+echo ==========================================================================
+echo   LISTO. Hay que REINICIAR la PC. Usa "Reiniciar", no "Apagar".
+echo ==========================================================================
+goto :fin_con_reinicio
 
 :: =========================================================================
 ::  SUBRUTINAS
@@ -761,9 +1160,58 @@ goto :eof
 :asegurar_par
 for /f "tokens=1,2 delims=:" %%a in ("%~1") do call :asegurar %%a %%b
 goto :eof
+
+:: Usuario de la sesion abierta (dueno del explorer.exe de esta sesion). Deja
+:: listos USID, UNAME, UHIVE, UCLS, UPS y UPROFILE. Se calcula una sola vez.
+:detectar_usuario
+if defined UHIVE goto :eof
+set "USID="
+set "UNAME="
+for /f "usebackq tokens=1,2 delims=|" %%a in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "$s=(Get-Process -Id $PID).SessionId; $p=Get-CimInstance Win32_Process -Filter 'Name=''explorer.exe''' | Where-Object { $_.SessionId -eq $s } | Select-Object -First 1; if ($p) { $o=Invoke-CimMethod -InputObject $p -MethodName GetOwner; $i=Invoke-CimMethod -InputObject $p -MethodName GetOwnerSid; $i.Sid + '|' + $o.Domain + '\' + $o.User }"`) do (
+    set "USID=%%a"
+    set "UNAME=%%b"
+)
+if defined USID if not "%USID:~0,4%"=="S-1-" set "USID="
+if not defined USID goto :usid_validado
+reg query "HKU\%USID%" >nul 2>&1
+if errorlevel 1 set "USID="
+:usid_validado
+if defined USID goto :usuario_detectado
+set "UHIVE=HKCU"
+set "UCLS=HKCU\Software\Classes"
+set "UPS=Registry::HKEY_CURRENT_USER"
+set "UNAME=%USERDOMAIN%\%USERNAME%"
+set "UPROFILE=%USERPROFILE%"
+goto :usuario_listo
+:usuario_detectado
+set "UHIVE=HKU\%USID%"
+:: Las clases del usuario viven en su propia colmena; si no estuviera cargada,
+:: Software\Classes del usuario es un enlace de Windows a esa misma colmena.
+set "UCLS=HKU\%USID%_Classes"
+reg query "%UCLS%" >nul 2>&1
+if errorlevel 1 set "UCLS=HKU\%USID%\Software\Classes"
+set "UPS=Registry::HKEY_USERS\%USID%"
+set "UPROFILE="
+for /f "tokens=2,*" %%a in ('reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\%USID%" /v ProfileImagePath 2^>nul ^| findstr /i "ProfileImagePath"') do call set "UPROFILE=%%b"
+:usuario_listo
+goto :eof
+
+:: Borra un valor si existe. Uso: call :borrar "clave" valor
+:borrar
+reg delete "%~1" /v %~2 /f >nul 2>&1
+goto :eof
+
+:: Espacio libre en el disco del sistema, en MB. Uso: call :libre VARIABLE
+:libre
+set "%~1=0"
+for /f "usebackq delims=" %%m in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "[string][math]::Floor((Get-PSDrive -Name $env:SystemDrive.Substring(0,1)).Free / 1MB)"`) do set "%~1=%%m"
+goto :eof
+
 :: =========================================================================
-::  LIMPIEZA DE TEMPORALES (PowerShell). La ejecuta el paso 12. cmd nunca
-::  llega hasta aca: todo termina antes con "exit /b" o "goto :eof".
+::  SECCIONES EN POWERSHELL. cmd nunca llega hasta aca: todo termina antes
+::  con "exit /b", "goto :menu" o "goto :eof".
+::   - LIMPIEZA: vaciado de temporales (paso 12 de la opcion 1).
+::   - VERIFICAR: el reporte de la opcion 2.
 :: =========================================================================
 #LIMPIEZA-INICIO#
 $ErrorActionPreference = 'SilentlyContinue'
@@ -850,3 +1298,343 @@ if (Get-Command Delete-DeliveryOptimizationCache -ErrorAction SilentlyContinue) 
 }
 Write-Output ('  TOTAL liberado: ' + [Math]::Round($totalBytes / 1MB, 1) + ' MB. Salteados por estar en uso: ' + $totalSalteados + '.')
 #LIMPIEZA-FIN#
+#VERIFICAR-INICIO#
+# ---------------------------------------------------------------------------
+# Reporte de la opcion 2, en PowerShell. cmd nunca llega aca.
+# ---------------------------------------------------------------------------
+$ErrorActionPreference = 'SilentlyContinue'
+$lineas = New-Object System.Collections.Generic.List[string]
+function L([string]$texto = '') { $lineas.Add($texto); Write-Host $texto }
+function Titulo([string]$texto) { L ''; L ('=== ' + $texto + ' ' + ('=' * [Math]::Max(3, 70 - $texto.Length))) }
+
+function Leer([string]$clave, [string]$valor) {
+    $item = Get-ItemProperty -LiteralPath ('Registry::' + $clave) -Name $valor -ErrorAction SilentlyContinue
+    if ($null -eq $item) { return '(no existe)' }
+    $dato = $item.$valor
+    if ($dato -is [byte[]]) { return (($dato | ForEach-Object { $_.ToString('X2') }) -join '') }
+    return [string]$dato
+}
+
+function InicioServicio([string]$nombre) {
+    $k = 'Registry::HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\' + $nombre
+    $p = Get-ItemProperty -LiteralPath $k -ErrorAction SilentlyContinue
+    if ($null -eq $p) { return 'no existe' }
+    switch ([int]$p.Start) {
+        0 { 'Boot' }
+        1 { 'Sistema' }
+        2 { if ($p.DelayedAutostart -eq 1) { 'Auto retrasado' } else { 'Automatico' } }
+        3 { 'Manual' }
+        4 { 'DESHABILITADO' }
+        default { [string]$p.Start }
+    }
+}
+
+# --- Equipo -----------------------------------------------------------------
+Titulo 'Equipo'
+$os = Get-CimInstance Win32_OperatingSystem
+$cs = Get-CimInstance Win32_ComputerSystem
+$ver = Leer 'HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion' 'DisplayVersion'
+L ('Fecha:            ' + (Get-Date -Format 'yyyy-MM-dd HH:mm'))
+L ('Equipo:           ' + $env:COMPUTERNAME)
+L ('Windows:          ' + $os.Caption + ' ' + $ver + ' (compilacion ' + $os.BuildNumber + ', ' + $os.OSArchitecture + ')')
+L ('RAM:              ' + [Math]::Round($cs.TotalPhysicalMemory / 1GB, 1) + ' GB')
+Get-PhysicalDisk | ForEach-Object { L ('Disco:            ' + $_.FriendlyName + ' - ' + $_.MediaType + ' - ' + [Math]::Round($_.Size / 1GB) + ' GB') }
+$c = Get-PSDrive -Name $env:SystemDrive.Substring(0, 1)
+L ('Libre en ' + $env:SystemDrive + '       ' + [Math]::Round($c.Free / 1GB, 1) + ' GB')
+if (Get-CimInstance Win32_Battery) { L 'Tipo:             Notebook (tiene bateria)' } else { L 'Tipo:             Escritorio' }
+L ('Procesador:       ' + ((Get-CimInstance Win32_Processor | Select-Object -First 1).Name -replace '\s+', ' ').Trim())
+Get-CimInstance Win32_VideoController | ForEach-Object {
+    $basica = ($_.InfFilename -eq 'display.inf' -or $_.Name -match 'Basic Display')
+    $nota = if ($basica) { '  <-- driver basico de Microsoft: sin aceleracion (tipico de GMA 3600)' } else { '' }
+    L ('Video:            ' + $_.Name + ' (' + $_.InfFilename + ', ' + $_.CurrentHorizontalResolution + 'x' + $_.CurrentVerticalResolution + ')' + $nota)
+}
+
+# --- Usuario de la sesion -----------------------------------------------------
+Titulo 'Usuario de la sesion'
+$s = (Get-Process -Id $PID).SessionId
+$ex = Get-CimInstance Win32_Process -Filter "Name='explorer.exe'" | Where-Object { $_.SessionId -eq $s } | Select-Object -First 1
+$sid = $null
+if ($ex) {
+    $o = Invoke-CimMethod -InputObject $ex -MethodName GetOwner
+    $sid = (Invoke-CimMethod -InputObject $ex -MethodName GetOwnerSid).Sid
+    L ('Sesion abierta:   ' + $o.Domain + '\' + $o.User + '  (' + $sid + ')')
+} else {
+    L 'Sesion abierta:   no detectada; se lee la cuenta actual'
+}
+L ('Ejecutado por:    ' + [Security.Principal.WindowsIdentity]::GetCurrent().Name)
+if ($sid -and (Test-Path -LiteralPath ('Registry::HKEY_USERS\' + $sid))) { $U = 'HKEY_USERS\' + $sid } else { $U = 'HKEY_CURRENT_USER' }
+
+# --- Antirrobo de Conectar Igualdad -------------------------------------------
+Titulo 'Antirrobo de Conectar Igualdad (Theft Deterrent)'
+$tda = @()
+foreach ($d in $env:ProgramFiles, ${env:ProgramFiles(x86)}) { if ($d) { $r = Join-Path $d 'Intel Learning Series\Theft Deterrent'; if (Test-Path -LiteralPath $r) { $tda += ('carpeta ' + $r) } } }
+Get-Service | Where-Object { ($_.Name + ' ' + $_.DisplayName) -match 'Theft|Deterrent|TDAgent' } | ForEach-Object { $tda += ('servicio ' + $_.Name + ' (' + $_.Status + ')') }
+foreach ($k in 'HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Run', 'HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Run') {
+    $i = Get-Item -LiteralPath ('Registry::' + $k)
+    if ($i) { $i.Property | Where-Object { $_ -match 'Theft|Deterrent|TDAgent' } | ForEach-Object { $tda += ('inicio ' + $_) } }
+}
+if ($tda) { $tda | ForEach-Object { L ('Detectado: ' + $_) }; L 'Si la netbook no esta liberada, NO lo desactives: sin el agente se bloquea.' } else { L 'No detectado.' }
+
+# --- Seguridad ----------------------------------------------------------------
+Titulo 'Seguridad'
+$mp = Get-MpComputerStatus
+if ($mp) {
+    L ('Defender servicio / antivirus:  ' + $mp.AMServiceEnabled + ' / ' + $mp.AntivirusEnabled)
+    L ('Tiempo real / comportamiento:   ' + $mp.RealTimeProtectionEnabled + ' / ' + $mp.BehaviorMonitorEnabled)
+    L ('Descargas (IOAV):               ' + $mp.IoavProtectionEnabled)
+    L ('Proteccion contra alteraciones: ' + $mp.IsTamperProtected)
+    L ('Firmas del:                     ' + $mp.AntivirusSignatureLastUpdated)
+} else { L 'Defender: no se pudo leer el estado' }
+$av = Get-CimInstance -Namespace root/SecurityCenter2 -ClassName AntiVirusProduct
+if ($av) { L ('Antivirus registrados:          ' + (($av | ForEach-Object { $_.displayName }) -join ', ')) }
+$pref = Get-MpPreference
+if ($pref) {
+    L ('PUA / nube (MAPS) / muestras:   ' + $pref.PUAProtection + ' / ' + $pref.MAPSReporting + ' / ' + $pref.SubmitSamplesConsent)
+    L ('Analisis: CPU max / prioridad baja / solo inactiva: ' + $pref.ScanAvgCPULoadFactor + ' / ' + $pref.EnableLowCpuPriority + ' / ' + $pref.ScanOnlyIfIdleEnabled)
+    L ('Analisis de recuperacion desactivados (rapido / completo): ' + $pref.DisableCatchupQuickScan + ' / ' + $pref.DisableCatchupFullScan)
+}
+Get-NetFirewallProfile | ForEach-Object { L ('Firewall ' + $_.Name + ':' + (' ' * (22 - $_.Name.Length)) + $_.Enabled) }
+$uac = 'HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System'
+L ('UAC EnableLUA / ConsentPromptBehaviorAdmin / PromptOnSecureDesktop: ' + (Leer $uac 'EnableLUA') + ' / ' + (Leer $uac 'ConsentPromptBehaviorAdmin') + ' / ' + (Leer $uac 'PromptOnSecureDesktop'))
+L ('SmartScreen (Explorer):         ' + (Leer 'HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer' 'SmartScreenEnabled'))
+L ('SmartScreen (politica):         ' + (Leer 'HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\System' 'EnableSmartScreen'))
+$dep = @{0 = 'AlwaysOff'; 1 = 'AlwaysOn'; 2 = 'OptIn'; 3 = 'OptOut'}[[int]$os.DataExecutionPrevention_SupportPolicy]
+L ('DEP:                            ' + $dep)
+$mm = 'HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management'
+L ('Spectre/Meltdown override:      ' + (Leer $mm 'FeatureSettingsOverride') + '  (3 = mitigaciones apagadas)')
+$wd = 'HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows Defender'
+foreach ($par in @(@($wd, 'DisableAntiSpyware'), @($wd, 'DisableAntiVirus'), @(($wd + '\Real-Time Protection'), 'DisableRealtimeMonitoring'), @(($wd + '\Spynet'), 'SpynetReporting'))) {
+    L ('Politica Defender ' + $par[1] + ': ' + (Leer $par[0] $par[1]))
+}
+$wu = 'HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate'
+L ('Politica WU NoAutoUpdate / DisableWindowsUpdateAccess: ' + (Leer ($wu + '\AU') 'NoAutoUpdate') + ' / ' + (Leer $wu 'DisableWindowsUpdateAccess'))
+L ('Reproduccion automatica NoDriveTypeAutoRun: ' + (Leer 'HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer' 'NoDriveTypeAutoRun'))
+
+# --- Memoria ------------------------------------------------------------------
+Titulo 'Memoria'
+$mma = Get-MMAgent
+if ($mma) { L ('Compresion de memoria / precarga de apps / combinacion de paginas: ' + $mma.MemoryCompression + ' / ' + $mma.ApplicationPreLaunch + ' / ' + $mma.PageCombining) }
+L ('Proceso de compresion activo:   ' + [bool](Get-Process -Name 'Memory Compression'))
+foreach ($v in 'DisablePagingExecutive', 'IOPageLockLimit', 'DontVerifyRandomDrivers', 'LargeSystemCache') { L ($v + ': ' + (Leer $mm $v)) }
+L ('Paginacion administrada por Windows: ' + $cs.AutomaticManagedPagefile)
+Get-CimInstance Win32_PageFileSetting | ForEach-Object { L ('Paginacion configurada:         ' + $_.Name + ' - inicial ' + $_.InitialSize + ' MB, maximo ' + $_.MaximumSize + ' MB   (la v2: 1,5 x RAM y 3 x RAM o 4 GB)') }
+Get-CimInstance Win32_PageFileUsage | ForEach-Object { L ('Archivo de paginacion:          ' + $_.Name + ' - ' + $_.AllocatedBaseSize + ' MB (en uso ' + $_.CurrentUsage + ' MB, pico ' + $_.PeakUsage + ' MB)') }
+
+# --- Servicios ----------------------------------------------------------------
+Titulo 'Servicios (inicio / estado / lo que espera la v2)'
+$espera = [ordered]@{
+    'SysMain' = 'Automatico'; 'TabletInputService' = 'Manual'; 'DoSvc' = 'Auto retrasado'
+    'DiagTrack' = 'DESHABILITADO'; 'dmwappushservice' = 'DESHABILITADO'; 'WSearch' = 'DESHABILITADO'; 'RemoteRegistry' = 'DESHABILITADO'
+    'XblAuthManager' = 'DESHABILITADO'; 'XblGameSave' = 'DESHABILITADO'; 'XboxNetApiSvc' = 'DESHABILITADO'; 'XboxGipSvc' = 'DESHABILITADO'; 'xbgm' = 'DESHABILITADO'
+    'bthserv' = 'DESHABILITADO'; 'BTAGService' = 'DESHABILITADO'; 'BthAvctpSvc' = 'DESHABILITADO'
+    'PcaSvc' = 'Manual'; 'TrkWks' = 'Manual'; 'iphlpsvc' = 'Manual'; 'DPS' = 'Manual'; 'CDPSvc' = 'Manual'; 'MapsBroker' = 'Manual'; 'edgeupdate' = 'Manual'
+    'lfsvc' = 'Manual'; 'WbioSrvc' = 'Manual'; 'RetailDemo' = 'Manual'
+    'BITS' = 'Auto retrasado'; 'WpnService' = 'Auto retrasado'
+    'Spooler' = 'segun respuesta'; 'LanmanServer' = 'segun respuesta'
+    'WinDefend' = 'Automatico'; 'WdNisSvc' = 'Manual'; 'SecurityHealthService' = 'Manual'; 'wscsvc' = 'Auto retrasado'; 'mpssvc' = 'Automatico'; 'BFE' = 'Automatico'
+    'wuauserv' = 'Manual'; 'UsoSvc' = 'Auto retrasado'; 'WaaSMedicSvc' = 'Manual'; 'CryptSvc' = 'Automatico'; 'TrustedInstaller' = 'Manual'
+    'AppXSvc' = 'Manual'; 'ClipSVC' = 'Manual'; 'InstallService' = 'Manual'; 'Appinfo' = 'Manual'; 'VSS' = 'Manual'; 'swprv' = 'Manual'; 'W32Time' = 'Manual'
+    'AdobeARMservice' = 'DESHABILITADO'
+    'EventLog' = 'Automatico'; 'Schedule' = 'Automatico'; 'Winmgmt' = 'Automatico'; 'Audiosrv' = 'Automatico'; 'Dhcp' = 'Automatico'; 'Dnscache' = 'Automatico'; 'Themes' = 'Automatico'
+}
+foreach ($n in $espera.Keys) {
+    $ini = InicioServicio $n
+    if ($ini -eq 'no existe') { continue }
+    $sv = Get-Service -Name $n
+    $est = if ($sv) { [string]$sv.Status } else { '?' }
+    $marca = if ($espera[$n] -eq 'segun respuesta' -or $espera[$n] -eq $ini) { ' ' } else { '*' }
+    L ($marca + ' ' + $n.PadRight(22) + $ini.PadRight(16) + $est.PadRight(10) + $espera[$n])
+}
+L '  (* = distinto de lo que deja la v2. Antes de correrla, es normal que haya varios.)'
+
+# --- Tareas programadas ---------------------------------------------------------
+Titulo 'Tareas programadas'
+$tareas = @(
+    '\Microsoft\Windows\Defrag\ScheduledDefrag',
+    '\Microsoft\Windows\Servicing\StartComponentCleanup',
+    '\Microsoft\Windows\DiskDiagnostic\Microsoft-Windows-DiskDiagnosticResolver',
+    '\Microsoft\Windows\Windows Defender\Windows Defender Scheduled Scan',
+    '\Microsoft\Windows\SystemRestore\SR',
+    '\Microsoft\Windows\Application Experience\Microsoft Compatibility Appraiser',
+    '\Microsoft\Windows\Customer Experience Improvement Program\Consolidator',
+    '\Microsoft\Windows\Maintenance\WinSAT',
+    '\Microsoft\Windows\Windows Error Reporting\QueueReporting',
+    '\Adobe Acrobat Update Task'
+)
+foreach ($t in $tareas) {
+    $ruta = $t.Substring(0, $t.LastIndexOf('\') + 1)
+    $nom = $t.Substring($t.LastIndexOf('\') + 1)
+    $st = Get-ScheduledTask -TaskPath $ruta -TaskName $nom
+    $estado = if ($st) { [string]$st.State } else { 'no existe' }
+    L ($estado.PadRight(10) + $t)
+}
+
+# --- Politicas del equipo -------------------------------------------------------
+Titulo 'Politicas del equipo'
+$pol = 'HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows'
+$lista = @(
+    @(($pol + '\DataCollection'), 'AllowTelemetry'),
+    @(($pol + '\Windows Feeds'), 'EnableFeeds'),
+    @(($pol + '\Windows Search'), 'AllowCortana'),
+    @(($pol + '\Windows Search'), 'EnableDynamicContentInWSB'),
+    @(($pol + '\GameDVR'), 'AllowGameDVR'),
+    @(($pol + '\DeliveryOptimization'), 'DODownloadMode'),
+    @(($pol + '\Windows Error Reporting'), 'Disabled'),
+    @(($pol + '\CloudContent'), 'DisableWindowsConsumerFeatures'),
+    @('HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\System', 'DisableAcrylicBackgroundOnLogon'),
+    @('HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows Defender Security Center\Systray', 'HideSystray'),
+    @('HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows Defender Security Center\Notifications', 'DisableEnhancedNotifications'),
+    @('HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\MRT', 'DontOfferThroughWUAU'),
+    @('HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Edge', 'StartupBoostEnabled'),
+    @('HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Edge', 'BackgroundModeEnabled'),
+    @('HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Edge\Recommended', 'SleepingTabsTimeout'),
+    @('HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Google\Chrome', 'BackgroundModeEnabled')
+)
+foreach ($par in $lista) { L ($par[1].PadRight(32) + (Leer $par[0] $par[1]).PadRight(12) + $par[0].Replace('HKEY_LOCAL_MACHINE', 'HKLM')) }
+
+# --- Ajustes del usuario --------------------------------------------------------
+Titulo 'Ajustes del usuario de la sesion'
+$lista = @(
+    @(($U + '\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager'), 'SilentInstalledAppsEnabled'),
+    @(($U + '\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager'), 'SubscribedContent-338389Enabled'),
+    @(($U + '\Software\Microsoft\Windows\CurrentVersion\AdvertisingInfo'), 'Enabled'),
+    @(($U + '\Software\Policies\Microsoft\Windows\Explorer'), 'DisableSearchBoxSuggestions'),
+    @(($U + '\Control Panel\Desktop'), 'UserPreferencesMask'),
+    @(($U + '\Control Panel\Desktop'), 'MenuShowDelay'),
+    @(($U + '\Control Panel\Desktop'), 'FontSmoothing'),
+    @(($U + '\Control Panel\Desktop'), 'DragFullWindows'),
+    @(($U + '\Control Panel\Desktop\WindowMetrics'), 'MinAnimate'),
+    @(($U + '\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'), 'IconsOnly'),
+    @(($U + '\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects'), 'VisualFXSetting'),
+    @(($U + '\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize'), 'EnableTransparency'),
+    @(($U + '\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'), 'LaunchTo'),
+    @(($U + '\System\GameConfigStore'), 'GameDVR_Enabled')
+)
+foreach ($par in $lista) { L ($par[1].PadRight(32) + (Leer $par[0] $par[1])) }
+$bg = Get-ChildItem -LiteralPath ('Registry::' + $U + '\Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications')
+$apagadas = @($bg | Where-Object { (Get-ItemProperty -LiteralPath $_.PSPath).Disabled -eq 1 }).Count
+L ('Apps en segundo plano apagadas: ' + $apagadas + ' de ' + @($bg).Count + '  (interruptor general GlobalUserDisabled: ' + (Leer ($U + '\Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications') 'GlobalUserDisabled') + ')')
+$cls = if ($U -eq 'HKEY_CURRENT_USER') { 'HKEY_CURRENT_USER\Software\Classes' } else { $U + '_Classes' }
+L ('Tipo de carpeta generico:       ' + (Leer ($cls + '\Local Settings\Software\Microsoft\Windows\Shell\Bags\AllFolders\Shell') 'FolderType'))
+L ('OneDrive al inicio:             ' + (Leer ($U + '\Software\Microsoft\Windows\CurrentVersion\Run') 'OneDrive'))
+
+# --- Disco y energia ----------------------------------------------------------
+Titulo 'Disco y energia'
+L ((fsutil behavior query DisableLastAccess) -join ' ')
+L ((fsutil behavior query Disable8dot3) -join ' ')
+$nd = (Get-Partition -DriveLetter $env:SystemDrive.Substring(0, 1)).DiskNumber
+$dd = Get-PhysicalDisk | Where-Object { $_.DeviceId -eq [string]$nd } | Select-Object -First 1
+$ca = $null
+if ($dd) { $ca = $dd | Get-StorageAdvancedProperty }
+if ($ca) { L ('Cache de escritura del disco:   ' + $ca.IsDeviceCacheEnabled + '   (vaciado de bufer desactivado: ' + $ca.IsPowerProtected + '; la v2 lo deja en True si el disco es mecanico)') } else { L 'Cache de escritura del disco:   Windows no informa su estado' }
+$rb = @(Get-PSDrive -PSProvider FileSystem | ForEach-Object { Join-Path $_.Root 'ReadyBoost.sfcache' } | Where-Object { Test-Path -LiteralPath $_ })
+$rbTexto = 'no'
+if ($rb.Count) { $rbTexto = $rb -join ', ' }
+L ('ReadyBoost en uso:              ' + $rbTexto)
+$compacto = $false
+foreach ($f in 'System32\shell32.dll', 'System32\mshtml.dll', 'explorer.exe') {
+    $ruta = Join-Path $env:windir $f
+    if ((Test-Path -LiteralPath $ruta) -and ((Get-Item -LiteralPath $ruta -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) { $compacto = $true }
+}
+L ('Sistema comprimido (CompactOS): ' + $compacto)
+L ('Plan de energia:                ' + ((powercfg /getactivescheme) -join ' '))
+L ('Inicio rapido (HiberbootEnabled): ' + (Leer 'HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Power' 'HiberbootEnabled'))
+L ('Hibernacion habilitada:         ' + (Leer 'HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Power' 'HibernateEnabled'))
+# Lee los valores actuales (enchufada / bateria) de un ajuste del plan activo.
+function Energia([string]$sub, [string]$ajuste) {
+    $v = powercfg /query SCHEME_CURRENT $sub $ajuste | Where-Object { $_ -match '0x[0-9a-fA-F]{8}\s*$' } | Select-Object -Last 2 | ForEach-Object { [Convert]::ToInt32(([regex]::Match($_, '0x[0-9a-fA-F]{8}')).Value, 16) }
+    if ($v) { ($v -join ' / ') } else { '?' }
+}
+L 'Valores enchufada / bateria. Botones y tapa: 0 nada, 1 suspender, 2 hibernar, 3 apagar.'
+L ('Boton de encendido:             ' + (Energia SUB_BUTTONS PBUTTONACTION))
+L ('Cerrar la tapa:                 ' + (Energia SUB_BUTTONS LIDACTION))
+L ('Boton de suspension:            ' + (Energia SUB_BUTTONS SBUTTONACTION))
+L ('Bateria critica:                ' + (Energia SUB_BATTERY BATACTIONCRIT))
+L ('Suspender tras (seg, 0 nunca, 14400 = 4 h): ' + (Energia SUB_SLEEP STANDBYIDLE))
+L ('Hibernar tras (seg, 0 nunca):   ' + (Energia SUB_SLEEP HIBERNATEIDLE))
+L ('Apagar disco tras (seg, 0 nunca): ' + (Energia SUB_DISK DISKIDLE))
+$fm = 'HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\FlyoutMenuSettings'
+L ('Menu de apagado: Suspender / Hibernar visibles: ' + (Leer $fm 'ShowSleepOption') + ' / ' + (Leer $fm 'ShowHibernateOption') + '   (0 = ocultos)')
+
+# --- Temporales y Prefetch ----------------------------------------------------
+Titulo 'Temporales y Prefetch (tamano actual)'
+# Mide sin seguir enlaces (junctions ni symlinks), igual que la limpieza.
+function Medir([string]$carpeta) {
+    if (-not [IO.Directory]::Exists($carpeta)) { return $null }
+    $total = 0; $archivos = 0
+    $pila = New-Object System.Collections.Stack; $pila.Push($carpeta)
+    while ($pila.Count -gt 0) {
+        $d = $pila.Pop()
+        try { $entradas = [IO.Directory]::GetFileSystemEntries($d) } catch { continue }
+        foreach ($e in $entradas) {
+            try { $a = [IO.File]::GetAttributes($e) } catch { continue }
+            if ($a -band [IO.FileAttributes]::ReparsePoint) { continue }
+            if ($a -band [IO.FileAttributes]::Directory) { $pila.Push($e) } else { $archivos++; try { $total += (New-Object IO.FileInfo($e)).Length } catch { } }
+        }
+    }
+    return ([string][Math]::Round($total / 1MB, 1)).PadLeft(8) + ' MB en ' + $archivos + ' archivos'
+}
+$carpetasTemp = @(@('temp (Temp de Windows)', (Join-Path $env:SystemRoot 'Temp')))
+Get-CimInstance Win32_UserProfile | Where-Object { -not $_.Special -and $_.LocalPath } | ForEach-Object {
+    $quien = Split-Path $_.LocalPath -Leaf
+    $carpetasTemp += ,@(('%temp% de ' + $quien), (Join-Path $_.LocalPath 'AppData\Local\Temp'))
+    $carpetasTemp += ,@(('Cache de Adobe Reader de ' + $quien), (Join-Path $_.LocalPath 'AppData\LocalLow\Adobe\AcroCef\DC\Acrobat\Cache'))
+}
+$carpetasTemp += ,@('Temp de la cuenta del sistema', (Join-Path $env:SystemRoot 'System32\config\systemprofile\AppData\Local\Temp'))
+$carpetasTemp += ,@('Informes de errores de Windows', (Join-Path $env:ProgramData 'Microsoft\Windows\WER'))
+$carpetasTemp += ,@('Volcados de cuelgues de video', (Join-Path $env:SystemRoot 'LiveKernelReports'))
+$carpetasTemp += ,@('Descargas del actualizador de Adobe', (Join-Path $env:ProgramData 'Adobe\ARM'))
+$carpetasTemp += ,@('Prefetch', (Join-Path $env:SystemRoot 'Prefetch'))
+foreach ($par in $carpetasTemp) { $m = Medir $par[1]; if ($null -ne $m) { L ($par[0].PadRight(40) + $m) } }
+$pf = Join-Path $env:SystemRoot 'Prefetch'
+L ('Prefetch: entradas de programas (.pf): ' + @(Get-ChildItem -LiteralPath $pf -Filter '*.pf' -Force).Count + '   rastro de arranque (NTOSBOOT): ' + [bool](Get-ChildItem -LiteralPath $pf -Filter 'NTOSBOOT-*' -Force) + '   Layout.ini: ' + (Test-Path -LiteralPath (Join-Path $pf 'Layout.ini')))
+
+# --- Puntos de restauracion ---------------------------------------------------
+Titulo 'Puntos de restauracion (ultimos 3)'
+L ('Restaurar sistema (RPSessionInterval, 1 = activado): ' + (Leer 'HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SystemRestore' 'RPSessionInterval'))
+$rp = Get-ComputerRestorePoint | Select-Object -Last 3
+if ($rp) { $rp | ForEach-Object { L ([Management.ManagementDateTimeConverter]::ToDateTime($_.CreationTime).ToString('yyyy-MM-dd HH:mm') + '  ' + $_.Description) } } else { L '(ninguno)' }
+
+# --- Clasicos de Windows 7 -----------------------------------------------------
+Titulo 'Clasicos de Windows 7'
+$fotos = Get-AppxPackage -AllUsers -Name Microsoft.Windows.Photos
+L ('App Fotos nueva instalada:      ' + [bool]$fotos)
+$fa = 'HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows Photo Viewer\Capabilities\FileAssociations'
+L ('Visualizador clasico para .jpg / .png / .gif / .bmp: ' + (Leer $fa '.jpg') + ' / ' + (Leer $fa '.png') + ' / ' + (Leer $fa '.gif') + ' / ' + (Leer $fa '.bmp'))
+L ('Programa predeterminado del usuario para .jpg: ' + (Leer ($U + '\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.jpg\UserChoice') 'ProgId'))
+L ('Alt+Tab clasico (AltTabSettings): ' + (Leer ($U + '\Software\Microsoft\Windows\CurrentVersion\Explorer') 'AltTabSettings'))
+
+# --- Adobe Reader --------------------------------------------------------------
+Titulo 'Adobe Reader'
+$u = 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*', 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*'
+$r = Get-ItemProperty -Path $u | Where-Object { $_.DisplayName -match 'Acrobat|Adobe Reader' } | Select-Object -First 1
+if ($r) {
+    L ('Instalado:                      ' + $r.DisplayName + ' ' + $r.DisplayVersion)
+    L ('Servicio de actualizacion:      ' + (InicioServicio 'AdobeARMservice') + '   (la v2 lo deja DESHABILITADO)')
+    $ta = @(Get-ScheduledTask -TaskName 'Adobe Acrobat Update Task*')
+    $estadoTarea = 'no existe'
+    if ($ta.Count) { $estadoTarea = [string]$ta[0].State }
+    L ('Tarea de actualizacion:         ' + $estadoTarea + '   (la v2 la deja Disabled)')
+} else { L 'No esta instalado.' }
+L ('Programa predeterminado para .pdf: ' + (Leer ($U + '\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.pdf\UserChoice') 'ProgId'))
+
+# --- Apps preinstaladas -------------------------------------------------------
+Titulo 'Apps preinstaladas que la v2 puede quitar (presentes)'
+$apps = 'Microsoft.549981C3F5F10', 'Microsoft.BingNews', 'Microsoft.GetHelp', 'Microsoft.Getstarted', 'Microsoft.MicrosoftOfficeHub', 'Microsoft.MicrosoftSolitaireCollection', 'Microsoft.MicrosoftStickyNotes', 'Microsoft.Office.OneNote', 'Microsoft.OutlookForWindows', 'Microsoft.People', 'Microsoft.SkypeApp', 'Microsoft.WindowsAlarms', 'Microsoft.WindowsMaps', 'microsoft.windowscommunicationsapps', 'Microsoft.YourPhone', 'Microsoft.ZuneMusic', 'Microsoft.ZuneVideo', 'Microsoft.XboxApp', 'Microsoft.XboxGamingOverlay', 'king.com.*'
+$hay = foreach ($a in $apps) { Get-AppxPackage -AllUsers -Name $a | Select-Object -ExpandProperty Name -Unique }
+if ($hay) { L (($hay | Sort-Object -Unique) -join ', ') } else { L '(ninguna)' }
+
+# --- Inicio de Windows --------------------------------------------------------
+Titulo 'Programas que arrancan con Windows'
+foreach ($k in @(($U + '\Software\Microsoft\Windows\CurrentVersion\Run'), 'HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Run', 'HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Run')) {
+    $i = Get-Item -LiteralPath ('Registry::' + $k)
+    if ($i) { $i.Property | ForEach-Object { L ('  - ' + $_) } }
+}
+
+# --- Guardar --------------------------------------------------------------------
+$nombre = 'estado-' + $env:COMPUTERNAME + '-' + (Get-Date -Format 'yyyyMMdd-HHmm') + '.txt'
+$destino = Join-Path (Split-Path -Parent $env:VE_RUTA) $nombre
+try { [IO.File]::WriteAllLines($destino, $lineas) } catch { $destino = Join-Path $env:TEMP $nombre; [IO.File]::WriteAllLines($destino, $lineas) }
+Write-Host ''
+Write-Host ('Reporte guardado en: ' + $destino) -ForegroundColor Green
+#VERIFICAR-FIN#
