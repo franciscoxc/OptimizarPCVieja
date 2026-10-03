@@ -9,7 +9,7 @@ title Optimizar PC Vieja v2
 ::  Para Windows 10 con disco mecanico (HDD) y 2 GB de RAM.
 ::
 ::  Un solo archivo, con menu:
-::    1. Optimizar la PC (opcion predeterminada: Enter).
+::    1. Optimizar la PC.
 ::    2. Verificar el estado: solo mira, no cambia nada.
 ::    3. Limpiar restos de Windows Update (DISM).
 ::    4. Desfragmentar a fondo.
@@ -68,22 +68,16 @@ echo     6. Deshacer lo perjudicial del script original (v1)
 echo     7. Instalar Chrome, WinRAR y VLC
 echo     0. Salir
 echo.
-set "OPC="
-set /p "OPC=  Elegi un numero y Enter (solo Enter = 1): "
-:: Enter solo elige la 1. De lo escrito vale el primer caracter, sin comillas.
-if not defined OPC set "OPC=1"
-set "OPC=%OPC:"=%"
-if not defined OPC set "OPC=1"
-set "OPC=%OPC:~0,1%"
-if "%OPC%"=="1" goto :op_optimizar
-if "%OPC%"=="2" goto :op_verificar
-if "%OPC%"=="3" goto :op_limpiar_wu
-if "%OPC%"=="4" goto :op_desfragmentar
-if "%OPC%"=="5" goto :op_revertir
-if "%OPC%"=="6" goto :op_deshacer_v1
-if "%OPC%"=="7" goto :op_instalar
-if "%OPC%"=="0" goto :salir
-echo   Opcion no valida: elegi un numero del 0 al 7.
+:: choice responde a una sola tecla, sin Enter, e ignora cualquier otra.
+choice /c 12345670 /n /m "  Toca un numero: "
+if errorlevel 8 goto :salir
+if errorlevel 7 goto :op_instalar
+if errorlevel 6 goto :op_deshacer_v1
+if errorlevel 5 goto :op_revertir
+if errorlevel 4 goto :op_desfragmentar
+if errorlevel 3 goto :op_limpiar_wu
+if errorlevel 2 goto :op_verificar
+if errorlevel 1 goto :op_optimizar
 goto :menu
 
 :: Final de las opciones que cambian el sistema: ofrecer reiniciar. Si no,
@@ -371,11 +365,19 @@ call :dword "%UHIVE%\System\GameConfigStore" GameDVR_Enabled 0
 call :dword "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\GameDVR" AppCaptureEnabled 0
 echo   [OK] Sin apps sugeridas, instalaciones silenciosas, consejos ni resultados web.
 
-:: Apps en segundo plano: una por una, salvo componentes de Windows, Store,
-:: alarmas, reproductores y Recortes y anotacion. Fotos si se apaga: es de las
-:: que mas consume.
-:: El interruptor general rompe la busqueda del Inicio.
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$b='%UPS%\Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications'; $keep='Microsoft.Windows.*','MicrosoftWindows.*','windows.*','Microsoft.AAD.BrokerPlugin*','Microsoft.AccountsControl*','Microsoft.CredDialogHost*','Microsoft.ECApp*','Microsoft.AsyncTextService*','Microsoft.BioEnrollment*','Microsoft.LockApp*','Microsoft.Win32WebViewHost*','Microsoft.WindowsStore*','Microsoft.DesktopAppInstaller*','Microsoft.ScreenSketch*','Microsoft.WindowsAlarms*','Microsoft.ZuneMusic*','Microsoft.ZuneVideo*','SpotifyAB.SpotifyMusic*'; $force='Microsoft.Windows.Photos*'; $n=0; Get-ChildItem -LiteralPath $b -ErrorAction SilentlyContinue | ForEach-Object { $app=$_.PSChildName; if (($app -like $force) -or -not ($keep | Where-Object { $app -like $_ })) { Set-ItemProperty -LiteralPath $_.PSPath -Name Disabled -Value 1 -Type DWord; Set-ItemProperty -LiteralPath $_.PSPath -Name DisabledByUser -Value 1 -Type DWord; $n++ } }; Write-Output ('  [OK] Apps en segundo plano desactivadas: ' + $n)"
+:: Apps en segundo plano: todas apagadas con el interruptor general. Contra: la
+:: busqueda del Inicio puede tardar en encontrar las apps recien instaladas.
+call :dword "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications" GlobalUserDisabled 1
+call :dword "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Search" BackgroundAppGlobalToggle 0
+echo   [OK] Apps en segundo plano: todas apagadas con el interruptor general.
+:: Microsoft Store: las apps se actualizan a mano, abriendola. Desde 2025 la Store
+:: solo deja pausar de 1 a 5 semanas; la politica de equipo "Desactivar la descarga
+:: e instalacion automatica de actualizaciones" sigue mandando. Va tambien el valor
+:: que escribia el viejo interruptor de la Store, para Stores sin actualizar.
+call :dword "HKLM\SOFTWARE\Policies\Microsoft\WindowsStore" AutoDownload 2
+call :dword "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsStore\WindowsUpdate" AutoDownload 2
+echo   [OK] Microsoft Store: las apps ya no se actualizan solas. Para actualizarlas,
+echo        abri la Store: Biblioteca, Obtener actualizaciones.
 
 :: =========================================================================
 call :titulo "7/11  Interfaz y Explorador"
@@ -535,6 +537,12 @@ if "%QUITARAPPS%"=="N" goto :apps_listo
 echo   Quitando apps preinstaladas para todos los usuarios, puede tardar...
 powershell -NoProfile -ExecutionPolicy Bypass -Command "$apps='Microsoft.549981C3F5F10','Microsoft.BingNews','Microsoft.BingSearch','Microsoft.Copilot','Microsoft.GetHelp','Microsoft.Getstarted','Microsoft.Messaging','Microsoft.Microsoft3DViewer','Microsoft.MicrosoftOfficeHub','Microsoft.MicrosoftSolitaireCollection','Microsoft.MicrosoftStickyNotes','Microsoft.MixedReality.Portal','Microsoft.MSPaint','Microsoft.Office.OneNote','Microsoft.OneConnect','Microsoft.OutlookForWindows','Microsoft.People','Microsoft.PowerAutomateDesktop','Microsoft.Print3D','Microsoft.SkypeApp','Microsoft.Todos','Microsoft.Wallet','Microsoft.WindowsAlarms','Microsoft.WindowsFeedbackHub','Microsoft.WindowsMaps','microsoft.windowscommunicationsapps','Microsoft.YourPhone','Microsoft.ZuneMusic','Microsoft.ZuneVideo','Microsoft.GamingApp','Microsoft.XboxApp','Microsoft.Xbox.TCUI','Microsoft.XboxGameOverlay','Microsoft.XboxGamingOverlay','Microsoft.XboxIdentityProvider','Microsoft.XboxSpeechToTextOverlay','Clipchamp.Clipchamp','MicrosoftTeams','king.com.*'; $prov=Get-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue; foreach ($a in $apps) { Get-AppxPackage -AllUsers -Name $a -ErrorAction SilentlyContinue | Sort-Object PackageFullName -Unique | ForEach-Object { Write-Output ('    - ' + $_.Name); Remove-AppxPackage -Package $_.PackageFullName -AllUsers -ErrorAction SilentlyContinue }; $prov | Where-Object { $_.DisplayName -like $a } | ForEach-Object { Remove-AppxProvisionedPackage -Online -PackageName $_.PackageName -ErrorAction SilentlyContinue | Out-Null } }"
 echo   [OK] Apps preinstaladas quitadas.
+:: Sin Correo, Calendario ni Contactos, sus servicios de sincronizacion no tienen
+:: nada que hacer. Son servicios por usuario: se deshabilita la plantilla y rige
+:: desde el proximo inicio de sesion.
+for %%s in (OneSyncSvc PimIndexMaintenanceSvc UnistoreSvc UserDataSvc MessagingService) do call :servicio %%s disabled
+echo   [OK] Deshabilitados sus servicios de sincronizacion: OneSyncSvc,
+echo        PimIndexMaintenanceSvc, UnistoreSvc, UserDataSvc y MessagingService.
 :apps_listo
 :: Visualizador de fotos de Windows, el de Windows 7: sigue instalado, pero
 :: Windows 10 le saco las fotos comunes. Se le devuelven con su nombre y su
@@ -813,6 +821,9 @@ call :titulo "Servicios: valores de fabrica de Windows 10"
 for %%s in (DiagTrack PcaSvc TrkWks iphlpsvc DPS WpnService Spooler LanmanServer SysMain) do call :servicio %%s auto
 for %%s in (WSearch CDPSvc MapsBroker edgeupdate BITS DoSvc) do call :servicio %%s delayed-auto
 for %%s in (dmwappushservice XblAuthManager XblGameSave XboxNetApiSvc XboxGipSvc xbgm bthserv BTAGService BthAvctpSvc lfsvc WbioSrvc RetailDemo TabletInputService) do call :servicio %%s demand
+:: Los de Correo, Calendario y Contactos: vuelven a fabrica por si las apps vuelven.
+call :servicio OneSyncSvc delayed-auto
+for %%s in (PimIndexMaintenanceSvc UnistoreSvc UserDataSvc MessagingService) do call :servicio %%s demand
 echo   [OK] Servicios en sus valores de fabrica.
 
 call :titulo "Tareas programadas"
@@ -838,8 +849,12 @@ call :borrar "%_pol%\Device Metadata" PreventDeviceMetadataFromNetwork
 call :borrar "%UHIVE%\Software\Policies\Microsoft\Windows\Explorer" DisableSearchBoxSuggestions
 powershell -NoProfile -ExecutionPolicy Bypass -Command "Enable-MMAgent -ApplicationPreLaunch -ErrorAction SilentlyContinue" >nul 2>&1
 powershell -NoProfile -ExecutionPolicy Bypass -Command "$b='%UPS%\Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications'; Get-ChildItem -LiteralPath $b -ErrorAction SilentlyContinue | ForEach-Object { Remove-ItemProperty -LiteralPath $_.PSPath -Name Disabled,DisabledByUser -ErrorAction SilentlyContinue }"
-echo   [OK] Noticias e intereses, Cortana, destacados, informe de errores, precarga
-echo        y apps en segundo plano como de fabrica.
+call :borrar "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications" GlobalUserDisabled
+call :borrar "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Search" BackgroundAppGlobalToggle
+call :borrar "HKLM\SOFTWARE\Policies\Microsoft\WindowsStore" AutoDownload
+call :borrar "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsStore\WindowsUpdate" AutoDownload
+echo   [OK] Noticias e intereses, Cortana, destacados, informe de errores, precarga,
+echo        apps en segundo plano y actualizacion de la Store como de fabrica.
 
 call :titulo "Interfaz y Explorador"
 set "_desk=%UHIVE%\Control Panel\Desktop"
@@ -1486,6 +1501,7 @@ $espera = [ordered]@{
     'wuauserv' = 'Manual'; 'UsoSvc' = 'Auto retrasado'; 'WaaSMedicSvc' = 'Manual'; 'CryptSvc' = 'Automatico'; 'TrustedInstaller' = 'Manual'
     'AppXSvc' = 'Manual'; 'ClipSVC' = 'Manual'; 'InstallService' = 'Manual'; 'Appinfo' = 'Manual'; 'VSS' = 'Manual'; 'swprv' = 'Manual'; 'W32Time' = 'Manual'
     'AdobeARMservice' = 'DESHABILITADO'
+    'OneSyncSvc' = 'segun respuesta'; 'PimIndexMaintenanceSvc' = 'segun respuesta'; 'UnistoreSvc' = 'segun respuesta'; 'UserDataSvc' = 'segun respuesta'; 'MessagingService' = 'segun respuesta'
     'EventLog' = 'Automatico'; 'Schedule' = 'Automatico'; 'Winmgmt' = 'Automatico'; 'Audiosrv' = 'Automatico'; 'Dhcp' = 'Automatico'; 'Dnscache' = 'Automatico'; 'Themes' = 'Automatico'
 }
 foreach ($n in $espera.Keys) {
@@ -1536,6 +1552,7 @@ $lista = @(
     @('HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows Defender Security Center\Systray', 'HideSystray'),
     @('HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows Defender Security Center\Notifications', 'DisableEnhancedNotifications'),
     @('HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\MRT', 'DontOfferThroughWUAU'),
+    @('HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\WindowsStore', 'AutoDownload'),
     @('HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Edge', 'StartupBoostEnabled'),
     @('HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Edge', 'BackgroundModeEnabled'),
     @('HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Edge\Recommended', 'SleepingTabsTimeout'),
@@ -1558,6 +1575,8 @@ $lista = @(
     @(($U + '\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'), 'IconsOnly'),
     @(($U + '\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects'), 'VisualFXSetting'),
     @(($U + '\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize'), 'EnableTransparency'),
+    @(($U + '\Software\Microsoft\Windows\CurrentVersion\Search'), 'BackgroundAppGlobalToggle'),
+    @('HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsStore\WindowsUpdate', 'AutoDownload'),
     @(($U + '\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'), 'LaunchTo'),
     @(($U + '\System\GameConfigStore'), 'GameDVR_Enabled')
 )

@@ -1,8 +1,8 @@
 # Optimizar PC Vieja
 
-[![Descargar OptimizarPC.bat](https://img.shields.io/badge/Descargar-OptimizarPC.bat-2ea44f?style=for-the-badge)](https://github.com/franciscoxc/OptimizarPCVieja/archive/HEAD.zip)
+[![Descargar OptimizarPC.bat](https://img.shields.io/badge/Descargar-OptimizarPC.bat-2ea44f?style=for-the-badge)](https://github.com/franciscoxc/OptimizarPCVieja/releases/latest/download/OptimizarPC.zip)
 
-Baja un ZIP: descomprimilo y hacé doble clic en `OptimizarPC.bat`.
+Baja `OptimizarPC.zip`, con el `.bat` suelto adentro, sin carpetas: descomprimilo y hacé doble clic en `OptimizarPC.bat`.
 
 Un script con menú para exprimir PCs viejas con **Windows 10, disco mecánico (HDD) y 2 GB de RAM**, incluidas las
 netbooks de Conectar Igualdad con procesador Atom (ver [su sección](#netbooks-de-conectar-igualdad-con-atom)).
@@ -19,7 +19,7 @@ Todo está en **`OptimizarPC.bat`**. Al abrirlo pide permisos de administrador y
 
 | Opción | Qué hace | Cambia algo |
 |---|---|---|
-| **1. Optimizar la PC** (o solo Enter) | La optimización (v2). Ya incluye las correcciones del script original. | Sí |
+| **1. Optimizar la PC** | La optimización (v2). Ya incluye las correcciones del script original. | Sí |
 | 2. Verificar el estado | Muestra el hardware (procesador, video, RAM), el antirrobo de Conectar Igualdad si lo hay, y el estado de todo lo que toca el script. Lo guarda en un `.txt` al lado del script, para comparar antes y después. | **No** (solo lee) |
 | 3. Limpiar restos de Windows Update | De vez en cuando: borra con DISM las versiones viejas que guardan las actualizaciones (WinSxS). Libera espacio, no acelera. Puede tardar más de una hora. Ver [Limpiar restos de Windows Update](#limpiar-restos-de-windows-update-vale-la-pena). | Sí (solo restos de actualizaciones) |
 | 4. Desfragmentar a fondo | De vez en cuando, para discos mecánicos: analiza, desfragmenta, junta el espacio libre y optimiza el arranque. En un SSD solo manda TRIM. Puede tardar horas. | Sí (solo ordena el disco) |
@@ -28,19 +28,20 @@ Todo está en **`OptimizarPC.bat`**. Al abrirlo pide permisos de administrador y
 | 7. Instalar Chrome, WinRAR y VLC | Con winget, en silencio: WinRAR, VLC y Chrome, del más chico al más grande. Chrome viene con uBlock Origin Lite. Ver [Opción 7](#opción-7-chrome-winrar-y-vlc). | Sí |
 | 0. Salir | | |
 
-Se responde con el número y Enter. Al terminar cada opción se vuelve al menú, así que la rutina completa es 1 y
+Se responde tocando el número, **sin Enter**: cualquier otra tecla se ignora. Al terminar cada opción se vuelve al menú, así que la rutina completa es 1 y
 después 7. Las que cambian el sistema (1, 5 y 6)
 ofrecen reiniciar al final; si decís que no, el menú recuerda que falta reiniciar y lo vuelve a ofrecer al salir.
 
 ## Cómo usarlo
 
-1. Bajalo con el botón de arriba, **descomprimí el ZIP** y copiá `OptimizarPC.bat` a la PC (pendrive, red, lo que
-   sea). Abierto desde adentro del ZIP funciona igual, pero avisa, porque Windows lo corre desde una carpeta temporal.
+1. Bajalo con el botón de arriba (el ZIP lo arma GitHub solo cada vez que cambia el script), **descomprimí el ZIP** y
+   copiá `OptimizarPC.bat` a la PC (pendrive, red, lo que sea). Abierto desde adentro del ZIP funciona igual, pero
+   avisa, porque Windows lo corre desde una carpeta temporal.
 2. Doble clic en `OptimizarPC.bat`. Si no tiene permisos, los pide solo (aparece el cartel de UAC).
    No hay que instalar nada: usa `cmd` y PowerShell, que vienen con Windows 10. Si lo bajaste de internet, Windows
    puede avisar una vez ("Windows protegió su PC": *Más información > Ejecutar de todas formas*). Para que no
    avise: botón derecho en el archivo *> Propiedades >* tildá *Desbloquear*.
-3. En el menú, Enter (o 1): **Optimizar la PC**.
+3. En el menú, tocá 1: **Optimizar la PC**.
 4. Leé los avisos de hardware si aparece alguno (poca RAM, video sin driver, antirrobo de Conectar Igualdad)
    y respondé las 4 preguntas: impresora, compartir en red, OneDrive y apps preinstaladas. Después no pregunta más.
 5. Esperá. En un disco mecánico puede tardar 10 a 20 minutos. Paciencia, mate y facturas.
@@ -128,6 +129,7 @@ Solo **repara** lo que encuentra apagado; lo que ya está bien no se toca.
 | **Automático (retrasado)** | `BITS`, `WpnService` | Tienen que correr solos, pero pueden esperar a que termine el arranque. |
 | **Según tu respuesta** | `Spooler` (impresión) | Con impresora: *Automático (retrasado)*. Sin impresora: *Manual*. |
 | **Según tu respuesta** | `LanmanServer` (compartir) | Si compartís carpetas o impresora en red: *Automático*. Si no: *Manual*. |
+| **Según tu respuesta** | `OneSyncSvc`, `PimIndexMaintenanceSvc`, `UnistoreSvc`, `UserDataSvc`, `MessagingService` | Sincronizan Correo, Calendario, Contactos y Mensajes. Si quitás las apps preinstaladas, quedan sin nada que hacer y se **deshabilitan**. Si no, quedan como vienen. Son servicios por usuario: rige desde el próximo inicio de sesión. |
 | **Automático** (a propósito) | `SysMain` | Compresión de memoria. Tiene que estar desde el arranque, que es cuando más se llena la RAM. |
 
 **Por qué no "todo a Manual" de una:** WinUtil (Chris Titus) tuvo durante años un "Set Services to Manual"
@@ -167,9 +169,19 @@ No se agregan exclusiones: son lo primero que buscan los virus.
 - Barra de juegos y grabación de juegos: apagadas.
 - Historial de actividad: no se publica ni se sube.
 - Informe de errores: apagado (escribía volcados al disco después de cada cuelgue).
-- **Apps en segundo plano:** se apagan una por una, **excepto** los componentes de Windows (búsqueda, Inicio, notificaciones y seguridad), la Store, las alarmas, los reproductores de música y Recortes y anotación.
-  **Fotos sí se apaga**: es de las que más RAM y disco usan de fondo, y se puede reactivar desde *Configuración > Privacidad > Aplicaciones en segundo plano*.
-  No se usa el interruptor general porque rompe la búsqueda de apps recién instaladas en el Inicio ([detalle](https://github.com/Disassembler0/Win10-Initial-Setup-Script/pull/42)).
+- **Apps en segundo plano:** todas apagadas con el **interruptor general** (*Configuración > Privacidad > Aplicaciones
+  en segundo plano*). Las apps funcionan igual cuando las abrís; lo que pierden es correr de fondo con la ventana cerrada.
+  Contras, aceptados: la búsqueda del Inicio puede tardar en encontrar una app recién instalada de la Store
+  ([detalle](https://github.com/Disassembler0/Win10-Initial-Setup-Script/pull/42)), y las alarmas y los avisos de apps
+  cerradas no suenan. Los programas de escritorio (Chrome, VLC, WinRAR) no se ven afectados.
+- **Microsoft Store con actualización manual:** las apps de la Store ya no se bajan actualizaciones solas, de fondo y
+  cuando se les canta. Se actualizan abriendo la Store, en *Biblioteca > Obtener actualizaciones* (de paso se
+  actualiza winget). Desde 2025 la Store ya no deja apagarlo, solo pausarlo de 1 a 5 semanas
+  ([Tom's Hardware](https://www.tomshardware.com/software/windows/microsoft-store-change-removes-the-ability-to-stop-app-updates-pausing-automatic-updates-now-limited-to-a-5-week-duration)),
+  así que el script usa la política de equipo *Desactivar la descarga e instalación automática de actualizaciones*
+  (`AutoDownload=2`), que sigue mandando ([The Windows Club](https://www.thewindowsclub.com/disable-automatic-microsoft-store-updates)).
+  Por eso la Store puede decir que algunas opciones las administra tu organización. La Store, winget y Windows Update
+  siguen andando; Windows y Defender se actualizan como siempre.
 - Precarga de apps UWP (`ApplicationPreLaunch`): apagada. Windows ya no carga en RAM apps "por si las abrís".
 - Tareas programadas de telemetría apagadas, entre ellas el *Compatibility Appraiser* (`CompatTelRunner`), famoso por dejar el disco al 100%. También WinSAT, que hace benchmarks de disco en el mantenimiento.
 - Otras dos de WinUtil, inofensivas: no ejecutar el software que el fabricante esconde en el BIOS (WPBT) y no bajar "apps acompañantes" al conectar dispositivos.
@@ -250,7 +262,7 @@ app Fotos, y el Alt+Tab clásico) y Restaurar sistema desactivado.
 | ¿Usás impresora? | `Spooler` en Manual |
 | ¿Compartís carpetas o impresora en red? | `LanmanServer` en Manual |
 | ¿Usás OneDrive? | Se saca OneDrive del inicio (no se desinstala; si lo abrís, vuelve) |
-| ¿Quitar apps preinstaladas? (si respondés "Sí") | Se desinstalan para todos los usuarios: Xbox, Solitario, Candy Crush, Noticias, Tu Teléfono, Skype, Contactos, Mapas, Correo y Calendario (Microsoft los discontinuó en 2024), Outlook nuevo, OneNote para Win10, Notas rápidas, Alarmas, Groove, Películas y TV, Paint 3D, Visor 3D, Portal de realidad mixta, Obtener ayuda, Sugerencias, Centro de comentarios, To Do, Cortana y Copilot. **Quedan** la Store, Calculadora, Cámara, Grabadora de sonidos, **Clima** y **Recortes y anotación** (Win+Shift+S). El Bloc de notas, Paint y la Herramienta Recortes clásicos no son apps de la Store: siguen. Todo se puede reinstalar desde la Store. |
+| ¿Quitar apps preinstaladas? (si respondés "Sí") | Se desinstalan para todos los usuarios: Xbox, Solitario, Candy Crush, Noticias, Tu Teléfono, Skype, Contactos, Mapas, Correo y Calendario (Microsoft los discontinuó en 2024), Outlook nuevo, OneNote para Win10, Notas rápidas, Alarmas, Groove, Películas y TV, Paint 3D, Visor 3D, Portal de realidad mixta, Obtener ayuda, Sugerencias, Centro de comentarios, To Do, Cortana y Copilot. **Quedan** la Store, Calculadora, Cámara, Grabadora de sonidos, **Clima** y **Recortes y anotación** (Win+Shift+S). El Bloc de notas, Paint y la Herramienta Recortes clásicos no son apps de la Store: siguen. Todo se puede reinstalar desde la Store. Además se deshabilitan sus servicios de sincronización (ver [Servicios](#3-servicios)). |
 
 ### 10. Limpieza
 
@@ -560,7 +572,6 @@ La opción 1 deja SysMain activo, que es lo que ReadyBoost necesita, y la opció
 | Deshabilitar Windows Update o Defender | Inseguro. Además, la Protección contra alteraciones lo revierte. |
 | Deshabilitar `TabletInputService` | Rompe escribir en el Inicio, Configuración y apps UWP. |
 | Deshabilitar `DoSvc` | Puede romper Windows Update. Lo correcto es `DODownloadMode=0`. |
-| Interruptor general de "apps en segundo plano" | Rompe la búsqueda de apps nuevas en el Inicio. Se hace app por app. |
 | "Set Services to Manual" masivo | Rompió Windows Update, la hora y el Bluetooth en WinUtil, y lo recortaron. |
 | Apagar las mitigaciones de Spectre/Meltdown | En CPUs viejas dan rendimiento, pero dejan la PC expuesta. Pediste seguridad: se dejan encendidas. |
 | Desinstalar OneDrive o Edge | Rompe más de lo que arregla. Se saca OneDrive del inicio y se dejan Edge y su motor (WebView2), que usan otras apps. |
@@ -582,17 +593,16 @@ La opción 1 deja SysMain activo, que es lo que ReadyBoost necesita, y la opció
 
 Desde acá no hay un Windows real, así que se validó todo lo que se puede validar sin uno:
 
-- **Wine (el `cmd.exe` de Wine):** el menú y sus seis opciones corren de punta a punta, una tras otra, con distintas
+- **Wine (el `cmd.exe` de Wine):** el menú y sus siete opciones corren de punta a punta, una tras otra, con distintas
   combinaciones de respuestas (por ejemplo: con y sin impresora, con y sin quitar apps).
-  El menú se probó con entradas torpes: Enter solo, letras, números de más, comillas, `&` y `%PATH%`.
+  El menú usa `choice`, que solo acepta las teclas del menú: no hay entradas raras que probar.
   La opción 7 se probó con un winget simulado: instalación nueva, ya instalado y al día, ya instalado y
   actualizado, y sin winget.
   Se simuló el estado que deja el script original (y políticas que apagan Defender y Windows Update)
   y se verificó en el registro que cada valor quedara corregido y escrito en `HKEY_USERS\<SID>` del usuario.
   También se probó el ciclo completo optimizar, revertir y verificar: el inicio rápido queda apagado, *Suspender* e
   *Hibernar* salen del menú de apagado, y la opción 5 los devuelve.
-- **PowerShell:** los 36 bloques de PowerShell pasan el parser oficial. La lógica de apps en segundo plano se probó con
-  nombres reales de paquetes.
+- **PowerShell:** los 35 bloques de PowerShell pasan el parser oficial.
 - **Limpieza:** la sección que vacía los temporales se **ejecutó de verdad** sobre un árbol de carpetas simulado, con
   trampas (y una carpeta Prefetch de mentira, donde solo se fueron las entradas de programas): un enlace a una carpeta valiosa (no la siguió), archivos de solo lectura (los borró), archivos imposibles de
   borrar (los salteó y los contó), la carpeta del propio script (no la tocó) y un intento de vaciar la carpeta de
@@ -638,7 +648,10 @@ Wine no los implementa, así que falta la prueba en un Windows 10 real. Para eso
    - [ ] *Propiedades del sistema > Protección del sistema* dice "Desactivado".
    - [ ] La opción 2 muestra la paginación fija en el doble de la RAM, la caché de escritura activada y el vaciado del búfer
      desactivado.
-   - [ ] En el menú, Enter solo elige la opción 1 y un número inválido vuelve al menú.
+   - [ ] En el menú, tocar un número entra a la opción sin Enter, y las otras teclas no hacen nada.
+   - [ ] *Configuración > Privacidad > Aplicaciones en segundo plano* aparece apagado.
+   - [ ] En la configuración de la Store, las actualizaciones automáticas aparecen apagadas y administradas por la
+     organización, y *Biblioteca > Obtener actualizaciones* actualiza a mano.
    - [ ] La opción 7 instala WinRAR, VLC y Chrome sin preguntas, y al abrir Chrome aparece uBlock Origin Lite.
 8. Probá la opción 5 y verificá que todo vuelva a la normalidad.
 
