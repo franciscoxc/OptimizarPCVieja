@@ -1,5 +1,8 @@
 @echo off
 setlocal EnableExtensions DisableDelayedExpansion
+:: La ruta de este archivo, para PowerShell. Por variable de entorno, y no pegada
+:: en el comando, para que una carpeta con apostrofo o & en el nombre no rompa nada.
+set "OPT_RUTA=%~f0"
 title Optimizar PC Vieja v2
 :: =========================================================================
 ::  OPTIMIZAR PC VIEJA v2
@@ -32,7 +35,7 @@ exit /b
 fltmc >nul 2>&1
 if not errorlevel 1 goto :es_admin
 echo Pidiendo permisos de administrador...
-powershell -NoProfile -ExecutionPolicy Bypass -Command "try { Start-Process -FilePath '%~f0' -Verb RunAs -ErrorAction Stop; exit 0 } catch { exit 1 }"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "try { Start-Process -FilePath $env:OPT_RUTA -Verb RunAs -ErrorAction Stop; exit 0 } catch { exit 1 }"
 if not errorlevel 1 exit /b
 echo.
 echo  No se obtuvieron permisos de administrador.
@@ -144,8 +147,8 @@ echo          Estos Atom aceptan hasta 2 GB: ampliarla es la mejora mas barata q
 if not "%GPU_BASICA%"=="1" goto :gpu_ok
 echo   AVISO: la placa de video anda con el driver basico de Microsoft, sin aceleracion.
 echo          Es lo tipico de los Atom N2600 y N2800 (GMA 3600): Intel no hizo driver para
-echo          Windows 10. En muchas netbooks anda el de Windows 7: probalo con un punto de
-echo          restauracion hecho. Sin driver, videos y animaciones van lentos. Ver README.md.
+echo          Windows 10. En muchas netbooks anda el de Windows 7: si falla, se vuelve atras
+echo          desde el Administrador de dispositivos. Sin driver, los videos van lentos.
 :gpu_ok
 if not "%ANTIRROBO%"=="1" goto :antirrobo_ok
 echo   AVISO: se detecto el antirrobo de Conectar Igualdad (Theft Deterrent).
@@ -158,7 +161,8 @@ echo   AVISO: parece que lo estas abriendo desde adentro de un ZIP. Funciona igu
 echo          pero conviene descomprimir la carpeta primero.
 :zip_ok
 echo.
-echo   - Antes de tocar nada se crea un punto de restauracion.
+echo   - No crea punto de restauracion: Restaurar sistema se desactiva. Si algo
+echo     sale mal, la vuelta atras es la opcion 5 del menu.
 echo   - En un disco mecanico puede tardar entre 10 y 20 minutos.
 echo   - Al terminar hay que REINICIAR la PC.
 echo.
@@ -179,56 +183,19 @@ echo   4. Quitar apps preinstaladas: Xbox, Solitario, Candy Crush, Noticias, Tu 
 echo      Skype, Contactos, Mapas, Correo y Calendario, Outlook nuevo, OneNote, Notas
 echo      rapidas, Alarmas, Groove, Peliculas y TV, Paint 3D, Cortana, Copilot y
 echo      similares. Quedan: Store, Calculadora, Camara, Grabadora de sonidos, Clima y
-echo      Recortes y anotacion. Fotos va en la pregunta 5. Todo se reinstala de la Store.
+echo      Recortes y anotacion. Todo se reinstala de la Store.
 choice /c SN /n /m "     Quitarlas? [S/N]: "
 if errorlevel 2 (set "QUITARAPPS=N") else (set "QUITARAPPS=S")
-echo.
-echo   5. Volver a los clasicos de Windows 7 que siguen escondidos en Windows 10:
-echo      el Visualizador de fotos en vez de la app Fotos, que en PCs lentas tarda
-echo      en abrir, y el Alt+Tab clasico, sin miniaturas.
-choice /c SN /n /m "     Usarlos? [S/N]: "
-if errorlevel 2 (set "CLASICOS=N") else (set "CLASICOS=S")
-echo.
-echo   6. Restaurar sistema guarda puntos para volver atras. Desactivarlo libera hasta
-echo      un 10%% del disco y saca escrituras de fondo, pero borra TODOS los puntos,
-echo      incluido el que crearia este script. La vuelta atras queda en manos de
-echo      la opcion 5 del menu o de reinstalar.
-choice /c SN /n /m "     Desactivarlo? [S/N]: "
-if errorlevel 2 (set "SINRESTAURAR=N") else (set "SINRESTAURAR=S")
 
 :: =========================================================================
-call :titulo "1/12  Punto de restauracion"
-:: =========================================================================
-if "%SINRESTAURAR%"=="S" goto :punto_salteado
-call :asegurar VSS demand
-call :asegurar swprv demand
-echo   Creando punto de restauracion, puede tardar unos minutos...
-reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SystemRestore" /v SystemRestorePointCreationFrequency /t REG_DWORD /d 0 /f >nul 2>&1
-powershell -NoProfile -ExecutionPolicy Bypass -Command "try { Enable-ComputerRestore -Drive ($env:SystemDrive + '\') -ErrorAction Stop; Checkpoint-Computer -Description 'Antes de OptimizarPC v2' -RestorePointType MODIFY_SETTINGS -ErrorAction Stop; exit 0 } catch { exit 1 }"
-set "RP_ERR=%errorlevel%"
-reg delete "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SystemRestore" /v SystemRestorePointCreationFrequency /f >nul 2>&1
-if "%RP_ERR%"=="0" goto :punto_ok
-echo   [!] No se pudo crear el punto de restauracion.
-choice /c SN /n /m "      Continuar igual? [S/N]: "
-if errorlevel 2 goto :menu
-goto :punto_listo
-:punto_ok
-echo   [OK] Punto de restauracion "Antes de OptimizarPC v2" creado.
-goto :punto_listo
-:punto_salteado
-echo   Salteado: elegiste desactivar Restaurar sistema, que lo borraria igual.
-echo   Si algo sale mal, la vuelta atras es la opcion 5 del menu.
-:punto_listo
-
-:: =========================================================================
-call :titulo "2/12  Seguridad: reparando lo que otra herramienta pudo apagar"
+call :titulo "1/11  Seguridad: reparando lo que otra herramienta pudo apagar"
 :: =========================================================================
 :: Servicios esenciales: solo se tocan si estan DESHABILITADOS, y vuelven a
 :: su valor de fabrica de Windows 10. Formato servicio:tipo.
 for %%s in (WinDefend:auto WdNisSvc:demand SecurityHealthService:demand wscsvc:delayed-auto mpssvc:auto BFE:auto) do call :asegurar_par %%s
 for %%s in (wuauserv:demand UsoSvc:delayed-auto WaaSMedicSvc:demand BITS:delayed-auto DoSvc:delayed-auto CryptSvc:auto TrustedInstaller:demand) do call :asegurar_par %%s
 for %%s in (AppXSvc:demand ClipSVC:demand InstallService:demand LicenseManager:demand TokenBroker:demand wlidsvc:demand TimeBrokerSvc:demand) do call :asegurar_par %%s
-for %%s in (Appinfo:demand EventLog:auto Schedule:auto W32Time:demand KeyIso:demand VaultSvc:demand seclogon:demand SamSs:auto Winmgmt:auto) do call :asegurar_par %%s
+for %%s in (VSS:demand swprv:demand Appinfo:demand EventLog:auto Schedule:auto W32Time:demand KeyIso:demand VaultSvc:demand seclogon:demand SamSs:auto Winmgmt:auto) do call :asegurar_par %%s
 for %%s in (Dhcp:auto Dnscache:auto NlaSvc:auto nsi:auto Audiosrv:auto AudioEndpointBuilder:auto Themes:auto ProfSvc:auto) do call :asegurar_par %%s
 
 :: Defender: quitar politicas que lo apagan (las ponen algunos "debloaters")
@@ -292,17 +259,16 @@ call :dword "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer" N
 echo   [OK] Reproduccion automatica desactivada.
 
 :: Tareas que tienen que estar activas: desfragmentacion (clave en HDD), limpieza
-:: automatica de actualizaciones viejas, aviso de disco por fallar, analisis de
-:: Defender y puntos de restauracion.
+:: automatica de actualizaciones viejas, aviso de disco por fallar y analisis de
+:: Defender.
 for %%t in ("\Microsoft\Windows\Defrag\ScheduledDefrag" "\Microsoft\Windows\Servicing\StartComponentCleanup" "\Microsoft\Windows\DiskDiagnostic\Microsoft-Windows-DiskDiagnosticResolver" "\Microsoft\Windows\Windows Defender\Windows Defender Scheduled Scan" "\Microsoft\Windows\Windows Defender\Windows Defender Cache Maintenance" "\Microsoft\Windows\Windows Defender\Windows Defender Cleanup" "\Microsoft\Windows\Windows Defender\Windows Defender Verification" "\Microsoft\Windows\WindowsUpdate\Scheduled Start") do schtasks /change /tn %%t /enable >nul 2>&1
-if not "%SINRESTAURAR%"=="S" schtasks /change /tn "\Microsoft\Windows\SystemRestore\SR" /enable >nul 2>&1
 echo   [OK] Tareas de mantenimiento y seguridad activas.
 
 :: Archivo de paginacion: con 2 GB de RAM es obligatorio
 powershell -NoProfile -ExecutionPolicy Bypass -Command "$cs=Get-CimInstance Win32_ComputerSystem; if (-not $cs.AutomaticManagedPagefile -and -not (Get-CimInstance Win32_PageFileSetting)) { Set-CimInstance -InputObject $cs -Property @{AutomaticManagedPagefile=$true}; Write-Output '  [REPARADO] No habia archivo de paginacion: ahora lo administra Windows.' }"
 
 :: =========================================================================
-call :titulo "3/12  Corrigiendo el script original v1"
+call :titulo "2/11  Corrigiendo el script original v1"
 :: =========================================================================
 :: SysMain maneja la compresion de memoria: con 2 GB de RAM es clave.
 call :servicio SysMain auto
@@ -323,7 +289,7 @@ echo   [OK] DisablePagingExecutive en 0; placebos IOPageLockLimit y DontVerifyRa
 echo   [OK] Delivery Optimization habilitado; su P2P se apaga con la politica oficial en el paso 7.
 
 :: =========================================================================
-call :titulo "4/12  Servicios: Manual siempre que se pueda"
+call :titulo "3/11  Servicios: Manual siempre que se pueda"
 :: =========================================================================
 :: Deshabilitados: telemetria, indexador, Xbox, Bluetooth y Registro remoto.
 for %%s in (DiagTrack dmwappushservice WSearch RemoteRegistry) do call :servicio %%s disabled
@@ -343,14 +309,14 @@ if "%COMPARTIR%"=="S" (call :servicio LanmanServer auto) else (call :servicio La
 if "%COMPARTIR%"=="S" (echo   [OK] Compartir en red: Automatico.) else (echo   [OK] Compartir en red: Manual.)
 
 :: =========================================================================
-call :titulo "5/12  Tareas programadas de telemetria"
+call :titulo "4/11  Tareas programadas de telemetria"
 :: =========================================================================
 for %%t in ("\Microsoft\Windows\Application Experience\Microsoft Compatibility Appraiser" "\Microsoft\Windows\Application Experience\ProgramDataUpdater" "\Microsoft\Windows\Autochk\Proxy" "\Microsoft\Windows\Customer Experience Improvement Program\Consolidator" "\Microsoft\Windows\Customer Experience Improvement Program\UsbCeip" "\Microsoft\Windows\DiskDiagnostic\Microsoft-Windows-DiskDiagnosticDataCollector" "\Microsoft\Windows\Feedback\Siuf\DmClient" "\Microsoft\Windows\Feedback\Siuf\DmClientOnScenarioDownload" "\Microsoft\Windows\Maps\MapsUpdateTask" "\Microsoft\Windows\Maps\MapsToastTask" "\Microsoft\Windows\Windows Error Reporting\QueueReporting" "\Microsoft\Windows\Maintenance\WinSAT" "\Microsoft\XblGameSave\XblGameSaveTask") do schtasks /change /tn %%t /disable >nul 2>&1
 echo   [OK] Desactivadas: Compatibility Appraiser, CEIP, comentarios, mapas,
 echo        informe de errores, WinSAT y Xbox.
 
 :: =========================================================================
-call :titulo "6/12  Defender: solo lo imprescindible"
+call :titulo "5/11  Defender: solo lo imprescindible"
 :: =========================================================================
 :: Se queda: tiempo real, comportamiento, nube, descargas, firmas, SmartScreen.
 :: Se recortan los analisis programados y lo que no protege.
@@ -363,7 +329,7 @@ echo   [OK] Sin notificaciones no criticas ni icono en la bandeja.
 echo   [OK] Sin la herramienta MRT mensual, redundante con Defender en tiempo real.
 
 :: =========================================================================
-call :titulo "7/12  Telemetria, publicidad y procesos en segundo plano"
+call :titulo "6/11  Telemetria, publicidad y procesos en segundo plano"
 :: =========================================================================
 set "_pol=HKLM\SOFTWARE\Policies\Microsoft\Windows"
 call :dword "%_pol%\DataCollection" AllowTelemetry 0
@@ -407,7 +373,7 @@ echo   [OK] Sin apps sugeridas, instalaciones silenciosas, consejos ni resultado
 powershell -NoProfile -ExecutionPolicy Bypass -Command "$b='%UPS%\Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications'; $keep='Microsoft.Windows.*','MicrosoftWindows.*','windows.*','Microsoft.AAD.BrokerPlugin*','Microsoft.AccountsControl*','Microsoft.CredDialogHost*','Microsoft.ECApp*','Microsoft.AsyncTextService*','Microsoft.BioEnrollment*','Microsoft.LockApp*','Microsoft.Win32WebViewHost*','Microsoft.WindowsStore*','Microsoft.DesktopAppInstaller*','Microsoft.ScreenSketch*','Microsoft.WindowsAlarms*','Microsoft.ZuneMusic*','Microsoft.ZuneVideo*','SpotifyAB.SpotifyMusic*'; $force='Microsoft.Windows.Photos*'; $n=0; Get-ChildItem -LiteralPath $b -ErrorAction SilentlyContinue | ForEach-Object { $app=$_.PSChildName; if (($app -like $force) -or -not ($keep | Where-Object { $app -like $_ })) { Set-ItemProperty -LiteralPath $_.PSPath -Name Disabled -Value 1 -Type DWord; Set-ItemProperty -LiteralPath $_.PSPath -Name DisabledByUser -Value 1 -Type DWord; $n++ } }; Write-Output ('  [OK] Apps en segundo plano desactivadas: ' + $n)"
 
 :: =========================================================================
-call :titulo "8/12  Interfaz y Explorador"
+call :titulo "7/11  Interfaz y Explorador"
 :: =========================================================================
 set "_desk=%UHIVE%\Control Panel\Desktop"
 set "_adv=%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced"
@@ -452,19 +418,17 @@ echo   [OK] Explorador: abre en Este equipo, muestra iconos en vez de miniaturas
 echo        adivina el tipo de cada carpeta.
 
 :: =========================================================================
-call :titulo "9/12  Memoria, disco y energia"
+call :titulo "8/11  Memoria, disco y energia"
 :: =========================================================================
 fsutil behavior set DisableLastAccess 1 >nul 2>&1
 fsutil behavior set Disable8dot3 1 >nul 2>&1
 echo   [OK] NTFS sin registro de ultimo acceso ni nombres cortos 8.3.
 
-:: Archivo de paginacion con tamano propio. El automatico arranca chico y crece
-:: cuando hace falta: en un disco lento, mientras crece, los programas pueden
-:: fallar por falta de memoria (Microsoft), y cada crecimiento lo fragmenta.
-:: Inicial: 1,5 veces la RAM, lo que recomienda Microsoft. Maximo: 3 veces la RAM
-:: o 4 GB, como el automatico. Solo si estaba en automatico: si alguien lo
-:: configuro a mano, se respeta. Se aplica al reiniciar.
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$cs=Get-CimInstance Win32_ComputerSystem; if (-not $cs.AutomaticManagedPagefile) { Write-Output '  [OK] Archivo de paginacion configurado a mano: se respeta como esta.'; exit 0 }; $ram=[math]::Round($cs.TotalPhysicalMemory / 1MB); $ini=[int][math]::Round($ram * 1.5); $max=[int][math]::Max($ram * 3, 4096); $libre=[math]::Floor((Get-PSDrive -Name $env:SystemDrive.Substring(0,1)).Free / 1MB); if ($libre -lt ($ini + 2048)) { Write-Output '  [AVISO] Poco espacio libre: el archivo de paginacion sigue en automatico.'; exit 0 }; try { Set-CimInstance -InputObject $cs -Property @{AutomaticManagedPagefile=$false} -ErrorAction Stop; $nombre=$env:SystemDrive + '\pagefile.sys'; $pf=Get-CimInstance Win32_PageFileSetting | Where-Object { $_.Name -eq $nombre } | Select-Object -First 1; if ($pf) { Set-CimInstance -InputObject $pf -Property @{InitialSize=[uint32]$ini; MaximumSize=[uint32]$max} -ErrorAction Stop } else { New-CimInstance -ClassName Win32_PageFileSetting -Property @{Name=$nombre; InitialSize=[uint32]$ini; MaximumSize=[uint32]$max} -ErrorAction Stop | Out-Null }; Write-Output ('  [OK] Archivo de paginacion: ' + $ini + ' MB desde el arranque, hasta ' + $max + ' MB. Ya no crece de a pedazos.') } catch { Set-CimInstance -InputObject $cs -Property @{AutomaticManagedPagefile=$true} -ErrorAction SilentlyContinue; Write-Output '  [AVISO] No se pudo configurar el archivo de paginacion: sigue en automatico.' }"
+:: Archivo de paginacion fijo en el doble de la RAM instalada (con 2 GB, 4096 MB).
+:: El automatico arranca chico y crece cuando hace falta: en un disco lento,
+:: mientras crece, los programas pueden fallar por falta de memoria (Microsoft),
+:: y crecer y achicarse lo fragmenta. Fijo, nunca cambia de tamano. Rige al reiniciar.
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$cs=Get-CimInstance Win32_ComputerSystem; $ram=[math]::Round((Get-CimInstance Win32_PhysicalMemory -ErrorAction SilentlyContinue | Measure-Object -Property Capacity -Sum).Sum / 1MB); if ($ram -lt 256) { $ram=[math]::Ceiling($cs.TotalPhysicalMemory / 512MB) * 512 }; $mb=[int]($ram * 2); $nombre=$env:SystemDrive + '\pagefile.sys'; $pf=Get-CimInstance Win32_PageFileSetting | Where-Object { $_.Name -eq $nombre } | Select-Object -First 1; if (-not $cs.AutomaticManagedPagefile -and $pf -and $pf.InitialSize -eq $mb -and $pf.MaximumSize -eq $mb) { Write-Output ('  [OK] Archivo de paginacion: ya estaba fijo en ' + $mb + ' MB.'); exit 0 }; $actual=0; Get-CimInstance Win32_PageFileUsage | Where-Object { $_.Name -eq $nombre } | ForEach-Object { $actual=[int]$_.AllocatedBaseSize }; $libre=[math]::Floor((Get-PSDrive -Name $env:SystemDrive.Substring(0,1)).Free / 1MB) + $actual; if ($libre -lt ($mb + 2048)) { Write-Output '  [AVISO] Poco espacio libre: el archivo de paginacion queda como esta.'; exit 0 }; try { Set-CimInstance -InputObject $cs -Property @{AutomaticManagedPagefile=$false} -ErrorAction Stop; $pf=Get-CimInstance Win32_PageFileSetting | Where-Object { $_.Name -eq $nombre } | Select-Object -First 1; if ($pf) { Set-CimInstance -InputObject $pf -Property @{InitialSize=[uint32]$mb; MaximumSize=[uint32]$mb} -ErrorAction Stop } else { New-CimInstance -ClassName Win32_PageFileSetting -Property @{Name=$nombre; InitialSize=[uint32]$mb; MaximumSize=[uint32]$mb} -ErrorAction Stop | Out-Null }; Write-Output ('  [OK] Archivo de paginacion fijo en ' + $mb + ' MB, el doble de la RAM: no crece ni se fragmenta.') } catch { Set-CimInstance -InputObject $cs -Property @{AutomaticManagedPagefile=$true} -ErrorAction SilentlyContinue; Write-Output '  [AVISO] No se pudo configurar el archivo de paginacion: queda automatico.' }"
 
 :: Cache de escritura del disco: activada y SIN vaciado del bufer. Asi Windows no
 :: espera a que el disco confirme cada escritura: se gana tiempo. El costo: ante
@@ -527,9 +491,9 @@ call :dword "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\FlyoutMenuS
 call :dword "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\FlyoutMenuSettings" ShowHibernateOption 0
 echo   [OK] Sin hibernacion ni inicio rapido: cada apagado es completo.
 echo   [OK] Suspender e Hibernar ya no aparecen en el menu de apagado.
-:: Restaurar sistema, segun la pregunta 6. Lo desactiva con la herramienta oficial,
-:: que borra sus puntos de restauracion y libera su espacio.
-if not "%SINRESTAURAR%"=="S" goto :restaurar_listo
+:: Restaurar sistema: desactivado. Cada punto cuesta escrituras de fondo y espacio
+:: en el disco, y en la practica se reinstala. La herramienta oficial borra sus
+:: puntos y libera el espacio. La vuelta atras es la opcion 5 del menu.
 powershell -NoProfile -ExecutionPolicy Bypass -Command "try { Disable-ComputerRestore -Drive ($env:SystemDrive + '\') -ErrorAction Stop; exit 0 } catch { exit 1 }" >nul 2>&1
 if errorlevel 1 goto :restaurar_error
 schtasks /change /tn "\Microsoft\Windows\SystemRestore\SR" /disable >nul 2>&1
@@ -541,7 +505,7 @@ echo           del sistema, Proteccion del sistema, Configurar.
 :restaurar_listo
 
 :: =========================================================================
-call :titulo "10/12  Navegadores"
+call :titulo "9/11  Navegadores"
 :: =========================================================================
 set "_edge=HKLM\SOFTWARE\Policies\Microsoft\Edge"
 for %%v in (StartupBoostEnabled BackgroundModeEnabled HubsSidebarEnabled WebWidgetAllowed ShowRecommendationsEnabled EdgeShoppingAssistantEnabled ShowMicrosoftRewards PersonalizationReportingEnabled DiagnosticData UserFeedbackAllowed) do call :dword "%_edge%" %%v 0
@@ -555,7 +519,7 @@ echo        en suspension a los 5 minutos. Chrome: sin quedar de fondo.
 echo        Van a decir "Administrado por tu organizacion": es normal.
 
 :: =========================================================================
-call :titulo "11/12  Opcionales y Adobe Reader"
+call :titulo "10/11  Opcionales, clasicos de Windows 7 y Adobe Reader"
 :: =========================================================================
 if "%ONEDRIVE%"=="S" goto :onedrive_listo
 reg delete "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Run" /v OneDrive /f >nul 2>&1
@@ -567,7 +531,6 @@ echo   Quitando apps preinstaladas para todos los usuarios, puede tardar...
 powershell -NoProfile -ExecutionPolicy Bypass -Command "$apps='Microsoft.549981C3F5F10','Microsoft.BingNews','Microsoft.BingSearch','Microsoft.Copilot','Microsoft.GetHelp','Microsoft.Getstarted','Microsoft.Messaging','Microsoft.Microsoft3DViewer','Microsoft.MicrosoftOfficeHub','Microsoft.MicrosoftSolitaireCollection','Microsoft.MicrosoftStickyNotes','Microsoft.MixedReality.Portal','Microsoft.MSPaint','Microsoft.Office.OneNote','Microsoft.OneConnect','Microsoft.OutlookForWindows','Microsoft.People','Microsoft.PowerAutomateDesktop','Microsoft.Print3D','Microsoft.SkypeApp','Microsoft.Todos','Microsoft.Wallet','Microsoft.WindowsAlarms','Microsoft.WindowsFeedbackHub','Microsoft.WindowsMaps','microsoft.windowscommunicationsapps','Microsoft.YourPhone','Microsoft.ZuneMusic','Microsoft.ZuneVideo','Microsoft.GamingApp','Microsoft.XboxApp','Microsoft.Xbox.TCUI','Microsoft.XboxGameOverlay','Microsoft.XboxGamingOverlay','Microsoft.XboxIdentityProvider','Microsoft.XboxSpeechToTextOverlay','Clipchamp.Clipchamp','MicrosoftTeams','king.com.*'; $prov=Get-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue; foreach ($a in $apps) { Get-AppxPackage -AllUsers -Name $a -ErrorAction SilentlyContinue | Sort-Object PackageFullName -Unique | ForEach-Object { Write-Output ('    - ' + $_.Name); Remove-AppxPackage -Package $_.PackageFullName -AllUsers -ErrorAction SilentlyContinue }; $prov | Where-Object { $_.DisplayName -like $a } | ForEach-Object { Remove-AppxProvisionedPackage -Online -PackageName $_.PackageName -ErrorAction SilentlyContinue | Out-Null } }"
 echo   [OK] Apps preinstaladas quitadas.
 :apps_listo
-if "%CLASICOS%"=="N" goto :clasicos_listo
 :: Visualizador de fotos de Windows, el de Windows 7: sigue instalado, pero
 :: Windows 10 le saco las fotos comunes. Se le devuelven con su nombre y su
 :: icono de siempre, y se registra en "Abrir con" y en Aplicaciones predeterminadas.
@@ -588,7 +551,6 @@ echo   [OK] App Fotos quitada. Si algun dia hace falta, se reinstala desde la St
 :: Alt+Tab clasico: iconos en vez de miniaturas en vivo de cada ventana.
 call :dword "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Explorer" AltTabSettings 1
 echo   [OK] Alt+Tab clasico activado.
-:clasicos_listo
 :: Adobe Reader, si esta instalado: fuera todo lo que arranca solo con Windows,
 :: incluido su actualizador automatico (tarea y servicio). Los PDF quedan para
 :: Edge o Chrome. Reader sigue andando si alguien lo abre.
@@ -600,14 +562,14 @@ echo   [OK] Adobe Reader no esta instalado: nada que limpiar.
 :adobe_listo
 
 :: =========================================================================
-call :titulo "12/12  Limpieza de temporales"
+call :titulo "11/11  Limpieza de temporales"
 :: =========================================================================
 :: Vaciado de todas las carpetas temporales de Windows. El codigo esta en la
 :: seccion LIMPIEZA al final de este archivo. Lo que esta en uso se saltea, y la
 :: carpeta desde la que corre el script tambien, por si se abrio desde un ZIP.
 echo   Vaciando temporales. Lo que Windows tiene en uso se saltea solo.
 set "OPT_SELF=%~dp0"
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$t=[IO.File]::ReadAllText('%~f0'); $i=$t.IndexOf('#LIMPIEZA-' + 'INICIO#'); $j=$t.IndexOf('#LIMPIEZA-' + 'FIN#'); if ($i -ge 0 -and $j -gt $i) { Invoke-Expression $t.Substring($i, $j - $i) }"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$t=[IO.File]::ReadAllText($env:OPT_RUTA); $i=$t.IndexOf('#LIMPIEZA-' + 'INICIO#'); $j=$t.IndexOf('#LIMPIEZA-' + 'FIN#'); if ($i -ge 0 -and $j -gt $i) { Invoke-Expression $t.Substring($i, $j - $i) }"
 echo   [OK] Limpieza terminada.
 
 :: =========================================================================
@@ -631,12 +593,10 @@ echo   sin suspender. Guarda lo que estes haciendo antes.
 echo.
 echo   Seguridad: Windows 10 recibe parches gratis hasta el 12/10/2027 si la PC
 echo   esta inscripta en ESU. Revisalo en Configuracion, Windows Update.
-if "%CLASICOS%"=="N" goto :final_sin_clasicos
 echo.
 echo   Fotos: despues de reiniciar, en Configuracion, Aplicaciones, Aplicaciones
 echo   predeterminadas, Visor de fotos, elegi "Visualizador de fotos de Windows".
 echo   O abri una foto y, cuando pregunte con que, elegilo y marca "Usar siempre".
-:final_sin_clasicos
 if not "%ADOBE%"=="S" goto :final_sin_adobe
 echo.
 echo   PDF: para abrirlos con Edge o Chrome en vez de Adobe Reader, en Configuracion,
@@ -654,7 +614,7 @@ goto :fin_con_reinicio
 :op_verificar
 title Optimizar PC Vieja v2 - Verificar estado
 cls
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$env:VE_RUTA='%~f0'; $t=[IO.File]::ReadAllText($env:VE_RUTA); $i=$t.IndexOf('#VERIFICAR-' + 'INICIO#'); $j=$t.IndexOf('#VERIFICAR-' + 'FIN#'); if ($i -ge 0 -and $j -gt $i) { Invoke-Expression $t.Substring($i, $j - $i) }"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$env:VE_RUTA=$env:OPT_RUTA; $t=[IO.File]::ReadAllText($env:OPT_RUTA); $i=$t.IndexOf('#VERIFICAR-' + 'INICIO#'); $j=$t.IndexOf('#VERIFICAR-' + 'FIN#'); if ($i -ge 0 -and $j -gt $i) { Invoke-Expression $t.Substring($i, $j - $i) }"
 goto :menu
 
 :: =========================================================================
@@ -823,8 +783,7 @@ goto :menu
 ::  Vuelve a los valores de fabrica de Windows 10 lo que la opcion 1 cambia y
 ::  que podria molestar. A proposito NO revierte la seguridad reparada, las
 ::  correcciones del v1, la telemetria apagada ni las apps quitadas (se
-::  reinstalan desde la Store). Para volver EXACTAMENTE a como estaba todo,
-::  esta el punto de restauracion "Antes de OptimizarPC v2" (rstrui.exe).
+::  reinstalan desde la Store).
 :: =========================================================================
 :op_revertir
 title Optimizar PC Vieja v2 - Revertir
@@ -840,7 +799,6 @@ echo   Vuelve a fabrica: servicios, apps en segundo plano, efectos visuales,
 echo   Explorador, energia, navegadores, recortes de Defender, tareas, cache de
 echo   escritura del disco y el actualizador de Adobe Reader.
 echo   NO apaga la seguridad ni vuelve a encender la telemetria.
-echo   Para volver todo exactamente como estaba: punto de restauracion.
 echo.
 choice /c SN /n /m "  Continuar? [S/N]: "
 if errorlevel 2 goto :menu
@@ -904,7 +862,7 @@ call :titulo "Cache de escritura del disco"
 powershell -NoProfile -ExecutionPolicy Bypass -Command "$n=(Get-Partition -DriveLetter $env:SystemDrive.Substring(0,1) -ErrorAction SilentlyContinue).DiskNumber; $d=Get-PhysicalDisk -ErrorAction SilentlyContinue | Where-Object { $_.DeviceId -eq [string]$n } | Select-Object -First 1; $w=Get-CimInstance Win32_DiskDrive -ErrorAction SilentlyContinue | Where-Object { $_.Index -eq $n } | Select-Object -First 1; if (-not $w -or -not $w.PNPDeviceID) { Write-Output '  No se encontro el disco del sistema: nada que revertir.'; exit 0 }; $k='Registry::HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Enum\' + $w.PNPDeviceID + '\Device Parameters\Disk'; Remove-ItemProperty -LiteralPath $k -Name CacheIsPowerProtected -ErrorAction SilentlyContinue; Write-Output '  [OK] El vaciado del bufer de escritura vuelve a estar activo, como de fabrica.'"
 
 call :titulo "Archivo de paginacion"
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$cs=Get-CimInstance Win32_ComputerSystem; if ($cs.AutomaticManagedPagefile) { Write-Output '  [OK] El archivo de paginacion ya es automatico.'; exit 0 }; $ram=[math]::Round($cs.TotalPhysicalMemory / 1MB); $ini=[int][math]::Round($ram * 1.5); $max=[int][math]::Max($ram * 3, 4096); $pf=Get-CimInstance Win32_PageFileSetting | Where-Object { $_.Name -eq ($env:SystemDrive + '\pagefile.sys') } | Select-Object -First 1; if ($pf -and $pf.InitialSize -eq $ini -and $pf.MaximumSize -eq $max) { Set-CimInstance -InputObject $cs -Property @{AutomaticManagedPagefile=$true}; Write-Output '  [OK] El archivo de paginacion vuelve a ser automatico, como de fabrica.' } else { Write-Output '  [OK] El archivo de paginacion lo configuro alguien a mano: se deja como esta.' }"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$cs=Get-CimInstance Win32_ComputerSystem; if ($cs.AutomaticManagedPagefile) { Write-Output '  [OK] El archivo de paginacion ya es automatico.'; exit 0 }; $ram=[math]::Round((Get-CimInstance Win32_PhysicalMemory -ErrorAction SilentlyContinue | Measure-Object -Property Capacity -Sum).Sum / 1MB); if ($ram -lt 256) { $ram=[math]::Ceiling($cs.TotalPhysicalMemory / 512MB) * 512 }; $mb=[int]($ram * 2); $nombre=$env:SystemDrive + '\pagefile.sys'; $pf=Get-CimInstance Win32_PageFileSetting | Where-Object { $_.Name -eq $nombre } | Select-Object -First 1; if ($pf -and $pf.InitialSize -eq $mb -and $pf.MaximumSize -eq $mb) { Set-CimInstance -InputObject $cs -Property @{AutomaticManagedPagefile=$true}; Write-Output '  [OK] El archivo de paginacion vuelve a ser automatico, como de fabrica.' } else { Write-Output '  [OK] El archivo de paginacion lo configuro alguien a mano: se deja como esta.' }"
 
 call :titulo "Energia"
 :: Herramienta oficial: vuelve los planes de Windows a fabrica, con sus botones,
@@ -1417,7 +1375,7 @@ if ($mma) { L ('Compresion de memoria / precarga de apps / combinacion de pagina
 L ('Proceso de compresion activo:   ' + [bool](Get-Process -Name 'Memory Compression'))
 foreach ($v in 'DisablePagingExecutive', 'IOPageLockLimit', 'DontVerifyRandomDrivers', 'LargeSystemCache') { L ($v + ': ' + (Leer $mm $v)) }
 L ('Paginacion administrada por Windows: ' + $cs.AutomaticManagedPagefile)
-Get-CimInstance Win32_PageFileSetting | ForEach-Object { L ('Paginacion configurada:         ' + $_.Name + ' - inicial ' + $_.InitialSize + ' MB, maximo ' + $_.MaximumSize + ' MB   (la v2: 1,5 x RAM y 3 x RAM o 4 GB)') }
+Get-CimInstance Win32_PageFileSetting | ForEach-Object { L ('Paginacion configurada:         ' + $_.Name + ' - inicial ' + $_.InitialSize + ' MB, maximo ' + $_.MaximumSize + ' MB   (la v2: fijo en el doble de la RAM)') }
 Get-CimInstance Win32_PageFileUsage | ForEach-Object { L ('Archivo de paginacion:          ' + $_.Name + ' - ' + $_.AllocatedBaseSize + ' MB (en uso ' + $_.CurrentUsage + ' MB, pico ' + $_.PeakUsage + ' MB)') }
 
 # --- Servicios ----------------------------------------------------------------

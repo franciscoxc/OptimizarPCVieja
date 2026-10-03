@@ -31,10 +31,12 @@ ofrecen reiniciar al final; si decís que no, el menú recuerda que falta reinic
 1. Copiá `OptimizarPC.bat` a la PC (pendrive, red, lo que sea). Si lo bajaste en un ZIP, **descomprimilo primero**:
    funciona igual desde adentro del ZIP, pero avisa, porque Windows lo corre desde una carpeta temporal.
 2. Doble clic en `OptimizarPC.bat`. Si no tiene permisos, los pide solo (aparece el cartel de UAC).
+   No hay que instalar nada: usa `cmd` y PowerShell, que vienen con Windows 10. Si lo bajaste de internet, Windows
+   puede avisar una vez ("Windows protegió su PC": *Más información > Ejecutar de todas formas*). Para que no
+   avise: botón derecho en el archivo *> Propiedades >* tildá *Desbloquear*.
 3. En el menú, Enter (o 1): **Optimizar la PC**.
 4. Leé los avisos de hardware si aparece alguno (poca RAM, video sin driver, antirrobo de Conectar Igualdad)
-   y respondé las 6 preguntas: impresora, compartir en red, OneDrive, apps preinstaladas, clásicos de Windows 7
-   y Restaurar sistema. Después no pregunta más.
+   y respondé las 4 preguntas: impresora, compartir en red, OneDrive y apps preinstaladas. Después no pregunta más.
 5. Esperá. En un disco mecánico puede tardar 10 a 20 minutos. Paciencia, mate y facturas.
 6. **Reiniciá** la PC (lo ofrece al final). Como el script apaga el inicio rápido, desde ahora *Apagar*
    también es un apagado completo: ya no hace falta acordarse de usar *Reiniciar*.
@@ -65,12 +67,13 @@ Criterio general:
   Se *deshabilita* solo lo inútil para esta PC: telemetría, Xbox, Bluetooth y el indexador.
 - **Nada residente que no se gane el lugar.** Lo que corre de fondo sin que lo uses se apaga. Lo que queda, queda
   porque le ahorra trabajo al disco o porque protege (ver [Caché de disco, ReadyBoost y las optimizaciones de Windows](#caché-de-disco-readyboost-y-las-optimizaciones-de-windows)).
-- **Antes de tocar nada, crea un punto de restauración.**
+- **Sin puntos de restauración.** Restaurar sistema se desactiva: en la práctica, ante un problema se reinstala.
+  La vuelta atrás es la opción 5 del menú.
 
 ### 0. Red de seguridad
 
-- Punto de restauración ("Antes de OptimizarPC v2"). Si no se puede crear, pregunta antes de seguir.
-  Si en la pregunta 6 elegís desactivar Restaurar sistema, no se crea: se borraría igual.
+- **No crea punto de restauración:** Restaurar sistema se desactiva (ver la sección 7), así que se borraría igual.
+  La vuelta atrás es la opción 5 del menú, que deja de fábrica lo que cambia la optimización.
 - Verifica que el archivo de paginación exista. Con 2 GB de RAM, sin paginación Windows se cuelga y cierra programas.
 
 ### 1. Seguridad: asegurar que lo importante esté encendido
@@ -79,7 +82,7 @@ Solo **repara** lo que encuentra apagado; lo que ya está bien no se toca.
 
 | Qué | Qué hace el script |
 |---|---|
-| Servicios esenciales | Si alguno está **deshabilitado**, lo vuelve a su valor de fábrica: Defender, Centro de seguridad, Firewall, Windows Update (y sus ayudantes BITS, Orquestador, Medic, Delivery Optimization), Store y licencias de apps, UAC (`Appinfo`), puntos de restauración (`VSS`, `swprv`), hora (`W32Time`), red, audio y temas. |
+| Servicios esenciales | Si alguno está **deshabilitado**, lo vuelve a su valor de fábrica: Defender, Centro de seguridad, Firewall, Windows Update (y sus ayudantes BITS, Orquestador, Medic, Delivery Optimization), Store y licencias de apps, UAC (`Appinfo`), instantáneas de volumen (`VSS`, `swprv`), hora (`W32Time`), red, audio y temas. |
 | Defender | Borra las políticas que lo desactivan (puestas por "debloaters"). Activa el bloqueo de PUA (adware y "optimizadores" truchos, justo lo que llena de basura una PC vieja). Actualiza las firmas. |
 | Firewall | Lo enciende en los 3 perfiles y borra políticas que lo apaguen. |
 | SmartScreen | Borra políticas que lo apaguen (Windows y Edge). |
@@ -88,7 +91,7 @@ Solo **repara** lo que encuentra apagado; lo que ya está bien no se toca.
 | Mitigaciones Spectre/Meltdown | Si alguien las apagó "para ganar rendimiento", las vuelve a encender. |
 | Windows Update | Borra políticas que lo bloquean. Windows 10 tiene parches gratis hasta el **12/10/2027** si la PC está inscripta en ESU (ver más abajo). |
 | Reproducción automática | La desactiva en todas las unidades (vía clásica de virus por pendrive). |
-| Tareas importantes | Se asegura de que estén activas la desfragmentación programada (clave en HDD), la limpieza automática de restos de actualizaciones (`StartComponentCleanup`), el aviso de disco por fallar, los análisis de Defender y la creación de puntos de restauración (salvo que desactives Restaurar sistema). |
+| Tareas importantes | Se asegura de que estén activas la desfragmentación programada (clave en HDD), la limpieza automática de restos de actualizaciones (`StartComponentCleanup`), el aviso de disco por fallar y los análisis de Defender. |
 
 ### 2. Correcciones al script original (v1)
 
@@ -185,16 +188,16 @@ No se agregan exclusiones: son lo primero que buscan los virus.
 ### 7. Memoria, disco y energía
 
 - Compresión de memoria: activada (requiere SysMain).
-- **Archivo de paginación con tamaño propio:** 1,5 veces la RAM desde el arranque y hasta 3 veces la RAM o 4 GB.
-  El automático arranca chico y crece de a pedazos, y en un disco lento eso trae errores y fragmentación
-  (ver [Caché de disco](#caché-de-disco-readyboost-y-las-optimizaciones-de-windows)). Si alguien lo había configurado a mano, se respeta.
+- **Archivo de paginación fijo en el doble de la RAM instalada** (con 2 GB, 4096 MB). El automático arranca chico y
+  crece de a pedazos, y en un disco lento eso trae errores y fragmentación. Fijo, nunca cambia de tamaño
+  (ver [Caché de disco](#caché-de-disco-readyboost-y-las-optimizaciones-de-windows)).
 - **Caché de escritura del disco activada y sin vaciado del búfer** (salvo en un SSD): Windows deja de esperar a que
   el disco confirme cada escritura. Se gana tiempo; el costo es el riesgo ante un corte de luz
   (ver [Caché de disco](#caché-de-disco-readyboost-y-las-optimizaciones-de-windows)).
 - NTFS: sin registro de último acceso y sin nombres cortos 8.3 (como en el v1).
-- **Restaurar sistema, según la pregunta 6.** Mientras haya puntos de restauración, cada escritura en el disco puede
-  costar una copia extra, y ocupan hasta un 10% del disco. Desactivarlo saca ese trabajo de fondo, pero borra **todos**
-  los puntos. Si reinstalás cuando hay problemas, como vos, es razonable desactivarlo.
+- **Restaurar sistema: desactivado.** Mientras haya puntos de restauración, cada escritura en el disco puede costar
+  una copia extra, y ocupan hasta un 10% del disco. Desactivarlo saca ese trabajo de fondo y borra **todos** los puntos.
+  En la práctica, ante un problema se reinstala, así que no se extrañan.
 
 **Energía: la prioridad es la velocidad, no el ahorro.** Se aplica a los tres planes de Windows (Equilibrado, Alto
 rendimiento y Economizador), por si alguien cambia de plan después, y también al plan activo si es otro (por ejemplo,
@@ -230,7 +233,10 @@ HDD, pero cada arranque es limpio y *Apagar* significa apagar.
 - **Chrome:** sin quedar corriendo de fondo al cerrarlo.
 - Nota: Edge y Chrome van a mostrar "Administrado por tu organización". Es normal: así se ven las políticas.
 
-### 9. Preguntas opcionales
+### 9. Las 4 preguntas
+
+Sin preguntar, siempre: los [clásicos de Windows 7](#clásicos-de-windows-7) (el Visualizador de fotos en lugar de la
+app Fotos, y el Alt+Tab clásico) y Restaurar sistema desactivado.
 
 | Pregunta | Si respondés "No" |
 |---|---|
@@ -238,8 +244,6 @@ HDD, pero cada arranque es limpio y *Apagar* significa apagar.
 | ¿Compartís carpetas o impresora en red? | `LanmanServer` en Manual |
 | ¿Usás OneDrive? | Se saca OneDrive del inicio (no se desinstala; si lo abrís, vuelve) |
 | ¿Quitar apps preinstaladas? (si respondés "Sí") | Se desinstalan para todos los usuarios: Xbox, Solitario, Candy Crush, Noticias, Tu Teléfono, Skype, Contactos, Mapas, Correo y Calendario (Microsoft los discontinuó en 2024), Outlook nuevo, OneNote para Win10, Notas rápidas, Alarmas, Groove, Películas y TV, Paint 3D, Visor 3D, Portal de realidad mixta, Obtener ayuda, Sugerencias, Centro de comentarios, To Do, Cortana y Copilot. **Quedan** la Store, Calculadora, Cámara, Grabadora de sonidos, **Clima** y **Recortes y anotación** (Win+Shift+S). El Bloc de notas, Paint y la Herramienta Recortes clásicos no son apps de la Store: siguen. Todo se puede reinstalar desde la Store. |
-| ¿Usar los clásicos de Windows 7? (si respondés "Sí") | Vuelve el **Visualizador de fotos de Windows** en lugar de la app Fotos, y el **Alt+Tab clásico**. Ver [Clásicos de Windows 7](#clásicos-de-windows-7). |
-| ¿Desactivar Restaurar sistema? (si respondés "Sí") | Se desactiva y se borran todos los puntos de restauración. No se crea el punto del paso 1. |
 
 ### 10. Limpieza
 
@@ -348,7 +352,8 @@ básico de Microsoft*: no hay aceleración, puede no estar la resolución nativa
 Todo lo dibuja el procesador. Por eso en estas netbooks apagar efectos visuales y transparencias no es un lujo:
 es lo que más se nota. Aun así, los videos (YouTube) van a ir mal.
 **Driver de Windows 7:** en el campo, en muchas Conectar Igualdad funciona, sobre todo en Windows 10 de 32 bits. En los
-foros de Intel también hay casos de pantalla azul (`VIDEO_TDR_FAILURE`). Probalo con un punto de restauración hecho.
+foros de Intel también hay casos de pantalla azul (`VIDEO_TDR_FAILURE`). Si falla, se vuelve atrás desde el *Administrador de dispositivos* (*Revertir al controlador anterior*) o desde el
+modo seguro.
 Con drivers viejos es donde más problemas da el inicio rápido, y el script lo apaga siempre. Además detecta si estás
 con el driver básico y te avisa.
 
@@ -458,7 +463,7 @@ a los programas, que terminarían en el archivo de paginación: justo lo que se 
 | `IoPageLockLimit` | "Buffer para el disco" | **Mito:** Windows lo ignora. |
 | Caché de escritura del disco | Que Windows no espere a que el disco termine cada escritura | **Sí.** Viene activada; el script se asegura de que lo esté. |
 | Desactivar el vaciado del búfer de caché de escritura | Que Windows ni siquiera espere a que el disco confirme cada escritura | **Sí, por decisión.** Se gana tiempo en cada escritura. El costo: ante un corte de luz se pueden perder o corromper los últimos cambios, y el propio cartel de Windows pide no marcarlo salvo que el disco tenga alimentación aparte ([Raymond Chen](https://devblogs.microsoft.com/oldnewthing/20130416-00/?p=4643)). Acá importa más el tiempo que esos datos: quien mantiene este repo lo usa así hace años sin problemas. En un SSD no se toca, y la opción 5 lo revierte. |
-| Archivo de paginación con tamaño propio | Que no crezca de a pedazos | **Sí.** El automático arranca chico y crece cuando hace falta. En un disco lento, mientras crece, los programas pueden fallar por falta de memoria ([Microsoft Learn](https://learn.microsoft.com/en-us/troubleshoot/windows-client/performance/slow-page-file-growth-memory-allocation-errors)), y crecer y achicarse lo fragmenta ([Microsoft](https://techcommunity.microsoft.com/blog/askperf/disk-fragmentation-and-system-performance/372921)). El script lo deja en 1,5 veces la RAM desde el arranque, lo que recomienda Microsoft, y hasta 3 veces la RAM o 4 GB, como el automático ([Microsoft Learn](https://learn.microsoft.com/en-us/troubleshoot/windows-client/performance/how-to-determine-the-appropriate-page-file-size-for-64-bit-versions-of-windows)). Solo si estaba en automático. |
+| Archivo de paginación fijo | Que no crezca de a pedazos | **Sí.** El automático arranca chico y crece cuando hace falta. En un disco lento, mientras crece, los programas pueden fallar por falta de memoria ([Microsoft Learn](https://learn.microsoft.com/en-us/troubleshoot/windows-client/performance/slow-page-file-growth-memory-allocation-errors)), y crecer y achicarse lo fragmenta ([Microsoft](https://techcommunity.microsoft.com/blog/askperf/disk-fragmentation-and-system-performance/372921)). El script lo deja **fijo en el doble de la RAM instalada**: con 2 GB, 4096 MB. Es la experiencia de quien mantiene este repo, y queda por encima del 1,5 veces la RAM que recomienda Microsoft como mínimo inicial. Fijo, nunca cambia de tamaño, y entre RAM y paginación hay hasta 6 GB para los programas. Si no hay espacio libre suficiente, queda como estaba. |
 | `fsutil behavior set mftzone` | Que la tabla de archivos (MFT) no se fragmente | **No.** Solo sirve en discos con muchísimos archivos chicos; la reserva ya existe. |
 
 ### ReadyBoost: lo único pensado justo para "los fragmentos"
@@ -488,7 +493,7 @@ La opción 1 deja SysMain activo, que es lo que ReadyBoost necesita, y la opció
 
 1. **Desfragmentar:** la pasada semanal, que el script deja activa, y la opción 4 de vez en cuando.
 2. **Dejar al menos 15% libre:** con menos, defrag solo desfragmenta en parte. La opción 4 avisa.
-3. **El archivo de paginación con tamaño propio**, que hace el script. Si ya está muy fragmentado, se desfragmenta al
+3. **El archivo de paginación fijo**, que hace el script. Si ya está muy fragmentado, se desfragmenta al
    arranque con UltraDefrag (ver [Desfragmentar](#desfragmentar-sirve-el-de-windows)).
 4. **Revisar el cabezal del disco.** Muchos discos de notebook estacionan el cabezal a los pocos segundos sin uso, para
    ahorrar energía, y volver a leer tarda hasta un par de segundos: las típicas congeladas cortas. Con
@@ -542,13 +547,13 @@ La opción 1 deja SysMain activo, que es lo que ReadyBoost necesita, y la opció
 Desde acá no hay un Windows real, así que se validó todo lo que se puede validar sin uno:
 
 - **Wine (el `cmd.exe` de Wine):** el menú y sus seis opciones corren de punta a punta, una tras otra, con distintas
-  combinaciones de respuestas (por ejemplo: con y sin Restaurar sistema, con y sin los clásicos de Windows 7).
+  combinaciones de respuestas (por ejemplo: con y sin impresora, con y sin quitar apps).
   El menú se probó con entradas torpes: Enter solo, letras, números de más, comillas, `&` y `%PATH%`.
   Se simuló el estado que deja el script original (y políticas que apagan Defender y Windows Update)
   y se verificó en el registro que cada valor quedara corregido y escrito en `HKEY_USERS\<SID>` del usuario.
   También se probó el ciclo completo optimizar, revertir y verificar: el inicio rápido queda apagado, *Suspender* e
   *Hibernar* salen del menú de apagado, y la opción 5 los devuelve.
-- **PowerShell:** los 34 bloques de PowerShell pasan el parser oficial. La lógica de apps en segundo plano se probó con
+- **PowerShell:** los 33 bloques de PowerShell pasan el parser oficial. La lógica de apps en segundo plano se probó con
   nombres reales de paquetes.
 - **Limpieza:** la sección que vacía los temporales se **ejecutó de verdad** sobre un árbol de carpetas simulado, con
   trampas (y una carpeta Prefetch de mentira, donde solo se fueron las entradas de programas): un enlace a una carpeta valiosa (no la siguió), archivos de solo lectura (los borró), archivos imposibles de
@@ -559,8 +564,8 @@ Desde acá no hay un Windows real, así que se validó todo lo que se puede vali
   íconos con `%SystemRoot%`, con comillas o inexistentes.
 - **Formato:** ASCII puro y fin de línea CRLF (con LF, `cmd` puede fallar al saltar a etiquetas).
 
-Lo que **no** se pudo probar acá: los servicios, Defender, la energía, la caché de escritura del disco, las apps y el
-punto de restauración.
+Lo que **no** se pudo probar acá: los servicios, Defender, la energía, la caché de escritura del disco, las apps y
+Restaurar sistema.
 Wine no los implementa, así que falta la prueba en un Windows 10 real. Para eso está la sección siguiente.
 
 ## Cómo probarlo en UTM (Mac) antes de usarlo en una PC real
@@ -580,7 +585,7 @@ Wine no los implementa, así que falta la prueba en un Windows 10 real. Para eso
    - [ ] *Seguridad de Windows*: protección en tiempo real encendida y firmas actualizadas.
    - [ ] Sonido, red, hora correcta y el portapapeles (Ctrl+C y Ctrl+V).
    - [ ] Edge abre y navega.
-   - [ ] Con los clásicos: una foto JPG abre con el Visualizador de fotos (después de elegirlo en Aplicaciones predeterminadas) y Alt+Tab muestra íconos.
+   - [ ] Una foto JPG abre con el Visualizador de fotos (después de elegirlo en Aplicaciones predeterminadas) y Alt+Tab muestra íconos.
    - [ ] El resumen de la limpieza muestra lo liberado por carpeta y los archivos salteados.
    - [ ] `C:\Windows\Prefetch` conserva `Layout.ini`, `NTOSBOOT-B00DFAAD.pf` y la carpeta `ReadyBoot`.
    - [ ] Win+Shift+S abre el recorte de pantalla (Recortes y anotación sigue instalado).
@@ -592,9 +597,8 @@ Wine no los implementa, así que falta la prueba en un Windows 10 real. Para eso
    - [ ] El botón de encendido apaga la PC por completo. En UTM se prueba con el botón de apagado de la ventana de la
      VM (el apagado normal, no el forzado), que le manda a Windows la misma señal que el botón físico.
    - [ ] En la netbook real: cerrar la tapa la apaga (la VM no tiene tapa).
-   - [ ] Si desactivaste Restaurar sistema: *Propiedades del sistema > Protección del sistema* dice "Desactivado".
-   - [ ] Existe el punto de restauración "Antes de OptimizarPC v2" (`rstrui.exe`).
-   - [ ] La opción 2 muestra la paginación en 1,5 veces la RAM, la caché de escritura activada y el vaciado del búfer
+   - [ ] *Propiedades del sistema > Protección del sistema* dice "Desactivado".
+   - [ ] La opción 2 muestra la paginación fija en el doble de la RAM, la caché de escritura activada y el vaciado del búfer
      desactivado.
    - [ ] En el menú, Enter solo elige la opción 1 y un número inválido vuelve al menú.
 8. Probá la opción 5 y verificá que todo vuelva a la normalidad.
