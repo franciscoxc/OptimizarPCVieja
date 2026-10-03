@@ -135,6 +135,9 @@ reg delete "%UCLS%\Local Settings\Software\Microsoft\Windows\Shell\Bags" /f >nul
 echo   [OK] Efectos visuales, desenfoque al iniciar sesion, menus, animaciones, Alt+Tab
 echo        y Explorador como de fabrica.
 
+call :titulo "Archivo de paginacion"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$cs=Get-CimInstance Win32_ComputerSystem; if ($cs.AutomaticManagedPagefile) { Write-Output '  [OK] El archivo de paginacion ya es automatico.'; exit 0 }; $ram=[math]::Round($cs.TotalPhysicalMemory / 1MB); $ini=[int][math]::Round($ram * 1.5); $max=[int][math]::Max($ram * 3, 4096); $pf=Get-CimInstance Win32_PageFileSetting | Where-Object { $_.Name -eq ($env:SystemDrive + '\pagefile.sys') } | Select-Object -First 1; if ($pf -and $pf.InitialSize -eq $ini -and $pf.MaximumSize -eq $max) { Set-CimInstance -InputObject $cs -Property @{AutomaticManagedPagefile=$true}; Write-Output '  [OK] El archivo de paginacion vuelve a ser automatico, como de fabrica.' } else { Write-Output '  [OK] El archivo de paginacion lo configuro alguien a mano: se deja como esta.' }"
+
 call :titulo "Energia"
 :: Herramienta oficial: vuelve los planes de Windows a fabrica, con sus botones,
 :: tapa, suspension y tiempos de disco, y deja activo el plan Equilibrado.

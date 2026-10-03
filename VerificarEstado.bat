@@ -147,7 +147,8 @@ if ($mma) { L ('Compresion de memoria / precarga de apps / combinacion de pagina
 L ('Proceso de compresion activo:   ' + [bool](Get-Process -Name 'Memory Compression'))
 foreach ($v in 'DisablePagingExecutive', 'IOPageLockLimit', 'DontVerifyRandomDrivers', 'LargeSystemCache') { L ($v + ': ' + (Leer $mm $v)) }
 L ('Paginacion administrada por Windows: ' + $cs.AutomaticManagedPagefile)
-Get-CimInstance Win32_PageFileUsage | ForEach-Object { L ('Archivo de paginacion:          ' + $_.Name + ' - ' + $_.AllocatedBaseSize + ' MB (en uso ' + $_.CurrentUsage + ' MB)') }
+Get-CimInstance Win32_PageFileSetting | ForEach-Object { L ('Paginacion configurada:         ' + $_.Name + ' - inicial ' + $_.InitialSize + ' MB, maximo ' + $_.MaximumSize + ' MB   (la v2: 1,5 x RAM y 3 x RAM o 4 GB)') }
+Get-CimInstance Win32_PageFileUsage | ForEach-Object { L ('Archivo de paginacion:          ' + $_.Name + ' - ' + $_.AllocatedBaseSize + ' MB (en uso ' + $_.CurrentUsage + ' MB, pico ' + $_.PeakUsage + ' MB)') }
 
 # --- Servicios ----------------------------------------------------------------
 Titulo 'Servicios (inicio / estado / lo que espera la v2)'
@@ -251,6 +252,15 @@ L ('OneDrive al inicio:             ' + (Leer ($U + '\Software\Microsoft\Windows
 Titulo 'Disco y energia'
 L ((fsutil behavior query DisableLastAccess) -join ' ')
 L ((fsutil behavior query Disable8dot3) -join ' ')
+$nd = (Get-Partition -DriveLetter $env:SystemDrive.Substring(0, 1)).DiskNumber
+$dd = Get-PhysicalDisk | Where-Object { $_.DeviceId -eq [string]$nd } | Select-Object -First 1
+$ca = $null
+if ($dd) { $ca = $dd | Get-StorageAdvancedProperty }
+if ($ca) { L ('Cache de escritura del disco:   ' + $ca.IsDeviceCacheEnabled + '   (vaciado de bufer desactivado: ' + $ca.IsPowerProtected + ', deberia ser False)') } else { L 'Cache de escritura del disco:   Windows no informa su estado' }
+$rb = @(Get-PSDrive -PSProvider FileSystem | ForEach-Object { Join-Path $_.Root 'ReadyBoost.sfcache' } | Where-Object { Test-Path -LiteralPath $_ })
+$rbTexto = 'no'
+if ($rb.Count) { $rbTexto = $rb -join ', ' }
+L ('ReadyBoost en uso:              ' + $rbTexto)
 $compacto = $false
 foreach ($f in 'System32\shell32.dll', 'System32\mshtml.dll', 'explorer.exe') {
     $ruta = Join-Path $env:windir $f

@@ -39,12 +39,20 @@ set "DISCO=%SystemDrive%"
 set "MEDIO=desconocido"
 for /f "usebackq delims=" %%m in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "$n=(Get-Partition -DriveLetter $env:SystemDrive.Substring(0,1)).DiskNumber; $d=Get-PhysicalDisk | Where-Object { $_.DeviceId -eq [string]$n } | Select-Object -First 1; if ($d) { [string]$d.MediaType } else { 'desconocido' }"`) do set "MEDIO=%%m"
 
+:: Con menos de 15% libre, defrag solo desfragmenta en parte: usa ese espacio
+:: para acomodar los pedazos.
+set "LIBRE_PCT=100"
+for /f "usebackq delims=" %%m in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "$v=Get-Volume -DriveLetter $env:SystemDrive.Substring(0,1); [string][math]::Floor(100 * $v.SizeRemaining / $v.Size)"`) do set "LIBRE_PCT=%%m"
+
 cls
 echo ==========================================================================
 echo   DESFRAGMENTAR A FONDO - disco %DISCO%
 echo ==========================================================================
 echo.
 echo   Tipo de disco detectado: %MEDIO%
+echo   Espacio libre: %LIBRE_PCT%%%
+if %LIBRE_PCT% LSS 15 echo   AVISO: con menos de 15%% libre, Windows solo desfragmenta en parte. Antes,
+if %LIBRE_PCT% LSS 15 echo   libera espacio: Papelera, LimpiarWindowsUpdate.bat o el Liberador de espacio.
 if /i "%MEDIO%"=="SSD" goto :ssd
 if /i not "%MEDIO%"=="HDD" echo   AVISO: no se pudo confirmar que sea un disco mecanico. Si es un SSD, cancela.
 echo.

@@ -56,6 +56,8 @@ Criterio general:
 - **La seguridad no se negocia.** Lo que debería estar encendido se verifica y se repara, por si otra herramienta lo apagó.
 - **Servicios: Manual siempre que se pueda.** Si un servicio tiene que arrancar solo, va en *Automático (retrasado)*.
   Se *deshabilita* solo lo inútil para esta PC: telemetría, Xbox, Bluetooth y el indexador.
+- **Nada residente que no se gane el lugar.** Lo que corre de fondo sin que lo uses se apaga. Lo que queda, queda
+  porque le ahorra trabajo al disco o porque protege (ver [Caché de disco, ReadyBoost y las optimizaciones de Windows](#caché-de-disco-readyboost-y-las-optimizaciones-de-windows)).
 - **Antes de tocar nada, crea un punto de restauración.**
 
 ### 0. Red de seguridad
@@ -176,6 +178,10 @@ No se agregan exclusiones: son lo primero que buscan los virus.
 ### 7. Memoria, disco y energía
 
 - Compresión de memoria: activada (requiere SysMain).
+- **Archivo de paginación con tamaño propio:** 1,5 veces la RAM desde el arranque y hasta 3 veces la RAM o 4 GB.
+  El automático arranca chico y crece de a pedazos, y en un disco lento eso trae errores y fragmentación
+  (ver [Caché de disco](#caché-de-disco-readyboost-y-las-optimizaciones-de-windows)). Si alguien lo había configurado a mano, se respeta.
+- **Caché de escritura del disco:** se verifica que esté activada, y que nadie haya desactivado el vaciado del búfer.
 - NTFS: sin registro de último acceso y sin nombres cortos 8.3 (como en el v1).
 - **Restaurar sistema, según la pregunta 6.** Mientras haya puntos de restauración, cada escritura en el disco puede
   costar una copia extra, y ocupan hasta un 10% del disco. Desactivarlo saca ese trabajo de fondo, pero borra **todos**
@@ -380,6 +386,8 @@ está **`DesfragmentarAFondo.bat`**, que usa la misma herramienta de Windows con
 | 5 | `/A /V` | Analiza otra vez, para comparar. |
 
 Usa `/H` (prioridad normal, termina antes) y `/U` (muestra el progreso). En un SSD no desfragmenta: manda TRIM.
+Antes de empezar avisa si queda menos de 15% libre: con menos, Windows solo desfragmenta en parte, porque usa ese
+espacio para acomodar los pedazos ([`defrag`, Microsoft Learn](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/defrag)).
 Puede tardar horas en un Atom: dejala enchufada y sin usar.
 
 Lo único que la herramienta de Windows no puede mover es lo que está en uso mientras Windows corre: el archivo de
@@ -412,6 +420,76 @@ reiniciá y volvé a correrlo.
 Rutina de mantenimiento, cada tantos meses: `LimpiarWindowsUpdate.bat` y después `DesfragmentarAFondo.bat`, que con
 menos archivos tiene menos que mover.
 
+## Caché de disco, ReadyBoost y las optimizaciones de Windows
+
+**El criterio: nada residente que no se gane el lugar.** Lo que corre de fondo sin que lo uses se apaga. Lo que queda,
+queda porque le ahorra trabajo al disco o porque protege. Así quedan las optimizaciones que trae Windows:
+
+| Optimización de Windows | Qué hace | Veredicto |
+|---|---|---|
+| Prefetch | Al abrir un programa, lee de una pasada lo que usó la última vez, en vez de saltar por el disco. | **Se queda.** No corre de fondo: trabaja al abrir programas. |
+| ReadyBoot | Al arrancar, precarga en RAM los archivos del arranque. | **Se queda.** Trabaja solo durante el arranque. |
+| Compresión de memoria (SysMain) | Comprime en RAM lo que si no iría al archivo de paginación. | **Se queda: es la más importante con 2 GB.** Comprimir en RAM es muchísimo más rápido que escribir y leer del disco. |
+| SuperFetch (SysMain) | Llena la RAM libre con los programas que más usás. | Viene en el mismo servicio que la compresión, así que se queda. Con 2 GB casi no hay RAM libre que llenar. |
+| Precarga de apps (PreLaunch) | Abre apps de la Store "por si acaso". | **Apagada.** |
+| Inicio rápido | Hiberna el núcleo al apagar. | **Apagado.** Ver la sección de energía. |
+| Indexador de búsqueda | Lee y relee el disco para indexarlo. | **Apagado.** |
+| ReadyBoost | Usa un pendrive o una tarjeta SD como caché del disco. | **Experimento opcional:** ver abajo. |
+
+### ¿Se puede agrandar la caché del disco?
+
+La caché de archivos de Windows ya usa **toda la RAM que sobra**, sola (en el Administrador de tareas figura como
+"En caché"), y la devuelve al instante cuando un programa la pide. Con 2 GB no hay de dónde sacar más sin quitársela
+a los programas, que terminarían en el archivo de paginación: justo lo que se quiere evitar. Los tweaks que circulan:
+
+| Tweak | Qué promete | Veredicto |
+|---|---|---|
+| `LargeSystemCache = 1` | Más caché de archivos | **No.** Es para servidores: le da prioridad a la caché por sobre los programas, y algunos drivers se portan mal con él ([TweakHound](https://www.tweakhound.com/2011/09/20/bad-tweaks/)). |
+| `fsutil behavior set memoryusage 2` | Más memoria para NTFS | **No.** Microsoft dice que ayuda cuando se abren muchísimos archivos *y sobra memoria*; si no, le quita memoria al resto ([Microsoft Learn](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/fsutil-behavior)). |
+| `IoPageLockLimit` | "Buffer para el disco" | **Mito:** Windows lo ignora. |
+| Caché de escritura del disco | Que Windows no espere a que el disco termine cada escritura | **Sí, y viene activada.** El script verifica que lo esté y avisa si alguien la apagó. |
+| Desactivar el vaciado del búfer de caché de escritura | Escribir todavía más rápido | **No.** Ante un corte de luz se corrompen archivos: el propio cartel de Windows dice que no se marque salvo que el disco tenga alimentación aparte ([Raymond Chen](https://devblogs.microsoft.com/oldnewthing/20130416-00/?p=4643)). Una netbook con la batería muerta es una PC sin UPS. El script avisa si está marcado. |
+| Archivo de paginación con tamaño propio | Que no crezca de a pedazos | **Sí.** El automático arranca chico y crece cuando hace falta. En un disco lento, mientras crece, los programas pueden fallar por falta de memoria ([Microsoft Learn](https://learn.microsoft.com/en-us/troubleshoot/windows-client/performance/slow-page-file-growth-memory-allocation-errors)), y crecer y achicarse lo fragmenta ([Microsoft](https://techcommunity.microsoft.com/blog/askperf/disk-fragmentation-and-system-performance/372921)). El script lo deja en 1,5 veces la RAM desde el arranque, lo que recomienda Microsoft, y hasta 3 veces la RAM o 4 GB, como el automático ([Microsoft Learn](https://learn.microsoft.com/en-us/troubleshoot/windows-client/performance/how-to-determine-the-appropriate-page-file-size-for-64-bit-versions-of-windows)). Solo si estaba en automático. |
+| `fsutil behavior set mftzone` | Que la tabla de archivos (MFT) no se fragmente | **No.** Solo sirve en discos con muchísimos archivos chicos; la reserva ya existe. |
+
+### ReadyBoost: lo único pensado justo para "los fragmentos"
+
+ReadyBoost no es RAM: es una caché de **lecturas chicas y dispersas** en un pendrive o una tarjeta SD. Es exactamente
+lo que un disco mecánico hace peor: cada salto del cabezal tarda milisegundos, y una memoria flash no tiene cabezal.
+Las lecturas grandes y seguidas las sigue haciendo el disco, que en eso es más rápido
+([Wikipedia](https://en.wikipedia.org/wiki/ReadyBoost), [Microsoft](https://learn.microsoft.com/en-us/archive/blogs/tomarcher/readyboost-qa)).
+
+Lo que dicen las pruebas: ayuda sobre todo con 1 GB de RAM o menos, y con 2 GB la diferencia es chica. En pruebas con
+PCMark dio entre 1% y 2% más con 4 GB, y 1% **menos** en una notebook con 2 GB
+([Digital Citizen](https://www.digitalcitizen.life/does-readyboost-work-does-it-improve-performance-slower-pcs/),
+[How-To Geek](https://www.howtogeek.com/123780/htg-explains-is-readyboost-worth-using/)). En un Atom hay un costo
+más: ReadyBoost cifra todo lo que guarda, y estos Atom no tienen instrucciones para cifrar
+([AES-NI](https://en.wikipedia.org/wiki/AES_instruction_set)): lo hacen a pura fuerza.
+
+Por eso no está en el script: hace falta hardware y la ganancia es incierta. Si querés probarlo en una netbook:
+
+1. Usá la ranura de tarjetas SD: la tarjeta queda adentro y no ocupa un USB. Una decente (clase 10 o A1) de 4 a 16 GB alcanza.
+2. *Este equipo >* botón derecho en la tarjeta *> Propiedades > ReadyBoost > Dedicar este dispositivo a ReadyBoost.*
+   Si Windows dice que es lenta, no sirve: probá otra.
+3. Usala una semana. Si no notás diferencia, sacala: no se rompe nada.
+
+`OptimizarPC.bat` deja SysMain activo, que es lo que ReadyBoost necesita, y `VerificarEstado.bat` muestra si está en
+uso. Con un SSD, ReadyBoost no tiene sentido.
+
+### Lo que de verdad ataca los fragmentos
+
+1. **Desfragmentar:** la pasada semanal, que el script deja activa, y `DesfragmentarAFondo.bat` de vez en cuando.
+2. **Dejar al menos 15% libre:** con menos, defrag solo desfragmenta en parte. `DesfragmentarAFondo.bat` avisa.
+3. **El archivo de paginación con tamaño propio**, que hace el script. Si ya está muy fragmentado, se desfragmenta al
+   arranque con UltraDefrag (ver [Desfragmentar](#desfragmentar-sirve-el-de-windows)).
+4. **Revisar el cabezal del disco.** Muchos discos de notebook estacionan el cabezal a los pocos segundos sin uso, para
+   ahorrar energía, y volver a leer tarda hasta un par de segundos: las típicas congeladas cortas. Con
+   [CrystalDiskInfo](https://crystalmark.info/en/software/crystaldiskinfo/) mirá el recuento de ciclos de carga y
+   descarga (*Load/Unload Cycle Count*): si sube de a miles por día, es eso. Se corrige subiendo la administración de
+   energía del disco (APM) a 254 desde el mismo programa, pero en la mayoría de los discos hay que repetirlo en cada
+   arranque, y eso implica dejar un programa residente: no lo automatizo ([detalle](https://commonemitter.blogspot.com/2019/09/disabling-hdd-apm.html)).
+5. **Un SSD**, que termina con el problema de raíz.
+
 ## Lo que NO hace (mitos y tweaks descartados)
 
 | Tweak | Por qué no |
@@ -424,6 +502,8 @@ menos archivos tiene menos que mover.
 | `NetworkThrottlingIndex`, `SystemResponsiveness` | Tweaks de gaming y multimedia. Acá no hacen nada útil. |
 | `StartupDelayInMSec = 0` | Hace que los programas de inicio arranquen todos juntos con el escritorio. En HDD eso empeora el arranque. |
 | Deshabilitar el archivo de paginación | Con 2 GB de RAM: cuelgues y programas que se cierran solos. |
+| `fsutil behavior set memoryusage 2`, `mftzone` | Más memoria para NTFS y más reserva para la MFT: con 2 GB y un disco de uso normal, no ayudan. Ver [Caché de disco](#caché-de-disco-readyboost-y-las-optimizaciones-de-windows). |
+| Desactivar el vaciado del búfer de caché de escritura | Ante un corte de luz se corrompen archivos. El script avisa si alguien lo hizo. |
 | Deshabilitar la desfragmentación | En HDD es necesaria. El script se asegura de que esté **activa**. Para una pasada a fondo, ver [Desfragmentar](#desfragmentar-sirve-el-de-windows). |
 | "Limpiadores de RAM" | Contraproducentes: Windows vuelve a cargar todo desde el disco lento. |
 | Vaciar `Prefetch` entero, o en cada arranque | Lo que hacen algunos "limpiadores": se lleva también el rastro de arranque, y los arranques siguientes son más lentos. El script borra solo las entradas de programas. |
@@ -460,7 +540,7 @@ Desde acá no hay un Windows real, así que se validó todo lo que se puede vali
   y se verificó en el registro que cada valor quedara corregido y escrito en `HKEY_USERS\<SID>` del usuario.
   También se probó el ciclo completo optimizar, revertir y verificar: el inicio rápido queda apagado, *Suspender* e
   *Hibernar* salen del menú, y `RevertirOptimizacion.bat` los devuelve.
-- **PowerShell:** los 35 bloques de PowerShell pasan el parser oficial. La lógica de apps en segundo plano se probó con
+- **PowerShell:** los 39 bloques de PowerShell pasan el parser oficial. La lógica de apps en segundo plano se probó con
   nombres reales de paquetes.
 - **Limpieza:** la sección que vacía los temporales se **ejecutó de verdad** sobre un árbol de carpetas simulado, con
   trampas (y una carpeta Prefetch de mentira, donde solo se fueron las entradas de programas): un enlace a una carpeta valiosa (no la siguió), archivos de solo lectura (los borró), archivos imposibles de
@@ -505,6 +585,7 @@ Wine no los implementa, así que falta la prueba en un Windows 10 real. Para eso
    - [ ] En la netbook real: cerrar la tapa la apaga (la VM no tiene tapa).
    - [ ] Si desactivaste Restaurar sistema: *Propiedades del sistema > Protección del sistema* dice "Desactivado".
    - [ ] Existe el punto de restauración "Antes de OptimizarPC v2" (`rstrui.exe`).
+   - [ ] `VerificarEstado.bat` muestra la paginación en 1,5 veces la RAM y la caché de escritura del disco activada.
 8. Probá `RevertirOptimizacion.bat` y verificá que todo vuelva a la normalidad.
 
 Pasame las salidas de `VerificarEstado.bat` y lo que haya fallado del checklist, y lo ajustamos.
@@ -556,6 +637,16 @@ lo mismo que se recomienda ahí, contrastadas con documentación de Microsoft:
 - **Limpieza de WinSxS:** [Microsoft Learn](https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/clean-up-the-winsxs-folder);
   `/SPSuperseded` es para Service Packs ([Microsoft](https://learn.microsoft.com/en-us/archive/blogs/joscon/how-to-reclaim-space-after-applying-windows-72008-r2-service-pack-1));
   error `0x800F0806` por operaciones pendientes ([Microsoft Q&A](https://learn.microsoft.com/en-us/answers/questions/2192270/dism-startcomponentcleanup-give-error-0x800f0806-t)).
+- **Caché y paginación:** crecimiento lento del archivo de paginación ([Microsoft Learn](https://learn.microsoft.com/en-us/troubleshoot/windows-client/performance/slow-page-file-growth-memory-allocation-errors)),
+  tamaños del automático ([Microsoft Learn](https://learn.microsoft.com/en-us/troubleshoot/windows-client/performance/how-to-determine-the-appropriate-page-file-size-for-64-bit-versions-of-windows)),
+  paginación dinámica y fragmentación ([Microsoft Tech Community](https://techcommunity.microsoft.com/blog/askperf/disk-fragmentation-and-system-performance/372921)),
+  `memoryusage` y `mftzone` ([`fsutil behavior`](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/fsutil-behavior)),
+  vaciado del búfer ([Raymond Chen](https://devblogs.microsoft.com/oldnewthing/20130416-00/?p=4643)),
+  estado de la caché de escritura ([`Get-StorageAdvancedProperty`](https://learn.microsoft.com/en-us/powershell/module/storage/get-storageadvancedproperty)),
+  `LargeSystemCache` ([TweakHound](https://www.tweakhound.com/2011/09/20/bad-tweaks/)).
+- **ReadyBoost:** [Wikipedia](https://en.wikipedia.org/wiki/ReadyBoost), [Microsoft](https://learn.microsoft.com/en-us/archive/blogs/tomarcher/readyboost-qa),
+  [Digital Citizen](https://www.digitalcitizen.life/does-readyboost-work-does-it-improve-performance-slower-pcs/), [How-To Geek](https://www.howtogeek.com/123780/htg-explains-is-readyboost-worth-using/).
+  Cabezal estacionado (APM): [Common Emitter](https://commonemitter.blogspot.com/2019/09/disabling-hdd-apm.html).
 - **Qué hay en la carpeta Prefetch:** [Prefetcher](https://en.wikipedia.org/wiki/Prefetcher), [ReadyBoot y SuperFetch](https://en.wikipedia.org/wiki/Windows_Vista_I/O_technologies).
 - **Restaurar sistema:** desactivarlo borra los puntos, según [TenForums](https://www.tenforums.com/tutorials/99782-enable-disable-system-restore-windows-3.html).
 - **Desfragmentador:** [límite de 64 MB](https://techcommunity.microsoft.com/blog/askperf/disk-fragmentation-and-system-performance/372921), [parámetros de `defrag`](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/defrag), [UltraDefrag](https://en.wikipedia.org/wiki/UltraDefrag).

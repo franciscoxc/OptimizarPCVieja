@@ -423,6 +423,19 @@ fsutil behavior set DisableLastAccess 1 >nul 2>&1
 fsutil behavior set Disable8dot3 1 >nul 2>&1
 echo   [OK] NTFS sin registro de ultimo acceso ni nombres cortos 8.3.
 
+:: Archivo de paginacion con tamano propio. El automatico arranca chico y crece
+:: cuando hace falta: en un disco lento, mientras crece, los programas pueden
+:: fallar por falta de memoria (Microsoft), y cada crecimiento lo fragmenta.
+:: Inicial: 1,5 veces la RAM, lo que recomienda Microsoft. Maximo: 3 veces la RAM
+:: o 4 GB, como el automatico. Solo si estaba en automatico: si alguien lo
+:: configuro a mano, se respeta. Se aplica al reiniciar.
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$cs=Get-CimInstance Win32_ComputerSystem; if (-not $cs.AutomaticManagedPagefile) { Write-Output '  [OK] Archivo de paginacion configurado a mano: se respeta como esta.'; exit 0 }; $ram=[math]::Round($cs.TotalPhysicalMemory / 1MB); $ini=[int][math]::Round($ram * 1.5); $max=[int][math]::Max($ram * 3, 4096); $libre=[math]::Floor((Get-PSDrive -Name $env:SystemDrive.Substring(0,1)).Free / 1MB); if ($libre -lt ($ini + 2048)) { Write-Output '  [AVISO] Poco espacio libre: el archivo de paginacion sigue en automatico.'; exit 0 }; try { Set-CimInstance -InputObject $cs -Property @{AutomaticManagedPagefile=$false} -ErrorAction Stop; $nombre=$env:SystemDrive + '\pagefile.sys'; $pf=Get-CimInstance Win32_PageFileSetting | Where-Object { $_.Name -eq $nombre } | Select-Object -First 1; if ($pf) { Set-CimInstance -InputObject $pf -Property @{InitialSize=[uint32]$ini; MaximumSize=[uint32]$max} -ErrorAction Stop } else { New-CimInstance -ClassName Win32_PageFileSetting -Property @{Name=$nombre; InitialSize=[uint32]$ini; MaximumSize=[uint32]$max} -ErrorAction Stop | Out-Null }; Write-Output ('  [OK] Archivo de paginacion: ' + $ini + ' MB desde el arranque, hasta ' + $max + ' MB. Ya no crece de a pedazos.') } catch { Set-CimInstance -InputObject $cs -Property @{AutomaticManagedPagefile=$true} -ErrorAction SilentlyContinue; Write-Output '  [AVISO] No se pudo configurar el archivo de paginacion: sigue en automatico.' }"
+
+:: Cache de escritura del disco: viene activada y en un disco mecanico es clave.
+:: Si alguien la apago, se avisa. Tambien se avisa si alguien desactivo el vaciado
+:: del bufer, que ante un corte de luz puede corromper archivos.
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$n=(Get-Partition -DriveLetter $env:SystemDrive.Substring(0,1) -ErrorAction SilentlyContinue).DiskNumber; $d=Get-PhysicalDisk -ErrorAction SilentlyContinue | Where-Object { $_.DeviceId -eq [string]$n } | Select-Object -First 1; $p=$null; if ($d) { $p=$d | Get-StorageAdvancedProperty -ErrorAction SilentlyContinue }; if (-not $p) { Write-Output '  [OK] Cache de escritura del disco: Windows no informa su estado, queda como esta.'; exit 0 }; if ($p.IsDeviceCacheEnabled) { Write-Output '  [OK] Cache de escritura del disco: activada.' } else { Write-Output '  [AVISO] La cache de escritura del disco esta APAGADA: escribir es mucho mas lento.'; Write-Output '          Activala en Administrador de dispositivos, Unidades de disco, tu disco,'; Write-Output '          Directivas: Habilitar cache de escritura en el dispositivo.' }; if ($p.IsPowerProtected -and [string]$d.MediaType -eq 'HDD') { Write-Output '  [AVISO] Alguien desactivo el vaciado del bufer de escritura: ante un corte de luz'; Write-Output '          se pueden corromper archivos. Destilda esa opcion en el mismo lugar.' }"
+
 :: CompactOS: en HDD conviene el sistema sin comprimir. Solo se descomprime si
 :: estaba comprimido y hay espacio; si no, se saltea: tarda varios minutos igual.
 set "COMPACTO=0"
