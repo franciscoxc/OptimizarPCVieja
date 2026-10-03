@@ -161,14 +161,7 @@ echo      MAS lentos hasta que se rehace solo. Microsoft midio de 4 a 15 segundo
 choice /c SN /n /m "     Vaciarlo igual? [S/N]: "
 if errorlevel 2 (set "PREFETCH=N") else (set "PREFETCH=S")
 echo.
-echo   7. Inicio rapido: en disco mecanico arranca mas rapido y no corre nada mientras
-echo      usas la PC; solo actua al apagar y al prender. Pero con drivers viejos, como
-echo      los de Windows 7, puede traer problemas: hay casos de procesador ocupado
-echo      despues de prender. Si la PC usa drivers de Windows 7, conviene que NO.
-choice /c SN /n /m "     Dejarlo activado? [S/N]: "
-if errorlevel 2 (set "INICIORAPIDO=N") else (set "INICIORAPIDO=S")
-echo.
-echo   8. Restaurar sistema guarda puntos para volver atras. Desactivarlo libera hasta
+echo   7. Restaurar sistema guarda puntos para volver atras. Desactivarlo libera hasta
 echo      un 10%% del disco y saca escrituras de fondo, pero borra TODOS los puntos,
 echo      incluido el que crearia este script. La vuelta atras queda en manos de
 echo      RevertirOptimizacion.bat o de reinstalar.
@@ -443,40 +436,39 @@ goto :compact_listo
 echo   [OK] El sistema no esta comprimido con CompactOS: nada que hacer.
 :compact_listo
 
-:: Energia. Notebook: se respeta el plan para cuidar la bateria.
-set "NOTEBOOK=0"
-powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Get-CimInstance Win32_Battery) { exit 1 } else { exit 0 }" >nul 2>&1
-if errorlevel 1 goto :energia_notebook
+:: Energia: la prioridad es la velocidad, no el ahorro. Se aplica a los tres
+:: planes de Windows, por si alguien cambia de plan despues:
+::  - el disco nunca se apaga solo: despertarlo congela la PC varios segundos;
+::  - la PC nunca suspende ni hiberna sola;
+::  - boton de encendido y tapa: apagado completo; boton de suspension: nada;
+::  - bateria critica: apagado completo, la unica salida prolija sin hibernacion.
+for %%p in (381b4222-f694-41f0-9685-ff5bb260df2e 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c a1841308-3541-4fab-bc81-f71556f20b4a) do call :energia_plan %%p
+:: Plan de Alto rendimiento en todas las PCs, notebooks incluidas. Si el plan no
+:: existe, se crea a partir del original de Windows. Si tampoco se puede, queda
+:: el plan que estaba, con los mismos ajustes.
 powercfg /setactive 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c >nul 2>&1
 if errorlevel 1 powercfg /duplicatescheme 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c >nul 2>&1
-if errorlevel 1 goto :energia_comun
+if errorlevel 1 goto :energia_alto_listo
 powercfg /setactive 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c >nul 2>&1
-echo   [OK] Plan de energia: Alto rendimiento.
-goto :energia_comun
-:energia_notebook
-set "NOTEBOOK=1"
-echo   Notebook detectada: se mantiene el plan de energia para cuidar la bateria.
-:energia_comun
-:: El HDD nunca se apaga enchufado: despertarlo congela la PC varios segundos.
-powercfg /change disk-timeout-ac 0 >nul 2>&1
-echo   [OK] El disco no se apaga mientras la PC esta enchufada.
-:: Inicio rapido, segun la pregunta 7.
-if "%INICIORAPIDO%"=="N" goto :inicio_rapido_no
-powercfg /hibernate on >nul 2>&1
-call :dword "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Power" HiberbootEnabled 1
-echo   [OK] Inicio rapido activado.
-goto :inicio_rapido_listo
-:inicio_rapido_no
-call :dword "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Power" HiberbootEnabled 0
-:: En una notebook la hibernacion queda: salva el trabajo si la bateria se agota.
-if "%NOTEBOOK%"=="1" goto :inicio_rapido_notebook
+echo   [OK] Plan de energia: Alto rendimiento, tambien en notebooks.
+:energia_alto_listo
+:: Los ajustes van tambien al plan activo, sea cual sea (por ejemplo, uno del
+:: fabricante), y se reactiva para que rijan desde ahora.
+call :energia_plan SCHEME_CURRENT
+powercfg /setactive SCHEME_CURRENT >nul 2>&1
+echo   [OK] El disco nunca se apaga solo y la PC nunca suspende ni hiberna sola.
+echo   [OK] Boton de encendido y tapa: apagado completo. Boton de suspension: nada.
+echo   [OK] Bateria critica: apagado completo.
+:: Sin hibernacion ni inicio rapido: cada apagado es completo, cada arranque es
+:: limpio y se borra hiberfil.sys: el 40% de la RAM, unos 800 MB con 2 GB.
 powercfg /hibernate off >nul 2>&1
-echo   [OK] Inicio rapido desactivado y archivo de hibernacion borrado: mas disco libre.
-goto :inicio_rapido_listo
-:inicio_rapido_notebook
-echo   [OK] Inicio rapido desactivado. La hibernacion queda para cuando se agota la bateria.
-:inicio_rapido_listo
-:: Restaurar sistema, segun la pregunta 8. Lo desactiva con la herramienta oficial,
+call :dword "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Power" HiberbootEnabled 0
+:: Suspender e Hibernar, fuera del menu de apagado.
+call :dword "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\FlyoutMenuSettings" ShowSleepOption 0
+call :dword "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\FlyoutMenuSettings" ShowHibernateOption 0
+echo   [OK] Sin hibernacion ni inicio rapido: cada apagado es completo.
+echo   [OK] Suspender e Hibernar ya no aparecen en el menu de apagado.
+:: Restaurar sistema, segun la pregunta 7. Lo desactiva con la herramienta oficial,
 :: que borra sus puntos de restauracion y libera su espacio.
 if not "%SINRESTAURAR%"=="S" goto :restaurar_listo
 powershell -NoProfile -ExecutionPolicy Bypass -Command "try { Disable-ComputerRestore -Drive ($env:SystemDrive + '\') -ErrorAction Stop; exit 0 } catch { exit 1 }" >nul 2>&1
@@ -563,10 +555,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command "$ks='%UPS%\Software\Micr
 echo.
 echo ==========================================================================
 echo   LISTO. Hay que REINICIAR la PC para aplicar todo.
-if "%INICIORAPIDO%"=="S" echo   Usa "Reiniciar", no "Apagar": con el inicio rapido, apagar no recarga todo.
 echo.
 echo   Para buscar archivos: Windows Search queda apagado porque castiga el disco.
 echo   Everything, de voidtools.com, encuentra cualquier archivo al instante.
+echo.
+echo   Energia: cerrar la tapa o apretar el boton de encendido ahora APAGA la PC,
+echo   sin suspender. Guarda lo que estes haciendo antes.
 echo.
 echo   Seguridad: Windows 10 recibe parches gratis hasta el 12/10/2027 si la PC
 echo   esta inscripta en ESU. Revisalo en Configuracion, Windows Update.
@@ -704,6 +698,26 @@ if "%~4"=="" goto :eof
 reg add "HKLM\SOFTWARE\Microsoft\Windows Photo Viewer\Capabilities\FileAssociations" /v %~4 /t REG_SZ /d "PhotoViewer.FileAssoc.%_tipo%" /f >nul 2>&1
 shift /4
 goto :visor_extension
+
+:: Aplica los ajustes de energia a un plan. Uso: call :energia_plan GUID
+:: (o SCHEME_CURRENT, el plan activo).
+:: Valores de botones y tapa: 0 nada, 1 suspender, 2 hibernar, 3 apagar.
+:: Tiempos en segundos: 0 es nunca.
+:energia_plan
+powercfg /setacvalueindex %1 SUB_DISK DISKIDLE 0 >nul 2>&1
+powercfg /setdcvalueindex %1 SUB_DISK DISKIDLE 0 >nul 2>&1
+powercfg /setacvalueindex %1 SUB_SLEEP STANDBYIDLE 0 >nul 2>&1
+powercfg /setdcvalueindex %1 SUB_SLEEP STANDBYIDLE 0 >nul 2>&1
+powercfg /setacvalueindex %1 SUB_SLEEP HIBERNATEIDLE 0 >nul 2>&1
+powercfg /setdcvalueindex %1 SUB_SLEEP HIBERNATEIDLE 0 >nul 2>&1
+powercfg /setacvalueindex %1 SUB_BUTTONS PBUTTONACTION 3 >nul 2>&1
+powercfg /setdcvalueindex %1 SUB_BUTTONS PBUTTONACTION 3 >nul 2>&1
+powercfg /setacvalueindex %1 SUB_BUTTONS LIDACTION 3 >nul 2>&1
+powercfg /setdcvalueindex %1 SUB_BUTTONS LIDACTION 3 >nul 2>&1
+powercfg /setacvalueindex %1 SUB_BUTTONS SBUTTONACTION 0 >nul 2>&1
+powercfg /setdcvalueindex %1 SUB_BUTTONS SBUTTONACTION 0 >nul 2>&1
+powercfg /setdcvalueindex %1 SUB_BATTERY BATACTIONCRIT 3 >nul 2>&1
+goto :eof
 
 :: Igual que :asegurar, pero recibe "servicio:tipo".
 :asegurar_par

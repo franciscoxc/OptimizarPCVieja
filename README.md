@@ -25,11 +25,12 @@ Objetivo: la mayor velocidad posible y el menor consumo de RAM, **sin apagar la 
    el script funciona igual desde adentro del ZIP, pero avisa, porque Windows lo corre desde una carpeta temporal.
 2. Doble clic en `OptimizarPC.bat`. Si no tiene permisos, los pide solo (aparece el cartel de UAC).
 3. Leé los avisos de hardware si aparece alguno (poca RAM, video sin driver, antirrobo de Conectar Igualdad)
-   y respondé las 8 preguntas: impresora, compartir en red, OneDrive, apps preinstaladas, clásicos de Windows 7,
-   Prefetch, inicio rápido y Restaurar sistema. Después no pregunta más.
+   y respondé las 7 preguntas: impresora, compartir en red, OneDrive, apps preinstaladas, clásicos de Windows 7,
+   Prefetch y Restaurar sistema. Después no pregunta más.
 4. Esperá. En un disco mecánico puede tardar 10 a 20 minutos. Paciencia, mate y facturas.
-5. **Reiniciá** con *Reiniciar*. Si dejaste el inicio rápido activado, no alcanza con *Apagar* y prender:
-   con el inicio rápido, "Apagar" no recarga todo y algunos cambios no se aplican.
+5. **Reiniciá** la PC (el script lo ofrece al final). Como el script apaga el inicio rápido, desde ahora *Apagar*
+   también es un apagado completo: ya no hace falta acordarse de usar *Reiniciar*.
+   **Ojo:** desde ahora, cerrar la tapa o apretar el botón de encendido **apaga** la PC, sin suspender. Guardá antes.
 
 Si en esa PC ya habías corrido el script original, no hace falta nada más: `OptimizarPC.bat` corrige lo que el original hizo mal.
 Si solo querés reparar el daño sin optimizar nada más, usá `DeshacerPerjudiciales.bat`.
@@ -59,7 +60,7 @@ Criterio general:
 ### 0. Red de seguridad
 
 - Punto de restauración ("Antes de OptimizarPC v2"). Si no se puede crear, pregunta antes de seguir.
-  Si en la pregunta 8 elegís desactivar Restaurar sistema, no se crea: se borraría igual.
+  Si en la pregunta 7 elegís desactivar Restaurar sistema, no se crea: se borraría igual.
 - Verifica que el archivo de paginación exista. Con 2 GB de RAM, sin paginación Windows se cuelga y cierra programas.
 
 ### 1. Seguridad: asegurar que lo importante esté encendido
@@ -167,19 +168,35 @@ No se agregan exclusiones: son lo primero que buscan los virus.
 
 - Compresión de memoria: activada (requiere SysMain).
 - NTFS: sin registro de último acceso y sin nombres cortos 8.3 (como en el v1).
-- **Inicio rápido, según la pregunta 7.** En un disco mecánico es la mayor mejora de arranque: Windows lee una sola
-  "foto" del sistema en vez de cientos de archivos sueltos. **No corre nada mientras usás la PC**: solo trabaja al
-  apagar y al prender. Contras: con drivers viejos (por ejemplo, los de Windows 7) puede dejar algo mal después de
-  prender; hay casos de `ntoskrnl.exe` usando 10-15% de procesador que desaparecen al desactivarlo
-  ([HP Community](https://h30434.www3.hp.com/t5/Notebook-Boot-and-Lockup/Fast-startup-causing-high-cpu-usage/td-p/7888113)).
-  Además, algunas actualizaciones necesitan un reinicio completo. Si lo desactivás en una PC de escritorio, también
-  se borra el archivo de hibernación (casi 1 GB con 2 GB de RAM). En una notebook la hibernación queda, para que
-  no se pierda el trabajo si se agota la batería.
-- **Restaurar sistema, según la pregunta 8.** Mientras haya puntos de restauración, cada escritura en el disco puede
+- **Restaurar sistema, según la pregunta 7.** Mientras haya puntos de restauración, cada escritura en el disco puede
   costar una copia extra, y ocupan hasta un 10% del disco. Desactivarlo saca ese trabajo de fondo, pero borra **todos**
   los puntos. Si reinstalás cuando hay problemas, como vos, es razonable desactivarlo.
-- PC de escritorio: plan de *Alto rendimiento*. Notebook: se mantiene el plan, para no matar la batería.
-- **El disco nunca se apaga enchufado.** El HDD dormido tarda varios segundos en despertar, y esa es la típica "congelada" al volver a la PC.
+
+**Energía: la prioridad es la velocidad, no el ahorro.** Se aplica a los tres planes de Windows (Equilibrado, Alto
+rendimiento y Economizador), por si alguien cambia de plan después, y también al plan activo si es otro (por ejemplo,
+uno del fabricante):
+
+| Qué | Cómo queda | Por qué |
+|---|---|---|
+| Plan de energía | *Alto rendimiento*, también en notebooks | Windows deja de frenar el procesador para ahorrar. La batería dura menos: es el precio. |
+| Disco | Nunca se apaga solo, enchufada o a batería | El HDD dormido tarda varios segundos en despertar: es la típica "congelada" al volver a la PC. |
+| Suspender e hibernar solos | Nunca | En PCs así, hibernar es lentísimo y suspender no aporta: se apaga y listo. |
+| Botón de encendido | Apagado completo | |
+| Cerrar la tapa | Apagado completo | En una PC de escritorio no hace nada: no tiene tapa. |
+| Botón de suspensión (si el teclado lo tiene) | Nada | El Panel de control no le ofrece "Apagar" a ese botón. |
+| Batería crítica | Apagado completo | De fábrica suele hibernar. Sin hibernación hay que decirle qué hacer, y apagar es la salida prolija: Windows cierra todo antes de que se corte. |
+| Hibernación e inicio rápido | Desactivados | Se borra `hiberfil.sys`: el 40% de la RAM, unos 800 MB con 2 GB. |
+| Menú de apagado | Sin *Suspender* ni *Hibernar* | Quedan *Apagar* y *Reiniciar*. *Suspender* se puede volver a mostrar desde *Panel de control > Opciones de energía > Elegir el comportamiento de los botones de inicio/apagado*. |
+
+El apagado de la pantalla no se toca: no cambia la velocidad.
+
+**Por qué sin inicio rápido:** en un disco mecánico, el inicio rápido acelera el arranque, porque Windows lee una sola
+"foto" del sistema en vez de cientos de archivos sueltos. Pero esa foto es un apagado a medias: el núcleo de Windows
+no se reinicia nunca y arrastra lo que tenía de un arranque al otro. Con drivers viejos (por ejemplo, los de Windows 7)
+puede dejar algo mal después de prender, y hay casos de `ntoskrnl.exe` usando 10-15% de procesador que desaparecen al
+desactivarlo ([HP Community](https://h30434.www3.hp.com/t5/Notebook-Boot-and-Lockup/Fast-startup-causing-high-cpu-usage/td-p/7888113)).
+Además, algunas actualizaciones necesitan un reinicio completo. Sin él, el arranque desde cero tarda más en un
+HDD, pero cada arranque es limpio y *Apagar* significa apagar.
 
 ### 8. Navegadores
 
@@ -198,7 +215,6 @@ No se agregan exclusiones: son lo primero que buscan los virus.
 | ¿Quitar apps preinstaladas? (si respondés "Sí") | Se desinstalan para todos los usuarios: Xbox, Solitario, Candy Crush, Noticias, Tu Teléfono, Skype, Contactos, Mapas, Correo y Calendario (Microsoft los discontinuó en 2024), Outlook nuevo, OneNote para Win10, Notas rápidas, Alarmas, Recortes y anotación, Groove, Películas y TV, Paint 3D, Visor 3D, Portal de realidad mixta, Obtener ayuda, Sugerencias, Centro de comentarios, To Do, Cortana y Copilot. **Quedan** la Store, Calculadora, Cámara, Grabadora de sonidos y **Clima**. El Bloc de notas, Paint y la Herramienta Recortes clásicos no son apps de la Store: siguen. Al quitar *Recortes y anotación* deja de andar Win+Shift+S; la tecla Impr Pant y la Herramienta Recortes clásica siguen. Todo se puede reinstalar desde la Store. |
 | ¿Usar los clásicos de Windows 7? (si respondés "Sí") | Vuelve el **Visualizador de fotos de Windows** en lugar de la app Fotos, y el **Alt+Tab clásico**. Ver [Clásicos de Windows 7](#clásicos-de-windows-7). |
 | ¿Vaciar también Prefetch? (si respondés "Sí") | Se vacía `C:\Windows\Prefetch`. **No lo recomiendo**: ver [Limpieza](#10-limpieza). |
-| ¿Dejar activado el inicio rápido? | Se desactiva el inicio rápido (y en una PC de escritorio se borra el archivo de hibernación). |
 | ¿Desactivar Restaurar sistema? (si respondés "Sí") | Se desactiva y se borran todos los puntos de restauración. No se crea el punto del paso 1. |
 
 ### 10. Limpieza
@@ -280,7 +296,8 @@ Todo lo dibuja el procesador. Por eso en estas netbooks apagar efectos visuales 
 es lo que más se nota. Aun así, los videos (YouTube) van a ir mal.
 **Driver de Windows 7:** en el campo, en muchas Conectar Igualdad funciona, sobre todo en Windows 10 de 32 bits. En los
 foros de Intel también hay casos de pantalla azul (`VIDEO_TDR_FAILURE`). Probalo con un punto de restauración hecho.
-Si anda, conviene no activar el inicio rápido (pregunta 7). El script detecta si estás con el driver básico y te avisa.
+Con drivers viejos es donde más problemas da el inicio rápido, y el script lo apaga siempre. Además detecta si estás
+con el driver básico y te avisa.
 
 **2. RAM.** Las G1 y G2 traen 1 GB, y Windows 10 de 64 bits pide 2 GB como mínimo. Intel especifica 2 GB como
 máximo para estos Atom: un módulo de 2 GB (DDR2 en la G1, DDR3 en las demás) es la mejora más barata que hay.
@@ -343,7 +360,6 @@ arranque, como [UltraDefrag](https://en.wikipedia.org/wiki/UltraDefrag). La vers
 | `NetworkThrottlingIndex`, `SystemResponsiveness` | Tweaks de gaming y multimedia. Acá no hacen nada útil. |
 | `StartupDelayInMSec = 0` | Hace que los programas de inicio arranquen todos juntos con el escritorio. En HDD eso empeora el arranque. |
 | Deshabilitar el archivo de paginación | Con 2 GB de RAM: cuelgues y programas que se cierran solos. |
-| Deshabilitar hibernación "porque sí" | Es una decisión con contras de ambos lados: por eso es la pregunta 7, explicada arriba. |
 | Deshabilitar la desfragmentación | En HDD es necesaria. El script se asegura de que esté **activa**. Para una pasada a fondo, ver [Desfragmentar](#desfragmentar-sirve-el-de-windows). |
 | "Limpiadores de RAM" | Contraproducentes: Windows vuelve a cargar todo desde el disco lento. |
 | Vaciar `Prefetch` siempre | Hace más lentos los arranques siguientes. Queda como pregunta (6), con la advertencia. |
@@ -374,11 +390,12 @@ arranque, como [UltraDefrag](https://en.wikipedia.org/wiki/UltraDefrag). La vers
 Desde acá no hay un Windows real, así que se validó todo lo que se puede validar sin uno:
 
 - **Wine (el `cmd.exe` de Wine):** los cinco scripts corren de punta a punta con distintas combinaciones de respuestas
-  (por ejemplo: con y sin inicio rápido, con y sin Restaurar sistema).
+  (por ejemplo: con y sin Restaurar sistema, con y sin los clásicos de Windows 7).
   Se simuló el estado que deja el script original (y políticas que apagan Defender y Windows Update)
   y se verificó en el registro que cada valor quedara corregido y escrito en `HKEY_USERS\<SID>` del usuario.
-  También se probó el ciclo completo optimizar, revertir y verificar.
-- **PowerShell:** los 32 bloques de PowerShell pasan el parser oficial. La lógica de apps en segundo plano se probó con
+  También se probó el ciclo completo optimizar, revertir y verificar: el inicio rápido queda apagado, *Suspender* e
+  *Hibernar* salen del menú, y `RevertirOptimizacion.bat` los devuelve.
+- **PowerShell:** los 30 bloques de PowerShell pasan el parser oficial. La lógica de apps en segundo plano se probó con
   nombres reales de paquetes.
 - **Limpieza:** la sección que vacía los temporales se **ejecutó de verdad** sobre un árbol de carpetas simulado, con
   trampas: un enlace a una carpeta valiosa (no la siguió), archivos de solo lectura (los borró), archivos imposibles de
@@ -411,6 +428,10 @@ Wine no los implementa, así que falta la prueba en un Windows 10 real. Para eso
    - [ ] Edge abre y navega.
    - [ ] Con los clásicos: una foto JPG abre con el Visualizador de fotos (después de elegirlo en Aplicaciones predeterminadas) y Alt+Tab muestra íconos.
    - [ ] El resumen de la limpieza muestra lo liberado por carpeta y los archivos salteados.
+   - [ ] El menú de apagado muestra *Apagar* y *Reiniciar*, sin *Suspender* ni *Hibernar*.
+   - [ ] El botón de encendido apaga la PC por completo. En UTM se prueba con el botón de apagado de la ventana de la
+     VM (el apagado normal, no el forzado), que le manda a Windows la misma señal que el botón físico.
+   - [ ] En la netbook real: cerrar la tapa la apaga (la VM no tiene tapa).
    - [ ] Si desactivaste Restaurar sistema: *Propiedades del sistema > Protección del sistema* dice "Desactivado".
    - [ ] Existe el punto de restauración "Antes de OptimizarPC v2" (`rstrui.exe`).
 8. Probá `RevertirOptimizacion.bat` y verificá que todo vuelva a la normalidad.
@@ -450,6 +471,12 @@ lo mismo que se recomienda ahí, contrastadas con documentación de Microsoft:
 - **CompactOS en HDD:** [TenForums](https://www.tenforums.com/performance-maintenance/131696-compression-os-experiment.html).
 - **Prefetch:** [Ryan Myers, Microsoft](https://learn.microsoft.com/en-us/archive/blogs/ryanmy/misinformation-and-the-the-prefetch-flag), [Ed Bott](https://edbott.com/2005/06/01/one-more-time-do-not-clean-out-your-prefetch-folder/).
 - **Inicio rápido:** cómo funciona y sus contras, en [Winbuzzer](https://winbuzzer.com/2020/05/19/how-to-disable-windows-10-fast-startup-hiberboot-hybrid-boot-hybrid-shutdown-xcxwbt/); caso de CPU alta, en [HP Community](https://h30434.www3.hp.com/t5/Notebook-Boot-and-Lockup/Fast-startup-causing-high-cpu-usage/td-p/7888113).
+- **Energía:** valores de [botones y tapa](https://learn.microsoft.com/en-us/windows-hardware/customize/power-settings/power-button-and-lid-settings)
+  y de [batería crítica](https://learn.microsoft.com/en-us/answers/questions/823581/powercfg-command-line-for-editing-the-existing-val)
+  (0 nada, 1 suspender, 2 hibernar, 3 apagar), [opciones de `powercfg`](https://learn.microsoft.com/windows-hardware/design/device-experiences/powercfg-command-line-options),
+  tamaño de `hiberfil.sys` (40% de la RAM; 20% si es el reducido, que solo sirve para el inicio rápido) en
+  [ElevenForum](https://www.elevenforum.com/t/specify-hibernation-file-type-as-full-or-reduced-in-windows-11.1955/),
+  y *Suspender* en el menú (`FlyoutMenuSettings`) en [TenForums](https://www.tenforums.com/tutorials/7456-add-remove-sleep-power-menu-windows-10-a.html).
 - **Restaurar sistema:** desactivarlo borra los puntos, según [TenForums](https://www.tenforums.com/tutorials/99782-enable-disable-system-restore-windows-3.html).
 - **Desfragmentador:** [límite de 64 MB](https://techcommunity.microsoft.com/blog/askperf/disk-fragmentation-and-system-performance/372921), [parámetros de `defrag`](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/defrag), [UltraDefrag](https://en.wikipedia.org/wiki/UltraDefrag).
 - **Desenfoque del inicio de sesión:** `DisableAcrylicBackgroundOnLogon`, tweak *Logon Screen Acrylic Blur* de WinUtil.

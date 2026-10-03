@@ -133,20 +133,20 @@ echo   [OK] Efectos visuales, desenfoque al iniciar sesion, menus, animaciones, 
 echo        y Explorador como de fabrica.
 
 call :titulo "Energia"
-powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Get-CimInstance Win32_Battery) { exit 1 } else { exit 0 }" >nul 2>&1
-if errorlevel 1 goto :energia_comun
-powercfg /setactive 381b4222-f694-41f0-9685-ff5bb260df2e >nul 2>&1
-echo   [OK] Plan de energia: Equilibrado.
-:energia_comun
-powercfg /change disk-timeout-ac 20 >nul 2>&1
-echo   [OK] El disco vuelve a apagarse a los 20 minutos de inactividad.
-
-call :titulo "Restaurar sistema e inicio rapido"
-powershell -NoProfile -ExecutionPolicy Bypass -Command "Enable-ComputerRestore -Drive ($env:SystemDrive + '\') -ErrorAction SilentlyContinue" >nul 2>&1
-schtasks /change /tn "\Microsoft\Windows\SystemRestore\SR" /enable >nul 2>&1
+:: Herramienta oficial: vuelve los planes de Windows a fabrica, con sus botones,
+:: tapa, suspension y tiempos de disco, y deja activo el plan Equilibrado.
+powercfg -restoredefaultschemes >nul 2>&1
 powercfg /hibernate on >nul 2>&1
 call :dword "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Power" HiberbootEnabled 1
-echo   [OK] Restaurar sistema e inicio rapido activados, como vienen de fabrica.
+call :borrar "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\FlyoutMenuSettings" ShowSleepOption
+call :borrar "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\FlyoutMenuSettings" ShowHibernateOption
+echo   [OK] Planes de energia de fabrica: Equilibrado, botones, tapa y suspension.
+echo   [OK] Hibernacion e inicio rapido activados; Suspender vuelve al menu de apagado.
+
+call :titulo "Restaurar sistema"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Enable-ComputerRestore -Drive ($env:SystemDrive + '\') -ErrorAction SilentlyContinue" >nul 2>&1
+schtasks /change /tn "\Microsoft\Windows\SystemRestore\SR" /enable >nul 2>&1
+echo   [OK] Restaurar sistema activado, como viene de fabrica.
 echo        Los puntos de restauracion borrados no vuelven: empiezan de cero.
 
 call :titulo "Navegadores"

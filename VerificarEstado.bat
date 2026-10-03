@@ -254,8 +254,21 @@ L ('Sistema comprimido (CompactOS): ' + $compacto)
 L ('Plan de energia:                ' + ((powercfg /getactivescheme) -join ' '))
 L ('Inicio rapido (HiberbootEnabled): ' + (Leer 'HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Power' 'HiberbootEnabled'))
 L ('Hibernacion habilitada:         ' + (Leer 'HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Power' 'HibernateEnabled'))
-L 'Apagar el disco tras (indices CA y CC, 0x0 = nunca):'
-powercfg /query SCHEME_CURRENT SUB_DISK DISKIDLE | Select-Object -Last 3 | Where-Object { $_.Trim() } | ForEach-Object { L ('  ' + $_.Trim()) }
+# Lee los valores actuales (enchufada / bateria) de un ajuste del plan activo.
+function Energia([string]$sub, [string]$ajuste) {
+    $v = powercfg /query SCHEME_CURRENT $sub $ajuste | Where-Object { $_ -match '0x[0-9a-fA-F]{8}\s*$' } | Select-Object -Last 2 | ForEach-Object { [Convert]::ToInt32(([regex]::Match($_, '0x[0-9a-fA-F]{8}')).Value, 16) }
+    if ($v) { ($v -join ' / ') } else { '?' }
+}
+L 'Valores enchufada / bateria. Botones y tapa: 0 nada, 1 suspender, 2 hibernar, 3 apagar.'
+L ('Boton de encendido:             ' + (Energia SUB_BUTTONS PBUTTONACTION))
+L ('Cerrar la tapa:                 ' + (Energia SUB_BUTTONS LIDACTION))
+L ('Boton de suspension:            ' + (Energia SUB_BUTTONS SBUTTONACTION))
+L ('Bateria critica:                ' + (Energia SUB_BATTERY BATACTIONCRIT))
+L ('Suspender tras (seg, 0 nunca):  ' + (Energia SUB_SLEEP STANDBYIDLE))
+L ('Hibernar tras (seg, 0 nunca):   ' + (Energia SUB_SLEEP HIBERNATEIDLE))
+L ('Apagar disco tras (seg, 0 nunca): ' + (Energia SUB_DISK DISKIDLE))
+$fm = 'HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\FlyoutMenuSettings'
+L ('Menu de apagado: Suspender / Hibernar visibles: ' + (Leer $fm 'ShowSleepOption') + ' / ' + (Leer $fm 'ShowHibernateOption') + '   (0 = ocultos)')
 
 # --- Temporales y Prefetch ----------------------------------------------------
 Titulo 'Temporales y Prefetch (tamano actual)'
