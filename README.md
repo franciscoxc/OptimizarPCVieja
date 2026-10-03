@@ -17,6 +17,7 @@ Objetivo: la mayor velocidad posible y el menor consumo de RAM, **sin apagar la 
 | `DeshacerPerjudiciales.bat` | Deshace **solo** lo dañino del script original (v1), para PCs donde ya lo corriste. | Sí, poco |
 | `RevertirOptimizacion.bat` | Vuelve a los valores de fábrica lo que cambia `OptimizarPC.bat` (por si algo sale mal). | Sí |
 | `DesfragmentarAFondo.bat` | Desfragmentación completa y opcional, para discos mecánicos: analiza, desfragmenta, junta el espacio libre y optimiza el arranque. En un SSD solo manda TRIM. Puede tardar horas. | Sí (solo ordena el disco) |
+| `LimpiarWindowsUpdate.bat` | Opcional, de vez en cuando: borra con DISM las versiones viejas que guardan las actualizaciones (WinSxS). Libera espacio, no acelera. Puede tardar más de una hora. Ver [Limpiar restos de Windows Update](#limpiar-restos-de-windows-update-vale-la-pena). | Sí (solo restos de actualizaciones) |
 | `VerificarEstado.bat` | Muestra el hardware (procesador, video, RAM), el antirrobo de Conectar Igualdad si lo hay, y el estado de todo lo que tocan los scripts. Ideal para comparar antes/después. | **No** (solo lee) |
 
 ## Cómo usarlo
@@ -25,8 +26,8 @@ Objetivo: la mayor velocidad posible y el menor consumo de RAM, **sin apagar la 
    el script funciona igual desde adentro del ZIP, pero avisa, porque Windows lo corre desde una carpeta temporal.
 2. Doble clic en `OptimizarPC.bat`. Si no tiene permisos, los pide solo (aparece el cartel de UAC).
 3. Leé los avisos de hardware si aparece alguno (poca RAM, video sin driver, antirrobo de Conectar Igualdad)
-   y respondé las 7 preguntas: impresora, compartir en red, OneDrive, apps preinstaladas, clásicos de Windows 7,
-   Prefetch y Restaurar sistema. Después no pregunta más.
+   y respondé las 6 preguntas: impresora, compartir en red, OneDrive, apps preinstaladas, clásicos de Windows 7
+   y Restaurar sistema. Después no pregunta más.
 4. Esperá. En un disco mecánico puede tardar 10 a 20 minutos. Paciencia, mate y facturas.
 5. **Reiniciá** la PC (el script lo ofrece al final). Como el script apaga el inicio rápido, desde ahora *Apagar*
    también es un apagado completo: ya no hace falta acordarse de usar *Reiniciar*.
@@ -60,7 +61,7 @@ Criterio general:
 ### 0. Red de seguridad
 
 - Punto de restauración ("Antes de OptimizarPC v2"). Si no se puede crear, pregunta antes de seguir.
-  Si en la pregunta 7 elegís desactivar Restaurar sistema, no se crea: se borraría igual.
+  Si en la pregunta 6 elegís desactivar Restaurar sistema, no se crea: se borraría igual.
 - Verifica que el archivo de paginación exista. Con 2 GB de RAM, sin paginación Windows se cuelga y cierra programas.
 
 ### 1. Seguridad: asegurar que lo importante esté encendido
@@ -78,7 +79,7 @@ Solo **repara** lo que encuentra apagado; lo que ya está bien no se toca.
 | Mitigaciones Spectre/Meltdown | Si alguien las apagó "para ganar rendimiento", las vuelve a encender. |
 | Windows Update | Borra políticas que lo bloquean. Windows 10 tiene parches gratis hasta el **12/10/2027** si la PC está inscripta en ESU (ver más abajo). |
 | Reproducción automática | La desactiva en todas las unidades (vía clásica de virus por pendrive). |
-| Tareas importantes | Se asegura de que estén activas la desfragmentación programada (clave en HDD), el aviso de disco por fallar, los análisis de Defender y la creación de puntos de restauración (salvo que desactives Restaurar sistema). |
+| Tareas importantes | Se asegura de que estén activas la desfragmentación programada (clave en HDD), la limpieza automática de restos de actualizaciones (`StartComponentCleanup`), el aviso de disco por fallar, los análisis de Defender y la creación de puntos de restauración (salvo que desactives Restaurar sistema). |
 
 ### 2. Correcciones al script original (v1)
 
@@ -103,6 +104,7 @@ Solo **repara** lo que encuentra apagado; lo que ya está bien no se toca.
 | **Deshabilitado** | Xbox (`XblAuthManager`, `XblGameSave`, `XboxNetApiSvc`, `XboxGipSvc`, `xbgm`) | No usás juegos. |
 | **Deshabilitado** | Bluetooth (`bthserv`, `BTAGService`, `BthAvctpSvc`) | No usás Bluetooth. |
 | **Deshabilitado** | `RemoteRegistry` | Ya viene así de fábrica; se asegura por seguridad. |
+| **Deshabilitado** | `AdobeARMservice`, si Adobe Reader está instalado | Su actualizador automático. Ver [Adobe Reader](#11-adobe-reader-si-está-instalado). |
 | **Manual** | `PcaSvc`, `TrkWks`, `iphlpsvc`, `DPS`, `CDPSvc`, `MapsBroker`, `edgeupdate` | No hace falta que arranquen con Windows. Edge se sigue actualizando con sus tareas programadas. Contra: con `DPS` en Manual, los solucionadores de problemas de Windows (y probablemente el aviso de "memoria baja") no andan hasta que el servicio se inicie. |
 | **Manual** | `lfsvc`, `WbioSrvc`, `RetailDemo`, `TabletInputService` | Su valor de fábrica: arrancan solo cuando alguien los necesita. |
 | **Automático (retrasado)** | `BITS`, `WpnService` | Tienen que correr solos, pero pueden esperar a que termine el arranque. |
@@ -146,7 +148,7 @@ No se agregan exclusiones: son lo primero que buscan los virus.
 - Barra de juegos y grabación de juegos: apagadas.
 - Historial de actividad: no se publica ni se sube.
 - Informe de errores: apagado (escribía volcados al disco después de cada cuelgue).
-- **Apps en segundo plano:** se apagan una por una, **excepto** los componentes de Windows (búsqueda, Inicio, notificaciones y seguridad), la Store, las alarmas y los reproductores de música.
+- **Apps en segundo plano:** se apagan una por una, **excepto** los componentes de Windows (búsqueda, Inicio, notificaciones y seguridad), la Store, las alarmas, los reproductores de música y Recortes y anotación.
   **Fotos sí se apaga**: es de las que más RAM y disco usan de fondo, y se puede reactivar desde *Configuración > Privacidad > Aplicaciones en segundo plano*.
   No se usa el interruptor general porque rompe la búsqueda de apps recién instaladas en el Inicio ([detalle](https://github.com/Disassembler0/Win10-Initial-Setup-Script/pull/42)).
 - Precarga de apps UWP (`ApplicationPreLaunch`): apagada. Windows ya no carga en RAM apps "por si las abrís".
@@ -155,8 +157,15 @@ No se agregan exclusiones: son lo primero que buscan los virus.
 
 ### 6. Interfaz y Explorador
 
-- Efectos visuales en "mejor rendimiento", pero **conservando el suavizado de fuentes** (si no, el texto se ve horrible) y las miniaturas.
-- Sin transparencias, sin animaciones de ventanas ni de la barra de tareas, y sin Aero Peek.
+- Efectos visuales en "mejor rendimiento". Quedan solo tres:
+  - **Mostrar el contenido de la ventana mientras se arrastra.**
+  - **Suavizar bordes para las fuentes de pantalla:** no es un efecto, es lo que hace legible el texto, y casi no gasta.
+  - **Animar las ventanas al minimizar y maximizar**, solo si la placa de video tiene driver. Con el *Adaptador de
+    pantalla básico* (las G3/G4 de Conectar Igualdad sin driver) la dibuja el procesador y va a los saltos, así que se apaga.
+- **Íconos en vez de miniaturas.** En un disco mecánico, abrir una carpeta con fotos o videos obliga a leer cada
+  archivo para dibujar su miniatura. Para recorrer fotos está el Visualizador (con las flechas pasás de una a otra).
+  Si las querés de vuelta: *Opciones de carpeta > Ver >* destildá *Mostrar siempre iconos, nunca vistas en miniatura*.
+- Sin transparencias, sin animaciones de menús ni de la barra de tareas, y sin Aero Peek.
 - Sin el desenfoque "acrílico" de la pantalla de inicio de sesión (`DisableAcrylicBackgroundOnLogon`, también de WinUtil): es otro
   efecto de transparencia, y sin aceleración de video lo calcula el procesador.
 - Menús más rápidos (`MenuShowDelay` de 400 a 100 ms).
@@ -168,7 +177,7 @@ No se agregan exclusiones: son lo primero que buscan los virus.
 
 - Compresión de memoria: activada (requiere SysMain).
 - NTFS: sin registro de último acceso y sin nombres cortos 8.3 (como en el v1).
-- **Restaurar sistema, según la pregunta 7.** Mientras haya puntos de restauración, cada escritura en el disco puede
+- **Restaurar sistema, según la pregunta 6.** Mientras haya puntos de restauración, cada escritura en el disco puede
   costar una copia extra, y ocupan hasta un 10% del disco. Desactivarlo saca ese trabajo de fondo, pero borra **todos**
   los puntos. Si reinstalás cuando hay problemas, como vos, es razonable desactivarlo.
 
@@ -180,13 +189,14 @@ uno del fabricante):
 |---|---|---|
 | Plan de energía | *Alto rendimiento*, también en notebooks | Windows deja de frenar el procesador para ahorrar. La batería dura menos: es el precio. |
 | Disco | Nunca se apaga solo, enchufada o a batería | El HDD dormido tarda varios segundos en despertar: es la típica "congelada" al volver a la PC. |
-| Suspender e hibernar solos | Nunca | En PCs así, hibernar es lentísimo y suspender no aporta: se apaga y listo. |
+| Suspender sola | A las **4 horas** sin uso, enchufada o a batería | Le da tiempo de sobra al mantenimiento automático de Windows (desfragmentación, limpieza de actualizaciones, análisis de Defender), que corre con la PC prendida y sin uso. Para despertarla, el botón de encendido. |
+| Hibernar sola | Nunca | La hibernación queda desactivada (ver abajo). |
 | Botón de encendido | Apagado completo | |
 | Cerrar la tapa | Apagado completo | En una PC de escritorio no hace nada: no tiene tapa. |
 | Botón de suspensión (si el teclado lo tiene) | Nada | El Panel de control no le ofrece "Apagar" a ese botón. |
 | Batería crítica | Apagado completo | De fábrica suele hibernar. Sin hibernación hay que decirle qué hacer, y apagar es la salida prolija: Windows cierra todo antes de que se corte. |
 | Hibernación e inicio rápido | Desactivados | Se borra `hiberfil.sys`: el 40% de la RAM, unos 800 MB con 2 GB. |
-| Menú de apagado | Sin *Suspender* ni *Hibernar* | Quedan *Apagar* y *Reiniciar*. *Suspender* se puede volver a mostrar desde *Panel de control > Opciones de energía > Elegir el comportamiento de los botones de inicio/apagado*. |
+| Menú de apagado | Sin *Suspender* ni *Hibernar* | Quedan *Apagar* y *Reiniciar*: la suspensión es solo la automática. *Suspender* se puede volver a mostrar desde *Panel de control > Opciones de energía > Elegir el comportamiento de los botones de inicio/apagado*. |
 
 El apagado de la pantalla no se toca: no cambia la velocidad.
 
@@ -212,9 +222,8 @@ HDD, pero cada arranque es limpio y *Apagar* significa apagar.
 | ¿Usás impresora? | `Spooler` en Manual |
 | ¿Compartís carpetas o impresora en red? | `LanmanServer` en Manual |
 | ¿Usás OneDrive? | Se saca OneDrive del inicio (no se desinstala; si lo abrís, vuelve) |
-| ¿Quitar apps preinstaladas? (si respondés "Sí") | Se desinstalan para todos los usuarios: Xbox, Solitario, Candy Crush, Noticias, Tu Teléfono, Skype, Contactos, Mapas, Correo y Calendario (Microsoft los discontinuó en 2024), Outlook nuevo, OneNote para Win10, Notas rápidas, Alarmas, Recortes y anotación, Groove, Películas y TV, Paint 3D, Visor 3D, Portal de realidad mixta, Obtener ayuda, Sugerencias, Centro de comentarios, To Do, Cortana y Copilot. **Quedan** la Store, Calculadora, Cámara, Grabadora de sonidos y **Clima**. El Bloc de notas, Paint y la Herramienta Recortes clásicos no son apps de la Store: siguen. Al quitar *Recortes y anotación* deja de andar Win+Shift+S; la tecla Impr Pant y la Herramienta Recortes clásica siguen. Todo se puede reinstalar desde la Store. |
+| ¿Quitar apps preinstaladas? (si respondés "Sí") | Se desinstalan para todos los usuarios: Xbox, Solitario, Candy Crush, Noticias, Tu Teléfono, Skype, Contactos, Mapas, Correo y Calendario (Microsoft los discontinuó en 2024), Outlook nuevo, OneNote para Win10, Notas rápidas, Alarmas, Groove, Películas y TV, Paint 3D, Visor 3D, Portal de realidad mixta, Obtener ayuda, Sugerencias, Centro de comentarios, To Do, Cortana y Copilot. **Quedan** la Store, Calculadora, Cámara, Grabadora de sonidos, **Clima** y **Recortes y anotación** (Win+Shift+S). El Bloc de notas, Paint y la Herramienta Recortes clásicos no son apps de la Store: siguen. Todo se puede reinstalar desde la Store. |
 | ¿Usar los clásicos de Windows 7? (si respondés "Sí") | Vuelve el **Visualizador de fotos de Windows** en lugar de la app Fotos, y el **Alt+Tab clásico**. Ver [Clásicos de Windows 7](#clásicos-de-windows-7). |
-| ¿Vaciar también Prefetch? (si respondés "Sí") | Se vacía `C:\Windows\Prefetch`. **No lo recomiendo**: ver [Limpieza](#10-limpieza). |
 | ¿Desactivar Restaurar sistema? (si respondés "Sí") | Se desactiva y se borran todos los puntos de restauración. No se crea el punto del paso 1. |
 
 ### 10. Limpieza
@@ -231,26 +240,55 @@ y al final muestra cuánto liberó cada carpeta y cuántos archivos salteó:
 | Volcados de memoria | `MEMORY.DMP` (puede pesar como toda la RAM), `Minidump` y `LiveKernelReports`. Esta última junta los cuelgues de video, frecuentes con drivers forzados. |
 | Registros viejos de actualizaciones | `C:\Windows\Logs\CBS\CbsPersist_*`. El registro actual no se toca. |
 | Caché de Delivery Optimization | Actualizaciones ya instaladas que se guardaban para compartir. |
-| `C:\Windows\Prefetch` | **Solo si respondés "Sí" a la pregunta 6.** |
+| `C:\Windows\Prefetch` | Solo las entradas de programas: ver abajo. |
+| Caché y actualizaciones bajadas de Adobe Reader | Si está instalado. Ver [Adobe Reader](#11-adobe-reader-si-está-instalado). |
 
 Medidas de seguridad: nunca sigue enlaces (junctions o symlinks) que apunten fuera de la carpeta, nunca vacía
 carpetas enteras como `C:\Windows` o un perfil de usuario (aunque alguien edite mal la lista), y saltea la carpeta
 desde la que corre el script, por si se abrió adentro de un ZIP.
 
-**Sobre Prefetch:** no lo recomiendo, pero la decisión es tuya y por eso es una pregunta. Windows usa esos archivos
-para arrancar y abrir programas más rápido, y en disco mecánico es donde más ayuda. Un desarrollador del equipo de
-rendimiento de Windows midió que, después de vaciarlo, el reinicio siguiente tardó entre 4 y 15 segundos **más**
+**Sobre Prefetch:** vaciarlo de vez en cuando tiene sentido, porque se llena de entradas de programas que ya no se
+usan (Adobe Reader y su actualizador dejan varias). Pero vaciarlo **entero** tiene un costo medido: Windows usa esa
+carpeta para arrancar y abrir programas más rápido, y un desarrollador del equipo de rendimiento de Windows midió que,
+sin ella, el reinicio siguiente tardó entre 4 y 15 segundos **más**
 ([Microsoft](https://learn.microsoft.com/en-us/archive/blogs/ryanmy/misinformation-and-the-the-prefetch-flag),
-[Ed Bott](https://edbott.com/2005/06/01/one-more-time-do-not-clean-out-your-prefetch-folder/)). Windows lo rehace
-solo, y además recorta la carpeta por su cuenta. Vaciado, también se pierde el mapa que usa el desfragmentador para
-optimizar el arranque.
+[Ed Bott](https://edbott.com/2005/06/01/one-more-time-do-not-clean-out-your-prefetch-folder/)).
+Por eso el script borra solo las entradas de programas (`*.pf`) y conserva lo que Windows usa para arrancar:
+
+- `NTOSBOOT-B00DFAAD.pf`, el rastro del arranque;
+- `Layout.ini`, el mapa con el que el desfragmentador ordena los archivos del arranque;
+- la carpeta `ReadyBoot` y las bases de SysMain (`Ag*.db`), que deciden qué precargar en memoria
+  ([Prefetcher](https://en.wikipedia.org/wiki/Prefetcher), [ReadyBoot y SuperFetch](https://en.wikipedia.org/wiki/Windows_Vista_I/O_technologies)).
+
+Así se va la basura y el arranque conserva su optimización. Cada programa tarda un poco más solo la primera vez que
+lo abrís, mientras Windows rehace su entrada.
 
 **Lo que no se toca, a propósito:** la Papelera (son tus archivos); la caché de miniaturas (regenerarla en un disco
 mecánico hace lentas las carpetas); `SoftwareDistribution\Download` (si hay una actualización a medio instalar, se
 rompe). `Windows.old` y los restos de actualizaciones grandes se borran mejor con *Liberador de espacio en disco >
 Limpiar archivos del sistema*.
 
-Al final muestra el estado de Defender y los programas que arrancan con Windows (revisalos en *Administrador de tareas > Inicio*), y ofrece reiniciar.
+### 11. Adobe Reader, si está instalado
+
+Los PDF quedan para Edge o Chrome. Adobe Reader sigue instalado y anda si alguien lo abre, pero ya no arranca nada solo:
+
+| Qué | Qué hace el script |
+|---|---|
+| Entradas de inicio | Quita las de Reader y Acrobat: *Adobe ARM* (el actualizador), *Speed Launcher* (`reader_sl.exe`, que precargaba Reader "por si acaso") y *Acrobat Assistant* (`acrotray.exe`). También las de *RunOnce*: algunas actualizaciones de Reader las volvían a agregar solas. |
+| Tarea *Adobe Acrobat Update Task* | Desactivada. Corría el actualizador al iniciar sesión y todos los días. |
+| Servicio `AdobeARMservice` | Detenido y deshabilitado. Es el que instala las actualizaciones en silencio, y estaba siempre en memoria. |
+| Caché de Reader | Vacía `AppData\LocalLow\Adobe\AcroCef\DC\Acrobat\Cache` de cada usuario: la parte web de Reader. |
+| Actualizaciones bajadas | Vacía `C:\ProgramData\Adobe\ARM`: el actualizador guarda ahí cada instalador que baja y no los borra nunca. |
+
+**El precio:** Reader deja de recibir parches de seguridad, y los PDF son una vía clásica de virus. Por eso:
+
+- Hacé que los PDF abran con el navegador: *Configuración > Aplicaciones > Aplicaciones predeterminadas > Elegir
+  aplicaciones predeterminadas por tipo de archivo > .pdf*. El script lo recuerda al final, y `VerificarEstado.bat`
+  muestra cuál quedó.
+- Si no usás Reader para nada, desinstalalo. Lo único que suele necesitarlo son los formularios PDF "dinámicos" (XFA),
+  que los navegadores no abren.
+
+Al terminar, el script muestra el estado de Defender y los programas que arrancan con Windows (revisalos en *Administrador de tareas > Inicio*), y ofrece reiniciar.
 
 ---
 
@@ -338,7 +376,7 @@ está **`DesfragmentarAFondo.bat`**, que usa la misma herramienta de Windows con
 | 1 | `/A /V` | Analiza y muestra el porcentaje de fragmentación. |
 | 2 | `/W` | Desfragmentación completa, incluidos los fragmentos de más de 64 MB. Si esa versión de Windows no acepta `/W`, hace la normal (`/D`). |
 | 3 | `/X` | Junta el espacio libre: los archivos nuevos se fragmentan menos. |
-| 4 | `/B` | Optimiza el arranque: junta los archivos que Windows lee al prender (usa el mapa de la carpeta Prefetch). |
+| 4 | `/B` | Optimiza el arranque: junta los archivos que Windows lee al prender. Usa `Layout.ini`, el mapa de la carpeta Prefetch, que `OptimizarPC.bat` conserva al limpiar. |
 | 5 | `/A /V` | Analiza otra vez, para comparar. |
 
 Usa `/H` (prioridad normal, termina antes) y `/U` (muestra el progreso). En un SSD no desfragmenta: manda TRIM.
@@ -347,6 +385,32 @@ Puede tardar horas en un Atom: dejala enchufada y sin usar.
 Lo único que la herramienta de Windows no puede mover es lo que está en uso mientras Windows corre: el archivo de
 paginación y partes de la tabla del disco (MFT). Para eso hace falta un desfragmentador que trabaje durante el
 arranque, como [UltraDefrag](https://en.wikipedia.org/wiki/UltraDefrag). La versión 7.1.4 es la última de código abierto.
+
+## Limpiar restos de Windows Update: ¿vale la pena?
+
+Cada actualización guarda en `C:\Windows\WinSxS` la versión anterior de lo que reemplaza, por si hay que
+desinstalarla. Los comandos que circulan para limpiar eso
+([Microsoft Learn](https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/clean-up-the-winsxs-folder)):
+
+| Comando | Qué hace | ¿Va? |
+|---|---|---|
+| `Dism.exe /Online /Cleanup-Image /StartComponentCleanup` | Borra las versiones anteriores que ya fueron reemplazadas. Windows hace lo mismo solo con la tarea *StartComponentCleanup*, pero recién a los 30 días y cortando a la hora de trabajo; el comando lo hace ya y completo. | **Sí** |
+| `... /StartComponentCleanup /ResetBase` | Además, las actualizaciones instaladas pasan a ser la base del sistema y se borra todo lo que quedaba para desinstalarlas. Libera más, pero esas actualizaciones **no se pueden desinstalar nunca más** (las que vengan después, sí). | **Opcional:** el script lo pregunta |
+| `Dism.exe /Online /Cleanup-Image /SPSuperseded` | Borra los archivos de respaldo de un *Service Pack* ([era de Windows 7](https://learn.microsoft.com/en-us/archive/blogs/joscon/how-to-reclaim-space-after-applying-windows-72008-r2-service-pack-1)). Windows 10 no tiene Service Packs: no hace nada. | **No** |
+
+**Vale la pena de vez en cuando, pero aparte.** Libera espacio (desde nada hasta varios GB, según cuántas
+actualizaciones se acumularon), pero **no acelera nada**, y en un Atom con disco mecánico puede tardar más de una hora
+con el disco al 100%. Por eso no está dentro de `OptimizarPC.bat`, que en cambio se asegura de que la limpieza
+automática de Windows esté activa.
+
+Para hacerla a mano está **`LimpiarWindowsUpdate.bat`**: primero analiza (`/AnalyzeComponentStore` dice si conviene
+limpiar), después pregunta por `/ResetBase`, limpia y muestra cuánto liberó. Si hay una actualización esperando un
+reinicio, DISM se niega con el error `0x800F0806`
+([Microsoft Q&A](https://learn.microsoft.com/en-us/answers/questions/2192270/dism-startcomponentcleanup-give-error-0x800f0806-t)):
+reiniciá y volvé a correrlo.
+
+Rutina de mantenimiento, cada tantos meses: `LimpiarWindowsUpdate.bat` y después `DesfragmentarAFondo.bat`, que con
+menos archivos tiene menos que mover.
 
 ## Lo que NO hace (mitos y tweaks descartados)
 
@@ -362,7 +426,8 @@ arranque, como [UltraDefrag](https://en.wikipedia.org/wiki/UltraDefrag). La vers
 | Deshabilitar el archivo de paginación | Con 2 GB de RAM: cuelgues y programas que se cierran solos. |
 | Deshabilitar la desfragmentación | En HDD es necesaria. El script se asegura de que esté **activa**. Para una pasada a fondo, ver [Desfragmentar](#desfragmentar-sirve-el-de-windows). |
 | "Limpiadores de RAM" | Contraproducentes: Windows vuelve a cargar todo desde el disco lento. |
-| Vaciar `Prefetch` siempre | Hace más lentos los arranques siguientes. Queda como pregunta (6), con la advertencia. |
+| Vaciar `Prefetch` entero, o en cada arranque | Lo que hacen algunos "limpiadores": se lleva también el rastro de arranque, y los arranques siguientes son más lentos. El script borra solo las entradas de programas. |
+| `Dism /SPSuperseded` | Limpia restos de *Service Packs*, que Windows 10 no tiene. Ver [Limpiar restos de Windows Update](#limpiar-restos-de-windows-update-vale-la-pena). |
 | `msconfig` > número de procesadores / memoria máxima | Solo sirven para **limitar**. Windows ya usa todo. |
 | Deshabilitar Windows Update o Defender | Inseguro. Además, la Protección contra alteraciones lo revierte. |
 | Deshabilitar `TabletInputService` | Rompe escribir en el Inicio, Configuración y apps UWP. |
@@ -389,16 +454,16 @@ arranque, como [UltraDefrag](https://en.wikipedia.org/wiki/UltraDefrag). La vers
 
 Desde acá no hay un Windows real, así que se validó todo lo que se puede validar sin uno:
 
-- **Wine (el `cmd.exe` de Wine):** los cinco scripts corren de punta a punta con distintas combinaciones de respuestas
+- **Wine (el `cmd.exe` de Wine):** los seis scripts corren de punta a punta con distintas combinaciones de respuestas
   (por ejemplo: con y sin Restaurar sistema, con y sin los clásicos de Windows 7).
   Se simuló el estado que deja el script original (y políticas que apagan Defender y Windows Update)
   y se verificó en el registro que cada valor quedara corregido y escrito en `HKEY_USERS\<SID>` del usuario.
   También se probó el ciclo completo optimizar, revertir y verificar: el inicio rápido queda apagado, *Suspender* e
   *Hibernar* salen del menú, y `RevertirOptimizacion.bat` los devuelve.
-- **PowerShell:** los 30 bloques de PowerShell pasan el parser oficial. La lógica de apps en segundo plano se probó con
+- **PowerShell:** los 35 bloques de PowerShell pasan el parser oficial. La lógica de apps en segundo plano se probó con
   nombres reales de paquetes.
 - **Limpieza:** la sección que vacía los temporales se **ejecutó de verdad** sobre un árbol de carpetas simulado, con
-  trampas: un enlace a una carpeta valiosa (no la siguió), archivos de solo lectura (los borró), archivos imposibles de
+  trampas (y una carpeta Prefetch de mentira, donde solo se fueron las entradas de programas): un enlace a una carpeta valiosa (no la siguió), archivos de solo lectura (los borró), archivos imposibles de
   borrar (los salteó y los contó), la carpeta del propio script (no la tocó) y un intento de vaciar la carpeta de
   Windows entera (lo bloqueó).
 - **Netbook simulada:** una G4 (Atom N2600, 1 GB, video sin driver, con antirrobo) muestra los tres avisos.
@@ -428,6 +493,12 @@ Wine no los implementa, así que falta la prueba en un Windows 10 real. Para eso
    - [ ] Edge abre y navega.
    - [ ] Con los clásicos: una foto JPG abre con el Visualizador de fotos (después de elegirlo en Aplicaciones predeterminadas) y Alt+Tab muestra íconos.
    - [ ] El resumen de la limpieza muestra lo liberado por carpeta y los archivos salteados.
+   - [ ] `C:\Windows\Prefetch` conserva `Layout.ini`, `NTOSBOOT-B00DFAAD.pf` y la carpeta `ReadyBoot`.
+   - [ ] Win+Shift+S abre el recorte de pantalla (Recortes y anotación sigue instalado).
+   - [ ] Al arrastrar una ventana se ve su contenido, y las carpetas con fotos muestran íconos.
+   - [ ] Con Adobe Reader instalado: no aparece en *Administrador de tareas > Inicio*, y el servicio *Adobe Acrobat
+     Update Service* está deshabilitado.
+   - [ ] (Opcional) `LimpiarWindowsUpdate.bat` analiza, limpia y muestra lo liberado sin errores.
    - [ ] El menú de apagado muestra *Apagar* y *Reiniciar*, sin *Suspender* ni *Hibernar*.
    - [ ] El botón de encendido apaga la PC por completo. En UTM se prueba con el botón de apagado de la ventana de la
      VM (el apagado normal, no el forzado), que le manda a Windows la misma señal que el botón físico.
@@ -477,6 +548,15 @@ lo mismo que se recomienda ahí, contrastadas con documentación de Microsoft:
   tamaño de `hiberfil.sys` (40% de la RAM; 20% si es el reducido, que solo sirve para el inicio rápido) en
   [ElevenForum](https://www.elevenforum.com/t/specify-hibernation-file-type-as-full-or-reduced-in-windows-11.1955/),
   y *Suspender* en el menú (`FlyoutMenuSettings`) en [TenForums](https://www.tenforums.com/tutorials/7456-add-remove-sleep-power-menu-windows-10-a.html).
+- **Adobe Reader:** qué hacen `armsvc.exe` y `AdobeARM.exe` en [Techdows](https://techdows.com/2014/06/how-to-disable-or-stop-armsvc-exe-of-adobe-reader.html)
+  y [gHacks](https://www.ghacks.net/2010/04/09/adobearm-exe-and-reader_sl-exe/); la entrada *RunOnce* del Speed Launcher en
+  [Dell Community](https://www.dell.com/community/en/conversations/virus-spyware/adobe-reader-11010-update-adds-run-once-entry-for-speed-launcher/647f4d26f4ccf8a8de5e0bee?commentId=647f4d60f4ccf8a8de61d495&page=2);
+  la carpeta de actualizaciones bajadas en [Adobe Community](https://community.adobe.com/t5/acrobat-discussions/multiple-acrordrdcupd-msi-files-taking-up-space/td-p/13858757);
+  la caché `AcroCef` en [Adobe Community](https://community.adobe.com/t5/acrobat-discussions/when-open-a-pdf-file-a-file-created-quot-debug-log-quot/m-p/12466171).
+- **Limpieza de WinSxS:** [Microsoft Learn](https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/clean-up-the-winsxs-folder);
+  `/SPSuperseded` es para Service Packs ([Microsoft](https://learn.microsoft.com/en-us/archive/blogs/joscon/how-to-reclaim-space-after-applying-windows-72008-r2-service-pack-1));
+  error `0x800F0806` por operaciones pendientes ([Microsoft Q&A](https://learn.microsoft.com/en-us/answers/questions/2192270/dism-startcomponentcleanup-give-error-0x800f0806-t)).
+- **Qué hay en la carpeta Prefetch:** [Prefetcher](https://en.wikipedia.org/wiki/Prefetcher), [ReadyBoot y SuperFetch](https://en.wikipedia.org/wiki/Windows_Vista_I/O_technologies).
 - **Restaurar sistema:** desactivarlo borra los puntos, según [TenForums](https://www.tenforums.com/tutorials/99782-enable-disable-system-restore-windows-3.html).
 - **Desfragmentador:** [límite de 64 MB](https://techcommunity.microsoft.com/blog/askperf/disk-fragmentation-and-system-performance/372921), [parámetros de `defrag`](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/defrag), [UltraDefrag](https://en.wikipedia.org/wiki/UltraDefrag).
 - **Desenfoque del inicio de sesión:** `DisableAcrylicBackgroundOnLogon`, tweak *Logon Screen Acrylic Blur* de WinUtil.

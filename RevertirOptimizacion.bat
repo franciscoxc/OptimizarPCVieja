@@ -5,7 +5,8 @@ title Revertir OptimizarPC v2
 ::  REVERTIR OPTIMIZARPC v2
 ::  Vuelve a los valores de fabrica de Windows 10 todo lo que OptimizarPC.bat
 ::  cambia y que podria molestar: servicios, apps en segundo plano, efectos
-::  visuales, Explorador, energia, navegadores, recortes de Defender y tareas.
+::  visuales, Explorador, energia, navegadores, recortes de Defender, tareas y
+::  el actualizador de Adobe Reader.
 ::
 ::  A proposito NO revierte:
 ::   - La seguridad reparada: firewall, UAC, DEP, SmartScreen, Defender,
@@ -71,7 +72,8 @@ echo.
 echo   Usuario: "%UNAME%"
 echo.
 echo   Vuelve a fabrica: servicios, apps en segundo plano, efectos visuales,
-echo   Explorador, energia, navegadores, recortes de Defender y tareas.
+echo   Explorador, energia, navegadores, recortes de Defender, tareas y el
+echo   actualizador de Adobe Reader.
 echo   NO apaga la seguridad ni vuelve a encender la telemetria.
 echo   Para volver todo exactamente como estaba: punto de restauracion.
 echo.
@@ -121,6 +123,7 @@ call :dword "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEf
 call :dword "%_adv%" ListviewAlphaSelect 1
 call :dword "%_adv%" ListviewShadow 1
 call :dword "%_adv%" TaskbarAnimations 1
+call :dword "%_adv%" IconsOnly 0
 call :dword "%_adv%" Start_TrackProgs 1
 call :borrar "%_adv%" LaunchTo
 call :dword "%UHIVE%\Software\Microsoft\Windows\DWM" EnableAeroPeek 1
@@ -157,6 +160,9 @@ call :borrar "%_edge%\Recommended" SleepingTabsTimeout
 call :borrar "HKLM\SOFTWARE\Policies\Microsoft\EdgeUpdate" CreateDesktopShortcutDefault
 call :borrar "HKLM\SOFTWARE\Policies\Google\Chrome" BackgroundModeEnabled
 echo   [OK] Politicas de Edge y Chrome quitadas.
+
+call :titulo "Adobe Reader"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "if (-not (Get-Service -Name AdobeARMservice -ErrorAction SilentlyContinue)) { Write-Output '  Adobe Reader no esta instalado: nada que revertir.'; exit 0 }; Set-Service -Name AdobeARMservice -StartupType Automatic -ErrorAction SilentlyContinue; Start-Service -Name AdobeARMservice -ErrorAction SilentlyContinue; Get-ScheduledTask -TaskName 'Adobe Acrobat Update Task*' -ErrorAction SilentlyContinue | Enable-ScheduledTask -ErrorAction SilentlyContinue | Out-Null; Write-Output '  [OK] Adobe Reader: actualizacion automatica activada otra vez.'; Write-Output '       Las entradas de inicio viejas no vuelven: Reader no las necesita.'"
 
 echo.
 echo   Para recuperar lo que no se revierte solo:

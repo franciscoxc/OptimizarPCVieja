@@ -54,7 +54,8 @@ echo.
 echo   - En un Atom con disco lento puede tardar VARIAS HORAS. Dejala enchufada.
 echo   - Mientras tanto la PC va a andar lenta: mejor no usarla.
 echo   - Se puede cortar en cualquier momento con Ctrl+C. No se rompe nada.
-echo   - Conviene correr antes OptimizarPC.bat: vacia temporales y hay menos que mover.
+echo   - Conviene correr antes OptimizarPC.bat y LimpiarWindowsUpdate.bat: borran
+echo     temporales y restos de actualizaciones, y hay menos que mover.
 echo.
 choice /c SN /n /m "  Empezar? [S/N]: "
 if errorlevel 2 exit /b 0
@@ -75,8 +76,9 @@ call :paso "3/5  Consolidar el espacio libre"
 defrag %DISCO% /X /H /U /V
 
 call :paso "4/5  Optimizar el arranque"
-:: Usa el mapa de arranque de la carpeta Prefetch. Si se vacio, Windows
-:: tarda unos dias en rehacerlo y este paso no tiene con que trabajar.
+:: Usa el mapa de arranque de la carpeta Prefetch (Layout.ini). OptimizarPC.bat
+:: lo conserva al limpiar; si alguien vacio la carpeta entera, Windows tarda unos
+:: dias en rehacerlo y este paso no tiene con que trabajar.
 defrag %DISCO% /B /H /U /V
 
 call :paso "5/5  Analisis final"

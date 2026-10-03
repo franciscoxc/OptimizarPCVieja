@@ -142,9 +142,9 @@ if errorlevel 2 (set "ONEDRIVE=N") else (set "ONEDRIVE=S")
 echo.
 echo   4. Quitar apps preinstaladas: Xbox, Solitario, Candy Crush, Noticias, Tu Telefono,
 echo      Skype, Contactos, Mapas, Correo y Calendario, Outlook nuevo, OneNote, Notas
-echo      rapidas, Alarmas, Recortes y anotacion, Groove, Peliculas y TV, Paint 3D,
-echo      Cortana, Copilot y similares. Quedan: Store, Calculadora, Camara, Grabadora
-echo      de sonidos y Clima. Fotos va en la pregunta 5. Todo se reinstala de la Store.
+echo      rapidas, Alarmas, Groove, Peliculas y TV, Paint 3D, Cortana, Copilot y
+echo      similares. Quedan: Store, Calculadora, Camara, Grabadora de sonidos, Clima y
+echo      Recortes y anotacion. Fotos va en la pregunta 5. Todo se reinstala de la Store.
 choice /c SN /n /m "     Quitarlas? [S/N]: "
 if errorlevel 2 (set "QUITARAPPS=N") else (set "QUITARAPPS=S")
 echo.
@@ -154,14 +154,7 @@ echo      en abrir, y el Alt+Tab clasico, sin miniaturas.
 choice /c SN /n /m "     Usarlos? [S/N]: "
 if errorlevel 2 (set "CLASICOS=N") else (set "CLASICOS=S")
 echo.
-echo   6. Los temporales, temp y %%temp%%, se vacian siempre. Vaciar TAMBIEN Prefetch?
-echo      NO lo recomiendo: Windows lo usa para arrancar y abrir programas mas rapido,
-echo      y en disco mecanico es donde mas ayuda. Vaciado, los proximos arranques son
-echo      MAS lentos hasta que se rehace solo. Microsoft midio de 4 a 15 segundos mas.
-choice /c SN /n /m "     Vaciarlo igual? [S/N]: "
-if errorlevel 2 (set "PREFETCH=N") else (set "PREFETCH=S")
-echo.
-echo   7. Restaurar sistema guarda puntos para volver atras. Desactivarlo libera hasta
+echo   6. Restaurar sistema guarda puntos para volver atras. Desactivarlo libera hasta
 echo      un 10%% del disco y saca escrituras de fondo, pero borra TODOS los puntos,
 echo      incluido el que crearia este script. La vuelta atras queda en manos de
 echo      RevertirOptimizacion.bat o de reinstalar.
@@ -263,9 +256,10 @@ call :dword "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer" N
 call :dword "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer" NoAutorun 1
 echo   [OK] Reproduccion automatica desactivada.
 
-:: Tareas que tienen que estar activas: desfragmentacion (clave en HDD), aviso
-:: de disco por fallar, analisis de Defender y puntos de restauracion.
-for %%t in ("\Microsoft\Windows\Defrag\ScheduledDefrag" "\Microsoft\Windows\DiskDiagnostic\Microsoft-Windows-DiskDiagnosticResolver" "\Microsoft\Windows\Windows Defender\Windows Defender Scheduled Scan" "\Microsoft\Windows\Windows Defender\Windows Defender Cache Maintenance" "\Microsoft\Windows\Windows Defender\Windows Defender Cleanup" "\Microsoft\Windows\Windows Defender\Windows Defender Verification" "\Microsoft\Windows\WindowsUpdate\Scheduled Start") do schtasks /change /tn %%t /enable >nul 2>&1
+:: Tareas que tienen que estar activas: desfragmentacion (clave en HDD), limpieza
+:: automatica de actualizaciones viejas, aviso de disco por fallar, analisis de
+:: Defender y puntos de restauracion.
+for %%t in ("\Microsoft\Windows\Defrag\ScheduledDefrag" "\Microsoft\Windows\Servicing\StartComponentCleanup" "\Microsoft\Windows\DiskDiagnostic\Microsoft-Windows-DiskDiagnosticResolver" "\Microsoft\Windows\Windows Defender\Windows Defender Scheduled Scan" "\Microsoft\Windows\Windows Defender\Windows Defender Cache Maintenance" "\Microsoft\Windows\Windows Defender\Windows Defender Cleanup" "\Microsoft\Windows\Windows Defender\Windows Defender Verification" "\Microsoft\Windows\WindowsUpdate\Scheduled Start") do schtasks /change /tn %%t /enable >nul 2>&1
 if not "%SINRESTAURAR%"=="S" schtasks /change /tn "\Microsoft\Windows\SystemRestore\SR" /enable >nul 2>&1
 echo   [OK] Tareas de mantenimiento y seguridad activas.
 
@@ -372,26 +366,36 @@ call :dword "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\GameDVR" AppCaptu
 echo   [OK] Sin apps sugeridas, instalaciones silenciosas, consejos ni resultados web.
 
 :: Apps en segundo plano: una por una, salvo componentes de Windows, Store,
-:: alarmas y reproductores. Fotos si se apaga: es de las que mas consume.
+:: alarmas, reproductores y Recortes y anotacion. Fotos si se apaga: es de las
+:: que mas consume.
 :: El interruptor general rompe la busqueda del Inicio.
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$b='%UPS%\Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications'; $keep='Microsoft.Windows.*','MicrosoftWindows.*','windows.*','Microsoft.AAD.BrokerPlugin*','Microsoft.AccountsControl*','Microsoft.CredDialogHost*','Microsoft.ECApp*','Microsoft.AsyncTextService*','Microsoft.BioEnrollment*','Microsoft.LockApp*','Microsoft.Win32WebViewHost*','Microsoft.WindowsStore*','Microsoft.DesktopAppInstaller*','Microsoft.WindowsAlarms*','Microsoft.ZuneMusic*','Microsoft.ZuneVideo*','SpotifyAB.SpotifyMusic*'; $force='Microsoft.Windows.Photos*'; $n=0; Get-ChildItem -LiteralPath $b -ErrorAction SilentlyContinue | ForEach-Object { $app=$_.PSChildName; if (($app -like $force) -or -not ($keep | Where-Object { $app -like $_ })) { Set-ItemProperty -LiteralPath $_.PSPath -Name Disabled -Value 1 -Type DWord; Set-ItemProperty -LiteralPath $_.PSPath -Name DisabledByUser -Value 1 -Type DWord; $n++ } }; Write-Output ('  [OK] Apps en segundo plano desactivadas: ' + $n)"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$b='%UPS%\Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications'; $keep='Microsoft.Windows.*','MicrosoftWindows.*','windows.*','Microsoft.AAD.BrokerPlugin*','Microsoft.AccountsControl*','Microsoft.CredDialogHost*','Microsoft.ECApp*','Microsoft.AsyncTextService*','Microsoft.BioEnrollment*','Microsoft.LockApp*','Microsoft.Win32WebViewHost*','Microsoft.WindowsStore*','Microsoft.DesktopAppInstaller*','Microsoft.ScreenSketch*','Microsoft.WindowsAlarms*','Microsoft.ZuneMusic*','Microsoft.ZuneVideo*','SpotifyAB.SpotifyMusic*'; $force='Microsoft.Windows.Photos*'; $n=0; Get-ChildItem -LiteralPath $b -ErrorAction SilentlyContinue | ForEach-Object { $app=$_.PSChildName; if (($app -like $force) -or -not ($keep | Where-Object { $app -like $_ })) { Set-ItemProperty -LiteralPath $_.PSPath -Name Disabled -Value 1 -Type DWord; Set-ItemProperty -LiteralPath $_.PSPath -Name DisabledByUser -Value 1 -Type DWord; $n++ } }; Write-Output ('  [OK] Apps en segundo plano desactivadas: ' + $n)"
 
 :: =========================================================================
 call :titulo "8/12  Interfaz y Explorador"
 :: =========================================================================
 set "_desk=%UHIVE%\Control Panel\Desktop"
 set "_adv=%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced"
-:: Efectos visuales en "mejor rendimiento", conservando el suavizado de fuentes.
+:: Efectos visuales en "mejor rendimiento", salvo:
+::  - el suavizado de fuentes: no es un efecto, es lo que hace legible el texto;
+::  - mostrar el contenido de la ventana mientras se arrastra;
+::  - la animacion al minimizar y maximizar, solo si la placa de video tiene
+::    driver: con el adaptador basico la dibuja el procesador y va a los saltos.
 reg add "%_desk%" /v UserPreferencesMask /t REG_BINARY /d 9012038010000000 /f >nul 2>&1
-call :sz "%_desk%" DragFullWindows 0
+call :sz "%_desk%" DragFullWindows 1
 call :sz "%_desk%" MenuShowDelay 100
 call :sz "%_desk%" FontSmoothing 2
 call :dword "%_desk%" FontSmoothingType 2
-call :sz "%_desk%\WindowMetrics" MinAnimate 0
+set "_minanim=1"
+if "%GPU_BASICA%"=="1" set "_minanim=0"
+call :sz "%_desk%\WindowMetrics" MinAnimate %_minanim%
 call :dword "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects" VisualFXSetting 3
 call :dword "%_adv%" ListviewAlphaSelect 0
 call :dword "%_adv%" ListviewShadow 0
 call :dword "%_adv%" TaskbarAnimations 0
+:: Iconos en vez de miniaturas: en un disco mecanico, abrir una carpeta con fotos
+:: o videos obliga a leer cada archivo para dibujar su miniatura.
+call :dword "%_adv%" IconsOnly 1
 call :dword "%UHIVE%\Software\Microsoft\Windows\DWM" EnableAeroPeek 0
 call :dword "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" EnableTransparency 0
 :: Sin el desenfoque "acrilico" de la pantalla de inicio de sesion: otro efecto de
@@ -404,9 +408,13 @@ call :dword "%_adv%" Start_TrackProgs 0
 reg delete "%UCLS%\Local Settings\Software\Microsoft\Windows\Shell\BagMRU" /f >nul 2>&1
 reg delete "%UCLS%\Local Settings\Software\Microsoft\Windows\Shell\Bags" /f >nul 2>&1
 call :sz "%UCLS%\Local Settings\Software\Microsoft\Windows\Shell\Bags\AllFolders\Shell" FolderType NotSpecified
-echo   [OK] Efectos visuales al minimo, conservando el suavizado de fuentes y las miniaturas.
+echo   [OK] Efectos visuales al minimo. Quedan el suavizado de fuentes y el contenido
+echo        de la ventana al arrastrar.
+if "%_minanim%"=="1" echo   [OK] Animacion al minimizar y maximizar: activada, el video tiene driver.
+if "%_minanim%"=="0" echo   [OK] Animacion al minimizar y maximizar: apagada, el video no tiene driver.
 echo   [OK] Menus mas rapidos, sin transparencias, animaciones ni desenfoque al iniciar sesion.
-echo   [OK] Explorador: abre en Este equipo y no adivina el tipo de cada carpeta.
+echo   [OK] Explorador: abre en Este equipo, muestra iconos en vez de miniaturas y no
+echo        adivina el tipo de cada carpeta.
 
 :: =========================================================================
 call :titulo "9/12  Memoria, disco y energia"
@@ -439,7 +447,8 @@ echo   [OK] El sistema no esta comprimido con CompactOS: nada que hacer.
 :: Energia: la prioridad es la velocidad, no el ahorro. Se aplica a los tres
 :: planes de Windows, por si alguien cambia de plan despues:
 ::  - el disco nunca se apaga solo: despertarlo congela la PC varios segundos;
-::  - la PC nunca suspende ni hiberna sola;
+::  - suspende sola a las 4 horas sin uso: le da tiempo de sobra al mantenimiento
+::    automatico de Windows, que corre con la PC prendida y sin uso. Nunca hiberna;
 ::  - boton de encendido y tapa: apagado completo; boton de suspension: nada;
 ::  - bateria critica: apagado completo, la unica salida prolija sin hibernacion.
 for %%p in (381b4222-f694-41f0-9685-ff5bb260df2e 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c a1841308-3541-4fab-bc81-f71556f20b4a) do call :energia_plan %%p
@@ -456,7 +465,8 @@ echo   [OK] Plan de energia: Alto rendimiento, tambien en notebooks.
 :: fabricante), y se reactiva para que rijan desde ahora.
 call :energia_plan SCHEME_CURRENT
 powercfg /setactive SCHEME_CURRENT >nul 2>&1
-echo   [OK] El disco nunca se apaga solo y la PC nunca suspende ni hiberna sola.
+echo   [OK] El disco nunca se apaga solo y la PC nunca hiberna.
+echo   [OK] Suspension a las 4 horas sin uso: da tiempo al mantenimiento de Windows.
 echo   [OK] Boton de encendido y tapa: apagado completo. Boton de suspension: nada.
 echo   [OK] Bateria critica: apagado completo.
 :: Sin hibernacion ni inicio rapido: cada apagado es completo, cada arranque es
@@ -468,7 +478,7 @@ call :dword "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\FlyoutMenuS
 call :dword "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\FlyoutMenuSettings" ShowHibernateOption 0
 echo   [OK] Sin hibernacion ni inicio rapido: cada apagado es completo.
 echo   [OK] Suspender e Hibernar ya no aparecen en el menu de apagado.
-:: Restaurar sistema, segun la pregunta 7. Lo desactiva con la herramienta oficial,
+:: Restaurar sistema, segun la pregunta 6. Lo desactiva con la herramienta oficial,
 :: que borra sus puntos de restauracion y libera su espacio.
 if not "%SINRESTAURAR%"=="S" goto :restaurar_listo
 powershell -NoProfile -ExecutionPolicy Bypass -Command "try { Disable-ComputerRestore -Drive ($env:SystemDrive + '\') -ErrorAction Stop; exit 0 } catch { exit 1 }" >nul 2>&1
@@ -496,7 +506,7 @@ echo        en suspension a los 5 minutos. Chrome: sin quedar de fondo.
 echo        Van a decir "Administrado por tu organizacion": es normal.
 
 :: =========================================================================
-call :titulo "11/12  Opcionales"
+call :titulo "11/12  Opcionales y Adobe Reader"
 :: =========================================================================
 if "%ONEDRIVE%"=="S" goto :onedrive_listo
 reg delete "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Run" /v OneDrive /f >nul 2>&1
@@ -505,7 +515,7 @@ echo   [OK] OneDrive ya no arranca con Windows. No se desinstalo.
 :onedrive_listo
 if "%QUITARAPPS%"=="N" goto :apps_listo
 echo   Quitando apps preinstaladas para todos los usuarios, puede tardar...
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$apps='Microsoft.549981C3F5F10','Microsoft.BingNews','Microsoft.BingSearch','Microsoft.Copilot','Microsoft.GetHelp','Microsoft.Getstarted','Microsoft.Messaging','Microsoft.Microsoft3DViewer','Microsoft.MicrosoftOfficeHub','Microsoft.MicrosoftSolitaireCollection','Microsoft.MicrosoftStickyNotes','Microsoft.MixedReality.Portal','Microsoft.MSPaint','Microsoft.Office.OneNote','Microsoft.OneConnect','Microsoft.OutlookForWindows','Microsoft.People','Microsoft.PowerAutomateDesktop','Microsoft.Print3D','Microsoft.ScreenSketch','Microsoft.SkypeApp','Microsoft.Todos','Microsoft.Wallet','Microsoft.WindowsAlarms','Microsoft.WindowsFeedbackHub','Microsoft.WindowsMaps','microsoft.windowscommunicationsapps','Microsoft.YourPhone','Microsoft.ZuneMusic','Microsoft.ZuneVideo','Microsoft.GamingApp','Microsoft.XboxApp','Microsoft.Xbox.TCUI','Microsoft.XboxGameOverlay','Microsoft.XboxGamingOverlay','Microsoft.XboxIdentityProvider','Microsoft.XboxSpeechToTextOverlay','Clipchamp.Clipchamp','MicrosoftTeams','king.com.*'; $prov=Get-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue; foreach ($a in $apps) { Get-AppxPackage -AllUsers -Name $a -ErrorAction SilentlyContinue | Sort-Object PackageFullName -Unique | ForEach-Object { Write-Output ('    - ' + $_.Name); Remove-AppxPackage -Package $_.PackageFullName -AllUsers -ErrorAction SilentlyContinue }; $prov | Where-Object { $_.DisplayName -like $a } | ForEach-Object { Remove-AppxProvisionedPackage -Online -PackageName $_.PackageName -ErrorAction SilentlyContinue | Out-Null } }"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$apps='Microsoft.549981C3F5F10','Microsoft.BingNews','Microsoft.BingSearch','Microsoft.Copilot','Microsoft.GetHelp','Microsoft.Getstarted','Microsoft.Messaging','Microsoft.Microsoft3DViewer','Microsoft.MicrosoftOfficeHub','Microsoft.MicrosoftSolitaireCollection','Microsoft.MicrosoftStickyNotes','Microsoft.MixedReality.Portal','Microsoft.MSPaint','Microsoft.Office.OneNote','Microsoft.OneConnect','Microsoft.OutlookForWindows','Microsoft.People','Microsoft.PowerAutomateDesktop','Microsoft.Print3D','Microsoft.SkypeApp','Microsoft.Todos','Microsoft.Wallet','Microsoft.WindowsAlarms','Microsoft.WindowsFeedbackHub','Microsoft.WindowsMaps','microsoft.windowscommunicationsapps','Microsoft.YourPhone','Microsoft.ZuneMusic','Microsoft.ZuneVideo','Microsoft.GamingApp','Microsoft.XboxApp','Microsoft.Xbox.TCUI','Microsoft.XboxGameOverlay','Microsoft.XboxGamingOverlay','Microsoft.XboxIdentityProvider','Microsoft.XboxSpeechToTextOverlay','Clipchamp.Clipchamp','MicrosoftTeams','king.com.*'; $prov=Get-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue; foreach ($a in $apps) { Get-AppxPackage -AllUsers -Name $a -ErrorAction SilentlyContinue | Sort-Object PackageFullName -Unique | ForEach-Object { Write-Output ('    - ' + $_.Name); Remove-AppxPackage -Package $_.PackageFullName -AllUsers -ErrorAction SilentlyContinue }; $prov | Where-Object { $_.DisplayName -like $a } | ForEach-Object { Remove-AppxProvisionedPackage -Online -PackageName $_.PackageName -ErrorAction SilentlyContinue | Out-Null } }"
 echo   [OK] Apps preinstaladas quitadas.
 :apps_listo
 if "%CLASICOS%"=="N" goto :clasicos_listo
@@ -530,6 +540,15 @@ echo   [OK] App Fotos quitada. Si algun dia hace falta, se reinstala desde la St
 call :dword "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Explorer" AltTabSettings 1
 echo   [OK] Alt+Tab clasico activado.
 :clasicos_listo
+:: Adobe Reader, si esta instalado: fuera todo lo que arranca solo con Windows,
+:: incluido su actualizador automatico (tarea y servicio). Los PDF quedan para
+:: Edge o Chrome. Reader sigue andando si alguien lo abre.
+set "ADOBE=N"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$n=0; $ks='%UPS%\Software\Microsoft\Windows\CurrentVersion\Run','%UPS%\Software\Microsoft\Windows\CurrentVersion\RunOnce','Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Run','Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\RunOnce','Registry::HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Run','Registry::HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\RunOnce'; foreach ($k in $ks) { $i=Get-Item -LiteralPath $k -ErrorAction SilentlyContinue; if ($i) { foreach ($v in $i.Property) { $d=[string]$i.GetValue($v); if (($v + ' ' + $d) -match 'AdobeARM|Adobe ARM|reader_sl|Speed Launcher|acrotray|Acrobat Assistant|AdobeCollabSync|\\Adobe\\(Acrobat|Reader)') { Remove-ItemProperty -LiteralPath $k -Name $v -ErrorAction SilentlyContinue; Write-Output ('  [OK] Adobe: fuera del inicio: ' + $v); $n++ } } } }; Get-ScheduledTask -TaskName 'Adobe Acrobat Update Task*' -ErrorAction SilentlyContinue | Where-Object { [string]$_.State -ne 'Disabled' } | ForEach-Object { $_ | Disable-ScheduledTask -ErrorAction SilentlyContinue | Out-Null; Write-Output ('  [OK] Adobe: tarea desactivada: ' + $_.TaskName); $n++ }; if (Get-Service -Name AdobeARMservice -ErrorAction SilentlyContinue) { Stop-Service -Name AdobeARMservice -Force -ErrorAction SilentlyContinue; Set-Service -Name AdobeARMservice -StartupType Disabled -ErrorAction SilentlyContinue; Write-Output '  [OK] Adobe: servicio de actualizacion automatica deshabilitado.'; $n++ }; $u='Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*','Registry::HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*'; $r=Get-ItemProperty -Path $u -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -match 'Acrobat|Adobe Reader' } | Select-Object -First 1; if ($r) { Write-Output ('  [OK] Adobe Reader instalado: ' + $r.DisplayName + '. Sigue andando si alguien lo abre.'); exit 2 }; if ($n) { exit 1 }; exit 0"
+if errorlevel 2 set "ADOBE=S"
+if errorlevel 1 goto :adobe_listo
+echo   [OK] Adobe Reader no esta instalado: nada que limpiar.
+:adobe_listo
 
 :: =========================================================================
 call :titulo "12/12  Limpieza de temporales"
@@ -539,7 +558,6 @@ call :titulo "12/12  Limpieza de temporales"
 :: carpeta desde la que corre el script tambien, por si se abrio desde un ZIP.
 echo   Vaciando temporales. Lo que Windows tiene en uso se saltea solo.
 set "OPT_SELF=%~dp0"
-set "OPT_PREFETCH=%PREFETCH%"
 powershell -NoProfile -ExecutionPolicy Bypass -Command "$t=[IO.File]::ReadAllText('%~f0'); $i=$t.IndexOf('#LIMPIEZA-' + 'INICIO#'); $j=$t.IndexOf('#LIMPIEZA-' + 'FIN#'); if ($i -ge 0 -and $j -gt $i) { Invoke-Expression $t.Substring($i, $j - $i) }"
 echo   [OK] Limpieza terminada.
 
@@ -570,6 +588,13 @@ echo   Fotos: despues de reiniciar, en Configuracion, Aplicaciones, Aplicaciones
 echo   predeterminadas, Visor de fotos, elegi "Visualizador de fotos de Windows".
 echo   O abri una foto y, cuando pregunte con que, elegilo y marca "Usar siempre".
 :final_sin_clasicos
+if not "%ADOBE%"=="S" goto :final_sin_adobe
+echo.
+echo   PDF: para abrirlos con Edge o Chrome en vez de Adobe Reader, en Configuracion,
+echo   Aplicaciones, Aplicaciones predeterminadas, Elegir aplicaciones predeterminadas
+echo   por tipo de archivo, busca .pdf y elegi el navegador. Como Reader ya no se
+echo   actualiza solo, si no lo usas para nada conviene desinstalarlo.
+:final_sin_adobe
 echo ==========================================================================
 choice /c SN /n /m "  Reiniciar ahora? [S/N]: "
 if errorlevel 2 goto :fin
@@ -706,8 +731,8 @@ goto :visor_extension
 :energia_plan
 powercfg /setacvalueindex %1 SUB_DISK DISKIDLE 0 >nul 2>&1
 powercfg /setdcvalueindex %1 SUB_DISK DISKIDLE 0 >nul 2>&1
-powercfg /setacvalueindex %1 SUB_SLEEP STANDBYIDLE 0 >nul 2>&1
-powercfg /setdcvalueindex %1 SUB_SLEEP STANDBYIDLE 0 >nul 2>&1
+powercfg /setacvalueindex %1 SUB_SLEEP STANDBYIDLE 14400 >nul 2>&1
+powercfg /setdcvalueindex %1 SUB_SLEEP STANDBYIDLE 14400 >nul 2>&1
 powercfg /setacvalueindex %1 SUB_SLEEP HIBERNATEIDLE 0 >nul 2>&1
 powercfg /setdcvalueindex %1 SUB_SLEEP HIBERNATEIDLE 0 >nul 2>&1
 powercfg /setacvalueindex %1 SUB_BUTTONS PBUTTONACTION 3 >nul 2>&1
@@ -741,9 +766,10 @@ $prohibidas = @($disco, $env:SystemRoot, (Join-Path $env:SystemRoot 'System32'),
 $perfiles = @(Get-CimInstance Win32_UserProfile | Where-Object { -not $_.Special -and $_.LocalPath -and [IO.Directory]::Exists($_.LocalPath) })
 $prohibidas += $perfiles | ForEach-Object { $_.LocalPath.TrimEnd('\') }
 
-# Borra el contenido de una carpeta. Saltea lo que esta en uso, nunca sigue
+# Borra el contenido de una carpeta: todo, o en la carpeta principal solo lo que
+# coincide con $Patron y no con $Excepto. Saltea lo que esta en uso, nunca sigue
 # enlaces (junctions ni symlinks) y nunca toca la carpeta del script.
-function Vaciar([string]$Nombre, [string]$Carpeta, [string]$Patron = '*') {
+function Vaciar([string]$Nombre, [string]$Carpeta, [string]$Patron = '*', [string]$Excepto = '') {
     if (-not $Carpeta -or -not [IO.Directory]::Exists($Carpeta)) { return }
     if ($prohibidas -contains $Carpeta.TrimEnd('\')) { return }
     $borrados = 0; $salteados = 0; $bytes = 0
@@ -757,6 +783,7 @@ function Vaciar([string]$Nombre, [string]$Carpeta, [string]$Patron = '*') {
         try { $entradas = [IO.Directory]::GetFileSystemEntries($dir, $filtro) } catch { $salteados++; continue }
         foreach ($e in $entradas) {
             if ($self -and $e.StartsWith($self.TrimEnd('\'), [StringComparison]::OrdinalIgnoreCase)) { continue }
+            if ($Excepto -and $dir -eq $Carpeta -and ([IO.Path]::GetFileName($e) -like $Excepto)) { continue }
             try { $attr = [IO.File]::GetAttributes($e) } catch { continue }
             if ($attr -band [IO.FileAttributes]::ReparsePoint) { continue }
             if ($attr -band [IO.FileAttributes]::Directory) { $pendientes.Push($e); $subcarpetas.Add($e); continue }
@@ -782,6 +809,7 @@ foreach ($p in $perfiles) {
     $quien = Split-Path $p.LocalPath -Leaf
     Vaciar ('%temp% de ' + $quien) (Join-Path $p.LocalPath 'AppData\Local\Temp')
     Vaciar ('Informes de errores de ' + $quien) (Join-Path $p.LocalPath 'AppData\Local\Microsoft\Windows\WER')
+    Vaciar ('Cache de Adobe Reader de ' + $quien) (Join-Path $p.LocalPath 'AppData\LocalLow\Adobe\AcroCef\DC\Acrobat\Cache')
 }
 Vaciar 'Temp de la cuenta del sistema' (Join-Path $env:SystemRoot 'System32\config\systemprofile\AppData\Local\Temp')
 Vaciar 'Temp de la cuenta del sistema, 32 bits' (Join-Path $env:SystemRoot 'SysWOW64\config\systemprofile\AppData\Local\Temp')
@@ -791,13 +819,18 @@ Vaciar 'Informes de errores de Windows' (Join-Path $env:ProgramData 'Microsoft\W
 Vaciar 'Volcados de pantallas azules (Minidump)' (Join-Path $env:SystemRoot 'Minidump')
 Vaciar 'Volcados de cuelgues de video' (Join-Path $env:SystemRoot 'LiveKernelReports')
 Vaciar 'Registros viejos de actualizaciones' (Join-Path $env:SystemRoot 'Logs\CBS') 'CbsPersist_*'
+Vaciar 'Descargas del actualizador de Adobe' (Join-Path $env:ProgramData 'Adobe\ARM')
 $dmp = Join-Path $env:SystemRoot 'MEMORY.DMP'
 if ([IO.File]::Exists($dmp)) {
     try { $largo = (New-Object IO.FileInfo($dmp)).Length; [IO.File]::Delete($dmp); $totalBytes += $largo
           Write-Output ('    ' + 'Volcado de memoria completo'.PadRight(44) + ([string][Math]::Round($largo / 1MB, 1)).PadLeft(8) + ' MB') }
     catch { $totalSalteados++ }
 }
-if ($env:OPT_PREFETCH -eq 'S') { Vaciar 'Prefetch' (Join-Path $env:SystemRoot 'Prefetch') }
+# Prefetch: solo las entradas de programas (*.pf), donde se acumula lo de programas
+# que ya no se usan. Quedan el rastro de arranque de Windows (NTOSBOOT), el mapa
+# del desfragmentador (Layout.ini), ReadyBoot y las bases de SysMain (Ag*.db):
+# asi el arranque no se resiente. Cada programa rehace su entrada al abrirlo.
+Vaciar 'Prefetch: entradas de programas' (Join-Path $env:SystemRoot 'Prefetch') '*.pf' 'NTOSBOOT-*'
 if (Get-Command Delete-DeliveryOptimizationCache -ErrorAction SilentlyContinue) {
     Delete-DeliveryOptimizationCache -Force -ErrorAction SilentlyContinue | Out-Null
     Write-Output ('    ' + 'Cache de Delivery Optimization'.PadRight(44) + '   vaciada')

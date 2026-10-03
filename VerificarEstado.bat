@@ -163,6 +163,7 @@ $espera = [ordered]@{
     'WinDefend' = 'Automatico'; 'WdNisSvc' = 'Manual'; 'SecurityHealthService' = 'Manual'; 'wscsvc' = 'Auto retrasado'; 'mpssvc' = 'Automatico'; 'BFE' = 'Automatico'
     'wuauserv' = 'Manual'; 'UsoSvc' = 'Auto retrasado'; 'WaaSMedicSvc' = 'Manual'; 'CryptSvc' = 'Automatico'; 'TrustedInstaller' = 'Manual'
     'AppXSvc' = 'Manual'; 'ClipSVC' = 'Manual'; 'InstallService' = 'Manual'; 'Appinfo' = 'Manual'; 'VSS' = 'Manual'; 'swprv' = 'Manual'; 'W32Time' = 'Manual'
+    'AdobeARMservice' = 'DESHABILITADO'
     'EventLog' = 'Automatico'; 'Schedule' = 'Automatico'; 'Winmgmt' = 'Automatico'; 'Audiosrv' = 'Automatico'; 'Dhcp' = 'Automatico'; 'Dnscache' = 'Automatico'; 'Themes' = 'Automatico'
 }
 foreach ($n in $espera.Keys) {
@@ -179,13 +180,15 @@ L '  (* = distinto de lo que deja la v2. Antes de correrla, es normal que haya v
 Titulo 'Tareas programadas'
 $tareas = @(
     '\Microsoft\Windows\Defrag\ScheduledDefrag',
+    '\Microsoft\Windows\Servicing\StartComponentCleanup',
     '\Microsoft\Windows\DiskDiagnostic\Microsoft-Windows-DiskDiagnosticResolver',
     '\Microsoft\Windows\Windows Defender\Windows Defender Scheduled Scan',
     '\Microsoft\Windows\SystemRestore\SR',
     '\Microsoft\Windows\Application Experience\Microsoft Compatibility Appraiser',
     '\Microsoft\Windows\Customer Experience Improvement Program\Consolidator',
     '\Microsoft\Windows\Maintenance\WinSAT',
-    '\Microsoft\Windows\Windows Error Reporting\QueueReporting'
+    '\Microsoft\Windows\Windows Error Reporting\QueueReporting',
+    '\Adobe Acrobat Update Task'
 )
 foreach ($t in $tareas) {
     $ruta = $t.Substring(0, $t.LastIndexOf('\') + 1)
@@ -228,6 +231,9 @@ $lista = @(
     @(($U + '\Control Panel\Desktop'), 'UserPreferencesMask'),
     @(($U + '\Control Panel\Desktop'), 'MenuShowDelay'),
     @(($U + '\Control Panel\Desktop'), 'FontSmoothing'),
+    @(($U + '\Control Panel\Desktop'), 'DragFullWindows'),
+    @(($U + '\Control Panel\Desktop\WindowMetrics'), 'MinAnimate'),
+    @(($U + '\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'), 'IconsOnly'),
     @(($U + '\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects'), 'VisualFXSetting'),
     @(($U + '\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize'), 'EnableTransparency'),
     @(($U + '\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'), 'LaunchTo'),
@@ -264,7 +270,7 @@ L ('Boton de encendido:             ' + (Energia SUB_BUTTONS PBUTTONACTION))
 L ('Cerrar la tapa:                 ' + (Energia SUB_BUTTONS LIDACTION))
 L ('Boton de suspension:            ' + (Energia SUB_BUTTONS SBUTTONACTION))
 L ('Bateria critica:                ' + (Energia SUB_BATTERY BATACTIONCRIT))
-L ('Suspender tras (seg, 0 nunca):  ' + (Energia SUB_SLEEP STANDBYIDLE))
+L ('Suspender tras (seg, 0 nunca, 14400 = 4 h): ' + (Energia SUB_SLEEP STANDBYIDLE))
 L ('Hibernar tras (seg, 0 nunca):   ' + (Energia SUB_SLEEP HIBERNATEIDLE))
 L ('Apagar disco tras (seg, 0 nunca): ' + (Energia SUB_DISK DISKIDLE))
 $fm = 'HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\FlyoutMenuSettings'
@@ -289,12 +295,19 @@ function Medir([string]$carpeta) {
     return ([string][Math]::Round($total / 1MB, 1)).PadLeft(8) + ' MB en ' + $archivos + ' archivos'
 }
 $carpetasTemp = @(@('temp (Temp de Windows)', (Join-Path $env:SystemRoot 'Temp')))
-Get-CimInstance Win32_UserProfile | Where-Object { -not $_.Special -and $_.LocalPath } | ForEach-Object { $carpetasTemp += ,@(('%temp% de ' + (Split-Path $_.LocalPath -Leaf)), (Join-Path $_.LocalPath 'AppData\Local\Temp')) }
+Get-CimInstance Win32_UserProfile | Where-Object { -not $_.Special -and $_.LocalPath } | ForEach-Object {
+    $quien = Split-Path $_.LocalPath -Leaf
+    $carpetasTemp += ,@(('%temp% de ' + $quien), (Join-Path $_.LocalPath 'AppData\Local\Temp'))
+    $carpetasTemp += ,@(('Cache de Adobe Reader de ' + $quien), (Join-Path $_.LocalPath 'AppData\LocalLow\Adobe\AcroCef\DC\Acrobat\Cache'))
+}
 $carpetasTemp += ,@('Temp de la cuenta del sistema', (Join-Path $env:SystemRoot 'System32\config\systemprofile\AppData\Local\Temp'))
 $carpetasTemp += ,@('Informes de errores de Windows', (Join-Path $env:ProgramData 'Microsoft\Windows\WER'))
 $carpetasTemp += ,@('Volcados de cuelgues de video', (Join-Path $env:SystemRoot 'LiveKernelReports'))
+$carpetasTemp += ,@('Descargas del actualizador de Adobe', (Join-Path $env:ProgramData 'Adobe\ARM'))
 $carpetasTemp += ,@('Prefetch', (Join-Path $env:SystemRoot 'Prefetch'))
 foreach ($par in $carpetasTemp) { $m = Medir $par[1]; if ($null -ne $m) { L ($par[0].PadRight(40) + $m) } }
+$pf = Join-Path $env:SystemRoot 'Prefetch'
+L ('Prefetch: entradas de programas (.pf): ' + @(Get-ChildItem -LiteralPath $pf -Filter '*.pf' -Force).Count + '   rastro de arranque (NTOSBOOT): ' + [bool](Get-ChildItem -LiteralPath $pf -Filter 'NTOSBOOT-*' -Force) + '   Layout.ini: ' + (Test-Path -LiteralPath (Join-Path $pf 'Layout.ini')))
 
 # --- Puntos de restauracion ---------------------------------------------------
 Titulo 'Puntos de restauracion (ultimos 3)'
@@ -311,9 +324,23 @@ L ('Visualizador clasico para .jpg / .png / .gif / .bmp: ' + (Leer $fa '.jpg') +
 L ('Programa predeterminado del usuario para .jpg: ' + (Leer ($U + '\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.jpg\UserChoice') 'ProgId'))
 L ('Alt+Tab clasico (AltTabSettings): ' + (Leer ($U + '\Software\Microsoft\Windows\CurrentVersion\Explorer') 'AltTabSettings'))
 
+# --- Adobe Reader --------------------------------------------------------------
+Titulo 'Adobe Reader'
+$u = 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*', 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*'
+$r = Get-ItemProperty -Path $u | Where-Object { $_.DisplayName -match 'Acrobat|Adobe Reader' } | Select-Object -First 1
+if ($r) {
+    L ('Instalado:                      ' + $r.DisplayName + ' ' + $r.DisplayVersion)
+    L ('Servicio de actualizacion:      ' + (InicioServicio 'AdobeARMservice') + '   (la v2 lo deja DESHABILITADO)')
+    $ta = @(Get-ScheduledTask -TaskName 'Adobe Acrobat Update Task*')
+    $estadoTarea = 'no existe'
+    if ($ta.Count) { $estadoTarea = [string]$ta[0].State }
+    L ('Tarea de actualizacion:         ' + $estadoTarea + '   (la v2 la deja Disabled)')
+} else { L 'No esta instalado.' }
+L ('Programa predeterminado para .pdf: ' + (Leer ($U + '\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.pdf\UserChoice') 'ProgId'))
+
 # --- Apps preinstaladas -------------------------------------------------------
 Titulo 'Apps preinstaladas que la v2 puede quitar (presentes)'
-$apps = 'Microsoft.549981C3F5F10', 'Microsoft.BingNews', 'Microsoft.GetHelp', 'Microsoft.Getstarted', 'Microsoft.MicrosoftOfficeHub', 'Microsoft.MicrosoftSolitaireCollection', 'Microsoft.MicrosoftStickyNotes', 'Microsoft.Office.OneNote', 'Microsoft.OutlookForWindows', 'Microsoft.People', 'Microsoft.ScreenSketch', 'Microsoft.SkypeApp', 'Microsoft.WindowsAlarms', 'Microsoft.WindowsMaps', 'microsoft.windowscommunicationsapps', 'Microsoft.YourPhone', 'Microsoft.ZuneMusic', 'Microsoft.ZuneVideo', 'Microsoft.XboxApp', 'Microsoft.XboxGamingOverlay', 'king.com.*'
+$apps = 'Microsoft.549981C3F5F10', 'Microsoft.BingNews', 'Microsoft.GetHelp', 'Microsoft.Getstarted', 'Microsoft.MicrosoftOfficeHub', 'Microsoft.MicrosoftSolitaireCollection', 'Microsoft.MicrosoftStickyNotes', 'Microsoft.Office.OneNote', 'Microsoft.OutlookForWindows', 'Microsoft.People', 'Microsoft.SkypeApp', 'Microsoft.WindowsAlarms', 'Microsoft.WindowsMaps', 'microsoft.windowscommunicationsapps', 'Microsoft.YourPhone', 'Microsoft.ZuneMusic', 'Microsoft.ZuneVideo', 'Microsoft.XboxApp', 'Microsoft.XboxGamingOverlay', 'king.com.*'
 $hay = foreach ($a in $apps) { Get-AppxPackage -AllUsers -Name $a | Select-Object -ExpandProperty Name -Unique }
 if ($hay) { L (($hay | Sort-Object -Unique) -join ', ') } else { L '(ninguna)' }
 
