@@ -575,8 +575,9 @@ echo   [OK] Limpieza terminada.
 :: =========================================================================
 call :titulo "Ultimos pasos"
 :: =========================================================================
-echo   Actualizando las firmas de Defender...
-powershell -NoProfile -ExecutionPolicy Bypass -Command "Update-MpSignature -ErrorAction SilentlyContinue; $s=Get-MpComputerStatus -ErrorAction SilentlyContinue; if ($s) { $rt='INACTIVO, hay otro antivirus?'; if ($s.RealTimeProtectionEnabled) { $rt='ACTIVO' }; $tp='inactiva'; if ($s.IsTamperProtected) { $tp='ACTIVA' }; Write-Output ('  Defender en tiempo real: ' + $rt); Write-Output ('  Proteccion contra alteraciones: ' + $tp); Write-Output ('  Firmas de virus del: ' + $s.AntivirusSignatureLastUpdated) } else { Write-Output '  No se pudo leer el estado de Defender. Hay otro antivirus instalado?' }"
+:: Estado de Defender. Las firmas no se actualizan aca: lo hace Windows Update, y
+:: en un disco mecanico tarda varios minutos.
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$s=Get-MpComputerStatus -ErrorAction SilentlyContinue; if ($s) { $rt='INACTIVO, hay otro antivirus?'; if ($s.RealTimeProtectionEnabled) { $rt='ACTIVO' }; $tp='inactiva'; if ($s.IsTamperProtected) { $tp='ACTIVA' }; Write-Output ('  Defender en tiempo real: ' + $rt); Write-Output ('  Proteccion contra alteraciones: ' + $tp); Write-Output ('  Firmas de virus del: ' + $s.AntivirusSignatureLastUpdated) } else { Write-Output '  No se pudo leer el estado de Defender. Hay otro antivirus instalado?' }"
 echo.
 echo   Programas que arrancan con Windows. Desactiva los que no uses en
 echo   Administrador de tareas, pestana Inicio, desde la sesion del usuario:

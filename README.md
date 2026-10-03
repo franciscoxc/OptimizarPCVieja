@@ -83,7 +83,7 @@ Solo **repara** lo que encuentra apagado; lo que ya está bien no se toca.
 | Qué | Qué hace el script |
 |---|---|
 | Servicios esenciales | Si alguno está **deshabilitado**, lo vuelve a su valor de fábrica: Defender, Centro de seguridad, Firewall, Windows Update (y sus ayudantes BITS, Orquestador, Medic, Delivery Optimization), Store y licencias de apps, UAC (`Appinfo`), instantáneas de volumen (`VSS`, `swprv`), hora (`W32Time`), red, audio y temas. |
-| Defender | Borra las políticas que lo desactivan (puestas por "debloaters"). Activa el bloqueo de PUA (adware y "optimizadores" truchos, justo lo que llena de basura una PC vieja). Actualiza las firmas. |
+| Defender | Borra las políticas que lo desactivan (puestas por "debloaters"). Activa el bloqueo de PUA (adware y "optimizadores" truchos, justo lo que llena de basura una PC vieja). Las firmas las sigue bajando Windows Update. |
 | Firewall | Lo enciende en los 3 perfiles y borra políticas que lo apaguen. |
 | SmartScreen | Borra políticas que lo apaguen (Windows y Edge). |
 | UAC | Si estaba apagado o en "no notificar nunca", lo vuelve al valor de fábrica. |
