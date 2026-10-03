@@ -207,6 +207,7 @@ $lista = @(
     @(($pol + '\DeliveryOptimization'), 'DODownloadMode'),
     @(($pol + '\Windows Error Reporting'), 'Disabled'),
     @(($pol + '\CloudContent'), 'DisableWindowsConsumerFeatures'),
+    @('HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\System', 'DisableAcrylicBackgroundOnLogon'),
     @('HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows Defender Security Center\Systray', 'HideSystray'),
     @('HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows Defender Security Center\Notifications', 'DisableEnhancedNotifications'),
     @('HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\MRT', 'DontOfferThroughWUAU'),
@@ -256,8 +257,35 @@ L ('Hibernacion habilitada:         ' + (Leer 'HKEY_LOCAL_MACHINE\SYSTEM\Current
 L 'Apagar el disco tras (indices CA y CC, 0x0 = nunca):'
 powercfg /query SCHEME_CURRENT SUB_DISK DISKIDLE | Select-Object -Last 3 | Where-Object { $_.Trim() } | ForEach-Object { L ('  ' + $_.Trim()) }
 
+# --- Temporales y Prefetch ----------------------------------------------------
+Titulo 'Temporales y Prefetch (tamano actual)'
+# Mide sin seguir enlaces (junctions ni symlinks), igual que la limpieza.
+function Medir([string]$carpeta) {
+    if (-not [IO.Directory]::Exists($carpeta)) { return $null }
+    $total = 0; $archivos = 0
+    $pila = New-Object System.Collections.Stack; $pila.Push($carpeta)
+    while ($pila.Count -gt 0) {
+        $d = $pila.Pop()
+        try { $entradas = [IO.Directory]::GetFileSystemEntries($d) } catch { continue }
+        foreach ($e in $entradas) {
+            try { $a = [IO.File]::GetAttributes($e) } catch { continue }
+            if ($a -band [IO.FileAttributes]::ReparsePoint) { continue }
+            if ($a -band [IO.FileAttributes]::Directory) { $pila.Push($e) } else { $archivos++; try { $total += (New-Object IO.FileInfo($e)).Length } catch { } }
+        }
+    }
+    return ([string][Math]::Round($total / 1MB, 1)).PadLeft(8) + ' MB en ' + $archivos + ' archivos'
+}
+$carpetasTemp = @(@('temp (Temp de Windows)', (Join-Path $env:SystemRoot 'Temp')))
+Get-CimInstance Win32_UserProfile | Where-Object { -not $_.Special -and $_.LocalPath } | ForEach-Object { $carpetasTemp += ,@(('%temp% de ' + (Split-Path $_.LocalPath -Leaf)), (Join-Path $_.LocalPath 'AppData\Local\Temp')) }
+$carpetasTemp += ,@('Temp de la cuenta del sistema', (Join-Path $env:SystemRoot 'System32\config\systemprofile\AppData\Local\Temp'))
+$carpetasTemp += ,@('Informes de errores de Windows', (Join-Path $env:ProgramData 'Microsoft\Windows\WER'))
+$carpetasTemp += ,@('Volcados de cuelgues de video', (Join-Path $env:SystemRoot 'LiveKernelReports'))
+$carpetasTemp += ,@('Prefetch', (Join-Path $env:SystemRoot 'Prefetch'))
+foreach ($par in $carpetasTemp) { $m = Medir $par[1]; if ($null -ne $m) { L ($par[0].PadRight(40) + $m) } }
+
 # --- Puntos de restauracion ---------------------------------------------------
 Titulo 'Puntos de restauracion (ultimos 3)'
+L ('Restaurar sistema (RPSessionInterval, 1 = activado): ' + (Leer 'HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SystemRestore' 'RPSessionInterval'))
 $rp = Get-ComputerRestorePoint | Select-Object -Last 3
 if ($rp) { $rp | ForEach-Object { L ([Management.ManagementDateTimeConverter]::ToDateTime($_.CreationTime).ToString('yyyy-MM-dd HH:mm') + '  ' + $_.Description) } } else { L '(ninguno)' }
 
@@ -272,7 +300,7 @@ L ('Alt+Tab clasico (AltTabSettings): ' + (Leer ($U + '\Software\Microsoft\Windo
 
 # --- Apps preinstaladas -------------------------------------------------------
 Titulo 'Apps preinstaladas que la v2 puede quitar (presentes)'
-$apps = 'Microsoft.549981C3F5F10', 'Microsoft.BingNews', 'Microsoft.BingWeather', 'Microsoft.GetHelp', 'Microsoft.Getstarted', 'Microsoft.MicrosoftOfficeHub', 'Microsoft.MicrosoftSolitaireCollection', 'Microsoft.People', 'Microsoft.SkypeApp', 'Microsoft.WindowsMaps', 'microsoft.windowscommunicationsapps', 'Microsoft.YourPhone', 'Microsoft.XboxApp', 'Microsoft.XboxGamingOverlay', 'king.com.*'
+$apps = 'Microsoft.549981C3F5F10', 'Microsoft.BingNews', 'Microsoft.GetHelp', 'Microsoft.Getstarted', 'Microsoft.MicrosoftOfficeHub', 'Microsoft.MicrosoftSolitaireCollection', 'Microsoft.MicrosoftStickyNotes', 'Microsoft.Office.OneNote', 'Microsoft.OutlookForWindows', 'Microsoft.People', 'Microsoft.ScreenSketch', 'Microsoft.SkypeApp', 'Microsoft.WindowsAlarms', 'Microsoft.WindowsMaps', 'microsoft.windowscommunicationsapps', 'Microsoft.YourPhone', 'Microsoft.ZuneMusic', 'Microsoft.ZuneVideo', 'Microsoft.XboxApp', 'Microsoft.XboxGamingOverlay', 'king.com.*'
 $hay = foreach ($a in $apps) { Get-AppxPackage -AllUsers -Name $a | Select-Object -ExpandProperty Name -Unique }
 if ($hay) { L (($hay | Sort-Object -Unique) -join ', ') } else { L '(ninguna)' }
 

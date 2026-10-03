@@ -126,9 +126,11 @@ call :borrar "%_adv%" LaunchTo
 call :dword "%UHIVE%\Software\Microsoft\Windows\DWM" EnableAeroPeek 1
 call :dword "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" EnableTransparency 1
 call :borrar "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Explorer" AltTabSettings
+call :borrar "HKLM\SOFTWARE\Policies\Microsoft\Windows\System" DisableAcrylicBackgroundOnLogon
 reg delete "%UCLS%\Local Settings\Software\Microsoft\Windows\Shell\BagMRU" /f >nul 2>&1
 reg delete "%UCLS%\Local Settings\Software\Microsoft\Windows\Shell\Bags" /f >nul 2>&1
-echo   [OK] Efectos visuales, menus, animaciones, Alt+Tab y Explorador como de fabrica.
+echo   [OK] Efectos visuales, desenfoque al iniciar sesion, menus, animaciones, Alt+Tab
+echo        y Explorador como de fabrica.
 
 call :titulo "Energia"
 powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Get-CimInstance Win32_Battery) { exit 1 } else { exit 0 }" >nul 2>&1
@@ -138,6 +140,14 @@ echo   [OK] Plan de energia: Equilibrado.
 :energia_comun
 powercfg /change disk-timeout-ac 20 >nul 2>&1
 echo   [OK] El disco vuelve a apagarse a los 20 minutos de inactividad.
+
+call :titulo "Restaurar sistema e inicio rapido"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Enable-ComputerRestore -Drive ($env:SystemDrive + '\') -ErrorAction SilentlyContinue" >nul 2>&1
+schtasks /change /tn "\Microsoft\Windows\SystemRestore\SR" /enable >nul 2>&1
+powercfg /hibernate on >nul 2>&1
+call :dword "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Power" HiberbootEnabled 1
+echo   [OK] Restaurar sistema e inicio rapido activados, como vienen de fabrica.
+echo        Los puntos de restauracion borrados no vuelven: empiezan de cero.
 
 call :titulo "Navegadores"
 set "_edge=HKLM\SOFTWARE\Policies\Microsoft\Edge"

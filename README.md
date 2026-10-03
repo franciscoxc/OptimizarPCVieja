@@ -16,6 +16,7 @@ Objetivo: la mayor velocidad posible y el menor consumo de RAM, **sin apagar la 
 | `OptimizarPC.bat` | La optimización (v2). Ya incluye las correcciones del script original. | Sí |
 | `DeshacerPerjudiciales.bat` | Deshace **solo** lo dañino del script original (v1), para PCs donde ya lo corriste. | Sí, poco |
 | `RevertirOptimizacion.bat` | Vuelve a los valores de fábrica lo que cambia `OptimizarPC.bat` (por si algo sale mal). | Sí |
+| `DesfragmentarAFondo.bat` | Desfragmentación completa y opcional, para discos mecánicos: analiza, desfragmenta, junta el espacio libre y optimiza el arranque. En un SSD solo manda TRIM. Puede tardar horas. | Sí (solo ordena el disco) |
 | `VerificarEstado.bat` | Muestra el hardware (procesador, video, RAM), el antirrobo de Conectar Igualdad si lo hay, y el estado de todo lo que tocan los scripts. Ideal para comparar antes/después. | **No** (solo lee) |
 
 ## Cómo usarlo
@@ -24,10 +25,11 @@ Objetivo: la mayor velocidad posible y el menor consumo de RAM, **sin apagar la 
    el script funciona igual desde adentro del ZIP, pero avisa, porque Windows lo corre desde una carpeta temporal.
 2. Doble clic en `OptimizarPC.bat`. Si no tiene permisos, los pide solo (aparece el cartel de UAC).
 3. Leé los avisos de hardware si aparece alguno (poca RAM, video sin driver, antirrobo de Conectar Igualdad)
-   y respondé las 5 preguntas: impresora, compartir en red, OneDrive, apps preinstaladas y clásicos de Windows 7.
+   y respondé las 8 preguntas: impresora, compartir en red, OneDrive, apps preinstaladas, clásicos de Windows 7,
+   Prefetch, inicio rápido y Restaurar sistema. Después no pregunta más.
 4. Esperá. En un disco mecánico puede tardar 10 a 20 minutos. Paciencia, mate y facturas.
-5. **Reiniciá** con *Reiniciar*, no con *Apagar* y prender.
-   Con el inicio rápido activado, "Apagar" no recarga todo y algunos cambios no se aplican.
+5. **Reiniciá** con *Reiniciar*. Si dejaste el inicio rápido activado, no alcanza con *Apagar* y prender:
+   con el inicio rápido, "Apagar" no recarga todo y algunos cambios no se aplican.
 
 Si en esa PC ya habías corrido el script original, no hace falta nada más: `OptimizarPC.bat` corrige lo que el original hizo mal.
 Si solo querés reparar el daño sin optimizar nada más, usá `DeshacerPerjudiciales.bat`.
@@ -57,6 +59,7 @@ Criterio general:
 ### 0. Red de seguridad
 
 - Punto de restauración ("Antes de OptimizarPC v2"). Si no se puede crear, pregunta antes de seguir.
+  Si en la pregunta 8 elegís desactivar Restaurar sistema, no se crea: se borraría igual.
 - Verifica que el archivo de paginación exista. Con 2 GB de RAM, sin paginación Windows se cuelga y cierra programas.
 
 ### 1. Seguridad: asegurar que lo importante esté encendido
@@ -74,7 +77,7 @@ Solo **repara** lo que encuentra apagado; lo que ya está bien no se toca.
 | Mitigaciones Spectre/Meltdown | Si alguien las apagó "para ganar rendimiento", las vuelve a encender. |
 | Windows Update | Borra políticas que lo bloquean. Windows 10 tiene parches gratis hasta el **12/10/2027** si la PC está inscripta en ESU (ver más abajo). |
 | Reproducción automática | La desactiva en todas las unidades (vía clásica de virus por pendrive). |
-| Tareas importantes | Se asegura de que estén activas la desfragmentación programada (clave en HDD), el aviso de disco por fallar, los análisis de Defender y la creación de puntos de restauración. |
+| Tareas importantes | Se asegura de que estén activas la desfragmentación programada (clave en HDD), el aviso de disco por fallar, los análisis de Defender y la creación de puntos de restauración (salvo que desactives Restaurar sistema). |
 
 ### 2. Correcciones al script original (v1)
 
@@ -95,7 +98,7 @@ Solo **repara** lo que encuentra apagado; lo que ya está bien no se toca.
 | Inicio | Servicios | Por qué |
 |---|---|---|
 | **Deshabilitado** | `DiagTrack`, `dmwappushservice` | Telemetría. No aportan nada a la PC. |
-| **Deshabilitado** | `WSearch` (indexador) | Su único trabajo es leer y releer el disco para indexarlo, justo lo que un HDD no aguanta. La búsqueda del Inicio sigue encontrando apps (Win10 20H2 en adelante); lo que se pierde es la búsqueda *instantánea* de contenido de archivos. |
+| **Deshabilitado** | `WSearch` (indexador) | Su único trabajo es leer y releer el disco para indexarlo, justo lo que un HDD no aguanta. La búsqueda del Inicio sigue encontrando apps (Win10 20H2 en adelante); lo que se pierde es la búsqueda *instantánea* de archivos. Para eso, [Everything](https://www.voidtools.com/) de voidtools: lee el índice del propio NTFS, encuentra cualquier archivo al instante y casi no usa disco. |
 | **Deshabilitado** | Xbox (`XblAuthManager`, `XblGameSave`, `XboxNetApiSvc`, `XboxGipSvc`, `xbgm`) | No usás juegos. |
 | **Deshabilitado** | Bluetooth (`bthserv`, `BTAGService`, `BthAvctpSvc`) | No usás Bluetooth. |
 | **Deshabilitado** | `RemoteRegistry` | Ya viene así de fábrica; se asegura por seguridad. |
@@ -153,6 +156,8 @@ No se agregan exclusiones: son lo primero que buscan los virus.
 
 - Efectos visuales en "mejor rendimiento", pero **conservando el suavizado de fuentes** (si no, el texto se ve horrible) y las miniaturas.
 - Sin transparencias, sin animaciones de ventanas ni de la barra de tareas, y sin Aero Peek.
+- Sin el desenfoque "acrílico" de la pantalla de inicio de sesión (`DisableAcrylicBackgroundOnLogon`, también de WinUtil): es otro
+  efecto de transparencia, y sin aceleración de video lo calcula el procesador.
 - Menús más rápidos (`MenuShowDelay` de 400 a 100 ms).
 - El Explorador abre en "Este equipo" en vez de "Acceso rápido", que en un HDD tarda en calcular los archivos recientes.
 - **Sin detección automática del tipo de carpeta.** Explorer deja de leer el contenido de cada carpeta para adivinar si es de fotos o de música (tweak de WinUtil).
@@ -162,7 +167,17 @@ No se agregan exclusiones: son lo primero que buscan los virus.
 
 - Compresión de memoria: activada (requiere SysMain).
 - NTFS: sin registro de último acceso y sin nombres cortos 8.3 (como en el v1).
-- **Inicio rápido: activado.** En un disco mecánico es la mayor mejora de arranque que hay: Windows lee una sola "foto" del sistema en vez de cientos de archivos sueltos. (WinUtil desactiva la hibernación; acá no, a propósito.)
+- **Inicio rápido, según la pregunta 7.** En un disco mecánico es la mayor mejora de arranque: Windows lee una sola
+  "foto" del sistema en vez de cientos de archivos sueltos. **No corre nada mientras usás la PC**: solo trabaja al
+  apagar y al prender. Contras: con drivers viejos (por ejemplo, los de Windows 7) puede dejar algo mal después de
+  prender; hay casos de `ntoskrnl.exe` usando 10-15% de procesador que desaparecen al desactivarlo
+  ([HP Community](https://h30434.www3.hp.com/t5/Notebook-Boot-and-Lockup/Fast-startup-causing-high-cpu-usage/td-p/7888113)).
+  Además, algunas actualizaciones necesitan un reinicio completo. Si lo desactivás en una PC de escritorio, también
+  se borra el archivo de hibernación (casi 1 GB con 2 GB de RAM). En una notebook la hibernación queda, para que
+  no se pierda el trabajo si se agota la batería.
+- **Restaurar sistema, según la pregunta 8.** Mientras haya puntos de restauración, cada escritura en el disco puede
+  costar una copia extra, y ocupan hasta un 10% del disco. Desactivarlo saca ese trabajo de fondo, pero borra **todos**
+  los puntos. Si reinstalás cuando hay problemas, como vos, es razonable desactivarlo.
 - PC de escritorio: plan de *Alto rendimiento*. Notebook: se mantiene el plan, para no matar la batería.
 - **El disco nunca se apaga enchufado.** El HDD dormido tarda varios segundos en despertar, y esa es la típica "congelada" al volver a la PC.
 
@@ -180,12 +195,44 @@ No se agregan exclusiones: son lo primero que buscan los virus.
 | ¿Usás impresora? | `Spooler` en Manual |
 | ¿Compartís carpetas o impresora en red? | `LanmanServer` en Manual |
 | ¿Usás OneDrive? | Se saca OneDrive del inicio (no se desinstala; si lo abrís, vuelve) |
-| ¿Quitar apps preinstaladas? (si respondés "Sí") | Se desinstalan para todos los usuarios: Xbox, Solitario, Candy Crush, Noticias, Clima, Tu Teléfono, Skype, Personas, Mapas, Correo y Calendario (Microsoft los discontinuó en 2024), Paint 3D, Visor 3D, Portal de realidad mixta, OneNote para Win10, Obtener ayuda, Sugerencias, Centro de comentarios, Cortana y Copilot. **No** se tocan la Store, Calculadora, Fotos, Cámara, Recortes, Notas rápidas, Alarmas, Grabadora ni los reproductores. Todo se puede reinstalar desde la Store. |
+| ¿Quitar apps preinstaladas? (si respondés "Sí") | Se desinstalan para todos los usuarios: Xbox, Solitario, Candy Crush, Noticias, Tu Teléfono, Skype, Contactos, Mapas, Correo y Calendario (Microsoft los discontinuó en 2024), Outlook nuevo, OneNote para Win10, Notas rápidas, Alarmas, Recortes y anotación, Groove, Películas y TV, Paint 3D, Visor 3D, Portal de realidad mixta, Obtener ayuda, Sugerencias, Centro de comentarios, To Do, Cortana y Copilot. **Quedan** la Store, Calculadora, Cámara, Grabadora de sonidos y **Clima**. El Bloc de notas, Paint y la Herramienta Recortes clásicos no son apps de la Store: siguen. Al quitar *Recortes y anotación* deja de andar Win+Shift+S; la tecla Impr Pant y la Herramienta Recortes clásica siguen. Todo se puede reinstalar desde la Store. |
 | ¿Usar los clásicos de Windows 7? (si respondés "Sí") | Vuelve el **Visualizador de fotos de Windows** en lugar de la app Fotos, y el **Alt+Tab clásico**. Ver [Clásicos de Windows 7](#clásicos-de-windows-7). |
+| ¿Vaciar también Prefetch? (si respondés "Sí") | Se vacía `C:\Windows\Prefetch`. **No lo recomiendo**: ver [Limpieza](#10-limpieza). |
+| ¿Dejar activado el inicio rápido? | Se desactiva el inicio rápido (y en una PC de escritorio se borra el archivo de hibernación). |
+| ¿Desactivar Restaurar sistema? (si respondés "Sí") | Se desactiva y se borran todos los puntos de restauración. No se crea el punto del paso 1. |
 
 ### 10. Limpieza
 
-- Archivos temporales del usuario y de Windows. Si el script corre desde una carpeta temporal (abierto adentro de un ZIP), esa carpeta se saltea para no borrarse a sí mismo.
+Vacía todas las carpetas temporales de Windows. Lo que está en uso **se saltea solo**, sin frenarse (siempre hay un par),
+y al final muestra cuánto liberó cada carpeta y cuántos archivos salteó:
+
+| Carpeta | Qué es |
+|---|---|
+| `C:\Windows\Temp` | La que se abre con *Ejecutar > temp*. |
+| `%temp%` de **cada** usuario | La que se abre con *Ejecutar > %temp%* (`C:\Users\<usuario>\AppData\Local\Temp`). Incluye la del administrador que elevó el script. |
+| Temp de las cuentas del sistema | `SYSTEM` (64 y 32 bits), `LocalService` y `NetworkService`: las usan servicios e instaladores, y nadie las limpia. |
+| Informes de errores | De Windows y de cada usuario (WER). |
+| Volcados de memoria | `MEMORY.DMP` (puede pesar como toda la RAM), `Minidump` y `LiveKernelReports`. Esta última junta los cuelgues de video, frecuentes con drivers forzados. |
+| Registros viejos de actualizaciones | `C:\Windows\Logs\CBS\CbsPersist_*`. El registro actual no se toca. |
+| Caché de Delivery Optimization | Actualizaciones ya instaladas que se guardaban para compartir. |
+| `C:\Windows\Prefetch` | **Solo si respondés "Sí" a la pregunta 6.** |
+
+Medidas de seguridad: nunca sigue enlaces (junctions o symlinks) que apunten fuera de la carpeta, nunca vacía
+carpetas enteras como `C:\Windows` o un perfil de usuario (aunque alguien edite mal la lista), y saltea la carpeta
+desde la que corre el script, por si se abrió adentro de un ZIP.
+
+**Sobre Prefetch:** no lo recomiendo, pero la decisión es tuya y por eso es una pregunta. Windows usa esos archivos
+para arrancar y abrir programas más rápido, y en disco mecánico es donde más ayuda. Un desarrollador del equipo de
+rendimiento de Windows midió que, después de vaciarlo, el reinicio siguiente tardó entre 4 y 15 segundos **más**
+([Microsoft](https://learn.microsoft.com/en-us/archive/blogs/ryanmy/misinformation-and-the-the-prefetch-flag),
+[Ed Bott](https://edbott.com/2005/06/01/one-more-time-do-not-clean-out-your-prefetch-folder/)). Windows lo rehace
+solo, y además recorta la carpeta por su cuenta. Vaciado, también se pierde el mapa que usa el desfragmentador para
+optimizar el arranque.
+
+**Lo que no se toca, a propósito:** la Papelera (son tus archivos); la caché de miniaturas (regenerarla en un disco
+mecánico hace lentas las carpetas); `SoftwareDistribution\Download` (si hay una actualización a medio instalar, se
+rompe). `Windows.old` y los restos de actualizaciones grandes se borran mejor con *Liberador de espacio en disco >
+Limpiar archivos del sistema*.
 
 Al final muestra el estado de Defender y los programas que arrancan con Windows (revisalos en *Administrador de tareas > Inicio*), y ofrece reiniciar.
 
@@ -207,6 +254,7 @@ Después de reiniciar, andá a *Configuración > Aplicaciones > Aplicaciones pre
 Otros clásicos que ya están y no hace falta tocar:
 
 - **Reproductor de Windows Media**, para música y video: elegilo en el mismo lugar de *Aplicaciones predeterminadas*.
+  Si quitaste las apps preinstaladas, es el reproductor que queda, porque Groove y Películas y TV se van.
 - Paint, Bloc de notas, WordPad y la Herramienta Recortes de siempre: en Windows 10 siguen siendo los de Windows 7.
 
 Lo que **no** se puede:
@@ -229,9 +277,10 @@ Lo que dicen los foros y la documentación sobre estas máquinas, generación po
 **1. El video de las G3/G4 es el verdadero cuello de botella.** Sin driver, Windows usa el *Adaptador de pantalla
 básico de Microsoft*: no hay aceleración, puede no estar la resolución nativa y no se controla el brillo.
 Todo lo dibuja el procesador. Por eso en estas netbooks apagar efectos visuales y transparencias no es un lujo:
-es lo que más se nota. Aun así, los videos (YouTube) van a ir mal. El driver de Windows 7 instalado a la fuerza
-suele terminar en pantalla negra o pantalla azul (`VIDEO_TDR_FAILURE`). No lo recomiendo.
-El script detecta esta situación y te avisa.
+es lo que más se nota. Aun así, los videos (YouTube) van a ir mal.
+**Driver de Windows 7:** en el campo, en muchas Conectar Igualdad funciona, sobre todo en Windows 10 de 32 bits. En los
+foros de Intel también hay casos de pantalla azul (`VIDEO_TDR_FAILURE`). Probalo con un punto de restauración hecho.
+Si anda, conviene no activar el inicio rápido (pregunta 7). El script detecta si estás con el driver básico y te avisa.
 
 **2. RAM.** Las G1 y G2 traen 1 GB, y Windows 10 de 64 bits pide 2 GB como mínimo. Intel especifica 2 GB como
 máximo para estos Atom: un módulo de 2 GB (DDR2 en la G1, DDR3 en las demás) es la mejora más barata que hay.
@@ -254,6 +303,34 @@ empezar, y en la lista final de programas de inicio lo marca con "NO lo desactiv
 **6. Alternativa.** Para las G3/G4 sin driver de video, los foros recomiendan un Linux liviano (Lubuntu, Linux Mint XFCE)
 si no hace falta Windows sí o sí.
 
+## Desfragmentar: ¿sirve el de Windows?
+
+Tu intuición es correcta en parte: el desfragmentador automático trabaja "por encima", **a propósito**.
+
+- Ignora los fragmentos de más de **64 MB**: Microsoft midió que juntarlos casi no cambia la velocidad, porque leer
+  64 MB seguidos tarda muchísimo más que el salto de un fragmento al otro
+  ([Microsoft Tech Community](https://techcommunity.microsoft.com/blog/askperf/disk-fragmentation-and-system-performance/372921)).
+- La pasada semanal automática hace la desfragmentación normal, pero no junta el espacio libre.
+
+Para mantenimiento, la semanal alcanza, y `OptimizarPC.bat` se asegura de que esté activa. Para una pasada a fondo
+está **`DesfragmentarAFondo.bat`**, que usa la misma herramienta de Windows con todos sus parámetros
+([`defrag`, Microsoft Learn](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/defrag)):
+
+| Paso | Parámetro | Qué hace |
+|---|---|---|
+| 1 | `/A /V` | Analiza y muestra el porcentaje de fragmentación. |
+| 2 | `/W` | Desfragmentación completa, incluidos los fragmentos de más de 64 MB. Si esa versión de Windows no acepta `/W`, hace la normal (`/D`). |
+| 3 | `/X` | Junta el espacio libre: los archivos nuevos se fragmentan menos. |
+| 4 | `/B` | Optimiza el arranque: junta los archivos que Windows lee al prender (usa el mapa de la carpeta Prefetch). |
+| 5 | `/A /V` | Analiza otra vez, para comparar. |
+
+Usa `/H` (prioridad normal, termina antes) y `/U` (muestra el progreso). En un SSD no desfragmenta: manda TRIM.
+Puede tardar horas en un Atom: dejala enchufada y sin usar.
+
+Lo único que la herramienta de Windows no puede mover es lo que está en uso mientras Windows corre: el archivo de
+paginación y partes de la tabla del disco (MFT). Para eso hace falta un desfragmentador que trabaje durante el
+arranque, como [UltraDefrag](https://en.wikipedia.org/wiki/UltraDefrag). La versión 7.1.4 es la última de código abierto.
+
 ## Lo que NO hace (mitos y tweaks descartados)
 
 | Tweak | Por qué no |
@@ -266,9 +343,10 @@ si no hace falta Windows sí o sí.
 | `NetworkThrottlingIndex`, `SystemResponsiveness` | Tweaks de gaming y multimedia. Acá no hacen nada útil. |
 | `StartupDelayInMSec = 0` | Hace que los programas de inicio arranquen todos juntos con el escritorio. En HDD eso empeora el arranque. |
 | Deshabilitar el archivo de paginación | Con 2 GB de RAM: cuelgues y programas que se cierran solos. |
-| Deshabilitar hibernación | Mata el inicio rápido, que en HDD es la mayor mejora de arranque. |
-| Deshabilitar la desfragmentación | En HDD es necesaria. El script se asegura de que esté **activa**. |
-| "Limpiadores de RAM" y vaciar la carpeta `Prefetch` | Contraproducentes: Windows vuelve a cargar todo desde el disco lento. |
+| Deshabilitar hibernación "porque sí" | Es una decisión con contras de ambos lados: por eso es la pregunta 7, explicada arriba. |
+| Deshabilitar la desfragmentación | En HDD es necesaria. El script se asegura de que esté **activa**. Para una pasada a fondo, ver [Desfragmentar](#desfragmentar-sirve-el-de-windows). |
+| "Limpiadores de RAM" | Contraproducentes: Windows vuelve a cargar todo desde el disco lento. |
+| Vaciar `Prefetch` siempre | Hace más lentos los arranques siguientes. Queda como pregunta (6), con la advertencia. |
 | `msconfig` > número de procesadores / memoria máxima | Solo sirven para **limitar**. Windows ya usa todo. |
 | Deshabilitar Windows Update o Defender | Inseguro. Además, la Protección contra alteraciones lo revierte. |
 | Deshabilitar `TabletInputService` | Rompe escribir en el Inicio, Configuración y apps UWP. |
@@ -295,12 +373,17 @@ si no hace falta Windows sí o sí.
 
 Desde acá no hay un Windows real, así que se validó todo lo que se puede validar sin uno:
 
-- **Wine (el `cmd.exe` de Wine):** los cuatro scripts corren de punta a punta con distintas combinaciones de respuestas.
+- **Wine (el `cmd.exe` de Wine):** los cinco scripts corren de punta a punta con distintas combinaciones de respuestas
+  (por ejemplo: con y sin inicio rápido, con y sin Restaurar sistema).
   Se simuló el estado que deja el script original (y políticas que apagan Defender y Windows Update)
   y se verificó en el registro que cada valor quedara corregido y escrito en `HKEY_USERS\<SID>` del usuario.
   También se probó el ciclo completo optimizar, revertir y verificar.
-- **PowerShell:** los 27 bloques de PowerShell pasan el parser oficial. La lógica de apps en segundo plano y la de
-  limpieza de temporales se probaron con datos simulados.
+- **PowerShell:** los 32 bloques de PowerShell pasan el parser oficial. La lógica de apps en segundo plano se probó con
+  nombres reales de paquetes.
+- **Limpieza:** la sección que vacía los temporales se **ejecutó de verdad** sobre un árbol de carpetas simulado, con
+  trampas: un enlace a una carpeta valiosa (no la siguió), archivos de solo lectura (los borró), archivos imposibles de
+  borrar (los salteó y los contó), la carpeta del propio script (no la tocó) y un intento de vaciar la carpeta de
+  Windows entera (lo bloqueó).
 - **Netbook simulada:** una G4 (Atom N2600, 1 GB, video sin driver, con antirrobo) muestra los tres avisos.
   El registro del Visualizador de fotos se verificó valor por valor contra el `.reg` de referencia, incluidos los
   íconos con `%SystemRoot%`, con comillas o inexistentes.
@@ -327,6 +410,8 @@ Wine no los implementa, así que falta la prueba en un Windows 10 real. Para eso
    - [ ] Sonido, red, hora correcta y el portapapeles (Ctrl+C y Ctrl+V).
    - [ ] Edge abre y navega.
    - [ ] Con los clásicos: una foto JPG abre con el Visualizador de fotos (después de elegirlo en Aplicaciones predeterminadas) y Alt+Tab muestra íconos.
+   - [ ] El resumen de la limpieza muestra lo liberado por carpeta y los archivos salteados.
+   - [ ] Si desactivaste Restaurar sistema: *Propiedades del sistema > Protección del sistema* dice "Desactivado".
    - [ ] Existe el punto de restauración "Antes de OptimizarPC v2" (`rstrui.exe`).
 8. Probá `RevertirOptimizacion.bat` y verificá que todo vuelva a la normalidad.
 
@@ -363,6 +448,11 @@ lo mismo que se recomienda ahí, contrastadas con documentación de Microsoft:
   Protección contra alteraciones: [Cloudbrothers](https://cloudbrothers.info/en/current-limits-defender-av-tamper-protection/).
 - **WpnService:** [batcmd](https://batcmd.com/windows/10/services/wpnservice/).
 - **CompactOS en HDD:** [TenForums](https://www.tenforums.com/performance-maintenance/131696-compression-os-experiment.html).
+- **Prefetch:** [Ryan Myers, Microsoft](https://learn.microsoft.com/en-us/archive/blogs/ryanmy/misinformation-and-the-the-prefetch-flag), [Ed Bott](https://edbott.com/2005/06/01/one-more-time-do-not-clean-out-your-prefetch-folder/).
+- **Inicio rápido:** cómo funciona y sus contras, en [Winbuzzer](https://winbuzzer.com/2020/05/19/how-to-disable-windows-10-fast-startup-hiberboot-hybrid-boot-hybrid-shutdown-xcxwbt/); caso de CPU alta, en [HP Community](https://h30434.www3.hp.com/t5/Notebook-Boot-and-Lockup/Fast-startup-causing-high-cpu-usage/td-p/7888113).
+- **Restaurar sistema:** desactivarlo borra los puntos, según [TenForums](https://www.tenforums.com/tutorials/99782-enable-disable-system-restore-windows-3.html).
+- **Desfragmentador:** [límite de 64 MB](https://techcommunity.microsoft.com/blog/askperf/disk-fragmentation-and-system-performance/372921), [parámetros de `defrag`](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/defrag), [UltraDefrag](https://en.wikipedia.org/wiki/UltraDefrag).
+- **Desenfoque del inicio de sesión:** `DisableAcrylicBackgroundOnLogon`, tweak *Logon Screen Acrylic Blur* de WinUtil.
 - **Precarga de apps (MMAgent):** [Microsoft Learn](https://learn.microsoft.com/en-us/powershell/module/mmagent/disable-mmagent).
 - **Netbooks de Conectar Igualdad:** generaciones y hardware en [netbookdelgobierno.com](https://www.netbookdelgobierno.com/2015/08/modelos-de-netbook-de-conectar-igualdad.html) y [Utiltecnico](https://www.utiltecnico.com/2021/08/todo-sobre-las-netbooks-conectar-igualdad-del-gobierno-argentino/). Windows 10 en estas netbooks: [Underc0de](https://underc0de.org/foro/dudas-generales-121/problemas-netbook-conectar-igualdad/).
 - **GMA 3600 sin driver para Windows 10:** [Intel Community](https://community.intel.com/t5/Graphics/Intel-GMA-3600-amp-Windows-10/m-p/460312), [Intel Community (32 bits)](https://community.intel.com/t5/Graphics/Windows-10-Intel-Graphics-Adapter-3600/m-p/486688). GMA 3150 con driver de Windows Update: [Intel Community](https://community.intel.com/t5/Graphics/Intel-GMA-3150-drivers-for-Windows-8-1-10/m-p/398142).

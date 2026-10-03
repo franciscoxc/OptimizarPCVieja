@@ -108,9 +108,9 @@ echo          Estos Atom aceptan hasta 2 GB: ampliarla es la mejora mas barata q
 :ram_ok
 if not "%GPU_BASICA%"=="1" goto :gpu_ok
 echo   AVISO: la placa de video anda con el driver basico de Microsoft, sin aceleracion.
-echo          Es lo tipico de los Atom N2600 y N2800 (GMA 3600): Intel nunca hizo driver
-echo          para Windows 10. Windows dibuja todo con el procesador, asi que los videos y
-echo          las animaciones van a ir lentos igual. Detalles en README.md.
+echo          Es lo tipico de los Atom N2600 y N2800 (GMA 3600): Intel no hizo driver para
+echo          Windows 10. En muchas netbooks anda el de Windows 7: probalo con un punto de
+echo          restauracion hecho. Sin driver, videos y animaciones van lentos. Ver README.md.
 :gpu_ok
 if not "%ANTIRROBO%"=="1" goto :antirrobo_ok
 echo   AVISO: se detecto el antirrobo de Conectar Igualdad (Theft Deterrent).
@@ -140,11 +140,11 @@ if errorlevel 2 (set "COMPARTIR=N") else (set "COMPARTIR=S")
 choice /c SN /n /m "  3. Usas OneDrive? [S/N]: "
 if errorlevel 2 (set "ONEDRIVE=N") else (set "ONEDRIVE=S")
 echo.
-echo   4. Quitar apps preinstaladas que no se usan: Xbox, Solitario, Candy Crush,
-echo      Noticias, Clima, Tu Telefono, Skype, Personas, Mapas, Correo y Calendario,
-echo      Paint 3D, OneNote para Win10, Cortana, Copilot y similares.
-echo      NO se tocan: Store, Calculadora, Camara, Recortes, Notas, Alarmas, Grabadora
-echo      ni los reproductores. Fotos va en la pregunta 5. Todo se reinstala desde la Store.
+echo   4. Quitar apps preinstaladas: Xbox, Solitario, Candy Crush, Noticias, Tu Telefono,
+echo      Skype, Contactos, Mapas, Correo y Calendario, Outlook nuevo, OneNote, Notas
+echo      rapidas, Alarmas, Recortes y anotacion, Groove, Peliculas y TV, Paint 3D,
+echo      Cortana, Copilot y similares. Quedan: Store, Calculadora, Camara, Grabadora
+echo      de sonidos y Clima. Fotos va en la pregunta 5. Todo se reinstala de la Store.
 choice /c SN /n /m "     Quitarlas? [S/N]: "
 if errorlevel 2 (set "QUITARAPPS=N") else (set "QUITARAPPS=S")
 echo.
@@ -153,10 +153,32 @@ echo      el Visualizador de fotos en vez de la app Fotos, que en PCs lentas tar
 echo      en abrir, y el Alt+Tab clasico, sin miniaturas.
 choice /c SN /n /m "     Usarlos? [S/N]: "
 if errorlevel 2 (set "CLASICOS=N") else (set "CLASICOS=S")
+echo.
+echo   6. Los temporales, temp y %%temp%%, se vacian siempre. Vaciar TAMBIEN Prefetch?
+echo      NO lo recomiendo: Windows lo usa para arrancar y abrir programas mas rapido,
+echo      y en disco mecanico es donde mas ayuda. Vaciado, los proximos arranques son
+echo      MAS lentos hasta que se rehace solo. Microsoft midio de 4 a 15 segundos mas.
+choice /c SN /n /m "     Vaciarlo igual? [S/N]: "
+if errorlevel 2 (set "PREFETCH=N") else (set "PREFETCH=S")
+echo.
+echo   7. Inicio rapido: en disco mecanico arranca mas rapido y no corre nada mientras
+echo      usas la PC; solo actua al apagar y al prender. Pero con drivers viejos, como
+echo      los de Windows 7, puede traer problemas: hay casos de procesador ocupado
+echo      despues de prender. Si la PC usa drivers de Windows 7, conviene que NO.
+choice /c SN /n /m "     Dejarlo activado? [S/N]: "
+if errorlevel 2 (set "INICIORAPIDO=N") else (set "INICIORAPIDO=S")
+echo.
+echo   8. Restaurar sistema guarda puntos para volver atras. Desactivarlo libera hasta
+echo      un 10%% del disco y saca escrituras de fondo, pero borra TODOS los puntos,
+echo      incluido el que crearia este script. La vuelta atras queda en manos de
+echo      RevertirOptimizacion.bat o de reinstalar.
+choice /c SN /n /m "     Desactivarlo? [S/N]: "
+if errorlevel 2 (set "SINRESTAURAR=N") else (set "SINRESTAURAR=S")
 
 :: =========================================================================
 call :titulo "1/12  Punto de restauracion"
 :: =========================================================================
+if "%SINRESTAURAR%"=="S" goto :punto_salteado
 call :asegurar VSS demand
 call :asegurar swprv demand
 echo   Creando punto de restauracion, puede tardar unos minutos...
@@ -171,6 +193,10 @@ if errorlevel 2 exit /b 1
 goto :punto_listo
 :punto_ok
 echo   [OK] Punto de restauracion "Antes de OptimizarPC v2" creado.
+goto :punto_listo
+:punto_salteado
+echo   Salteado: elegiste desactivar Restaurar sistema, que lo borraria igual.
+echo   Si algo sale mal, la vuelta atras es RevertirOptimizacion.bat.
 :punto_listo
 
 :: =========================================================================
@@ -246,7 +272,8 @@ echo   [OK] Reproduccion automatica desactivada.
 
 :: Tareas que tienen que estar activas: desfragmentacion (clave en HDD), aviso
 :: de disco por fallar, analisis de Defender y puntos de restauracion.
-for %%t in ("\Microsoft\Windows\Defrag\ScheduledDefrag" "\Microsoft\Windows\DiskDiagnostic\Microsoft-Windows-DiskDiagnosticResolver" "\Microsoft\Windows\Windows Defender\Windows Defender Scheduled Scan" "\Microsoft\Windows\Windows Defender\Windows Defender Cache Maintenance" "\Microsoft\Windows\Windows Defender\Windows Defender Cleanup" "\Microsoft\Windows\Windows Defender\Windows Defender Verification" "\Microsoft\Windows\WindowsUpdate\Scheduled Start" "\Microsoft\Windows\SystemRestore\SR") do schtasks /change /tn %%t /enable >nul 2>&1
+for %%t in ("\Microsoft\Windows\Defrag\ScheduledDefrag" "\Microsoft\Windows\DiskDiagnostic\Microsoft-Windows-DiskDiagnosticResolver" "\Microsoft\Windows\Windows Defender\Windows Defender Scheduled Scan" "\Microsoft\Windows\Windows Defender\Windows Defender Cache Maintenance" "\Microsoft\Windows\Windows Defender\Windows Defender Cleanup" "\Microsoft\Windows\Windows Defender\Windows Defender Verification" "\Microsoft\Windows\WindowsUpdate\Scheduled Start") do schtasks /change /tn %%t /enable >nul 2>&1
+if not "%SINRESTAURAR%"=="S" schtasks /change /tn "\Microsoft\Windows\SystemRestore\SR" /enable >nul 2>&1
 echo   [OK] Tareas de mantenimiento y seguridad activas.
 
 :: Archivo de paginacion: con 2 GB de RAM es obligatorio
@@ -374,6 +401,9 @@ call :dword "%_adv%" ListviewShadow 0
 call :dword "%_adv%" TaskbarAnimations 0
 call :dword "%UHIVE%\Software\Microsoft\Windows\DWM" EnableAeroPeek 0
 call :dword "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" EnableTransparency 0
+:: Sin el desenfoque "acrilico" de la pantalla de inicio de sesion: otro efecto de
+:: transparencia, y sin aceleracion de video lo calcula el procesador.
+call :dword "HKLM\SOFTWARE\Policies\Microsoft\Windows\System" DisableAcrylicBackgroundOnLogon 1
 :: El Explorador abre en "Este equipo" y no rastrea los programas abiertos.
 call :dword "%_adv%" LaunchTo 1
 call :dword "%_adv%" Start_TrackProgs 0
@@ -382,7 +412,7 @@ reg delete "%UCLS%\Local Settings\Software\Microsoft\Windows\Shell\BagMRU" /f >n
 reg delete "%UCLS%\Local Settings\Software\Microsoft\Windows\Shell\Bags" /f >nul 2>&1
 call :sz "%UCLS%\Local Settings\Software\Microsoft\Windows\Shell\Bags\AllFolders\Shell" FolderType NotSpecified
 echo   [OK] Efectos visuales al minimo, conservando el suavizado de fuentes y las miniaturas.
-echo   [OK] Menus mas rapidos, sin transparencias ni animaciones.
+echo   [OK] Menus mas rapidos, sin transparencias, animaciones ni desenfoque al iniciar sesion.
 echo   [OK] Explorador: abre en Este equipo y no adivina el tipo de cada carpeta.
 
 :: =========================================================================
@@ -414,6 +444,7 @@ echo   [OK] El sistema no esta comprimido con CompactOS: nada que hacer.
 :compact_listo
 
 :: Energia. Notebook: se respeta el plan para cuidar la bateria.
+set "NOTEBOOK=0"
 powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Get-CimInstance Win32_Battery) { exit 1 } else { exit 0 }" >nul 2>&1
 if errorlevel 1 goto :energia_notebook
 powercfg /setactive 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c >nul 2>&1
@@ -423,15 +454,40 @@ powercfg /setactive 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c >nul 2>&1
 echo   [OK] Plan de energia: Alto rendimiento.
 goto :energia_comun
 :energia_notebook
+set "NOTEBOOK=1"
 echo   Notebook detectada: se mantiene el plan de energia para cuidar la bateria.
 :energia_comun
 :: El HDD nunca se apaga enchufado: despertarlo congela la PC varios segundos.
 powercfg /change disk-timeout-ac 0 >nul 2>&1
 echo   [OK] El disco no se apaga mientras la PC esta enchufada.
-:: Inicio rapido: en HDD es la mayor mejora de arranque.
+:: Inicio rapido, segun la pregunta 7.
+if "%INICIORAPIDO%"=="N" goto :inicio_rapido_no
 powercfg /hibernate on >nul 2>&1
 call :dword "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Power" HiberbootEnabled 1
 echo   [OK] Inicio rapido activado.
+goto :inicio_rapido_listo
+:inicio_rapido_no
+call :dword "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Power" HiberbootEnabled 0
+:: En una notebook la hibernacion queda: salva el trabajo si la bateria se agota.
+if "%NOTEBOOK%"=="1" goto :inicio_rapido_notebook
+powercfg /hibernate off >nul 2>&1
+echo   [OK] Inicio rapido desactivado y archivo de hibernacion borrado: mas disco libre.
+goto :inicio_rapido_listo
+:inicio_rapido_notebook
+echo   [OK] Inicio rapido desactivado. La hibernacion queda para cuando se agota la bateria.
+:inicio_rapido_listo
+:: Restaurar sistema, segun la pregunta 8. Lo desactiva con la herramienta oficial,
+:: que borra sus puntos de restauracion y libera su espacio.
+if not "%SINRESTAURAR%"=="S" goto :restaurar_listo
+powershell -NoProfile -ExecutionPolicy Bypass -Command "try { Disable-ComputerRestore -Drive ($env:SystemDrive + '\') -ErrorAction Stop; exit 0 } catch { exit 1 }" >nul 2>&1
+if errorlevel 1 goto :restaurar_error
+schtasks /change /tn "\Microsoft\Windows\SystemRestore\SR" /disable >nul 2>&1
+echo   [OK] Restaurar sistema desactivado: se borraron sus puntos y se libero su espacio.
+goto :restaurar_listo
+:restaurar_error
+echo   [AVISO] No se pudo desactivar Restaurar sistema. Se puede a mano en Propiedades
+echo           del sistema, Proteccion del sistema, Configurar.
+:restaurar_listo
 
 :: =========================================================================
 call :titulo "10/12  Navegadores"
@@ -457,7 +513,7 @@ echo   [OK] OneDrive ya no arranca con Windows. No se desinstalo.
 :onedrive_listo
 if "%QUITARAPPS%"=="N" goto :apps_listo
 echo   Quitando apps preinstaladas para todos los usuarios, puede tardar...
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$apps='Microsoft.549981C3F5F10','Microsoft.BingNews','Microsoft.BingWeather','Microsoft.BingSearch','Microsoft.Copilot','Microsoft.GetHelp','Microsoft.Getstarted','Microsoft.Messaging','Microsoft.Microsoft3DViewer','Microsoft.MicrosoftOfficeHub','Microsoft.MicrosoftSolitaireCollection','Microsoft.MixedReality.Portal','Microsoft.MSPaint','Microsoft.Office.OneNote','Microsoft.OneConnect','Microsoft.People','Microsoft.Print3D','Microsoft.SkypeApp','Microsoft.Wallet','Microsoft.WindowsFeedbackHub','Microsoft.WindowsMaps','microsoft.windowscommunicationsapps','Microsoft.YourPhone','Microsoft.GamingApp','Microsoft.XboxApp','Microsoft.Xbox.TCUI','Microsoft.XboxGameOverlay','Microsoft.XboxGamingOverlay','Microsoft.XboxIdentityProvider','Microsoft.XboxSpeechToTextOverlay','Clipchamp.Clipchamp','MicrosoftTeams','king.com.*'; $prov=Get-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue; foreach ($a in $apps) { Get-AppxPackage -AllUsers -Name $a -ErrorAction SilentlyContinue | Sort-Object PackageFullName -Unique | ForEach-Object { Write-Output ('    - ' + $_.Name); Remove-AppxPackage -Package $_.PackageFullName -AllUsers -ErrorAction SilentlyContinue }; $prov | Where-Object { $_.DisplayName -like $a } | ForEach-Object { Remove-AppxProvisionedPackage -Online -PackageName $_.PackageName -ErrorAction SilentlyContinue | Out-Null } }"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$apps='Microsoft.549981C3F5F10','Microsoft.BingNews','Microsoft.BingSearch','Microsoft.Copilot','Microsoft.GetHelp','Microsoft.Getstarted','Microsoft.Messaging','Microsoft.Microsoft3DViewer','Microsoft.MicrosoftOfficeHub','Microsoft.MicrosoftSolitaireCollection','Microsoft.MicrosoftStickyNotes','Microsoft.MixedReality.Portal','Microsoft.MSPaint','Microsoft.Office.OneNote','Microsoft.OneConnect','Microsoft.OutlookForWindows','Microsoft.People','Microsoft.PowerAutomateDesktop','Microsoft.Print3D','Microsoft.ScreenSketch','Microsoft.SkypeApp','Microsoft.Todos','Microsoft.Wallet','Microsoft.WindowsAlarms','Microsoft.WindowsFeedbackHub','Microsoft.WindowsMaps','microsoft.windowscommunicationsapps','Microsoft.YourPhone','Microsoft.ZuneMusic','Microsoft.ZuneVideo','Microsoft.GamingApp','Microsoft.XboxApp','Microsoft.Xbox.TCUI','Microsoft.XboxGameOverlay','Microsoft.XboxGamingOverlay','Microsoft.XboxIdentityProvider','Microsoft.XboxSpeechToTextOverlay','Clipchamp.Clipchamp','MicrosoftTeams','king.com.*'; $prov=Get-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue; foreach ($a in $apps) { Get-AppxPackage -AllUsers -Name $a -ErrorAction SilentlyContinue | Sort-Object PackageFullName -Unique | ForEach-Object { Write-Output ('    - ' + $_.Name); Remove-AppxPackage -Package $_.PackageFullName -AllUsers -ErrorAction SilentlyContinue }; $prov | Where-Object { $_.DisplayName -like $a } | ForEach-Object { Remove-AppxProvisionedPackage -Online -PackageName $_.PackageName -ErrorAction SilentlyContinue | Out-Null } }"
 echo   [OK] Apps preinstaladas quitadas.
 :apps_listo
 if "%CLASICOS%"=="N" goto :clasicos_listo
@@ -486,10 +542,14 @@ echo   [OK] Alt+Tab clasico activado.
 :: =========================================================================
 call :titulo "12/12  Limpieza de temporales"
 :: =========================================================================
-:: Si el script corre desde una carpeta temporal (por ejemplo, abierto adentro
-:: de un ZIP), esa carpeta se saltea para no borrarse a si mismo.
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$self='%~dp0'; $dirs=@($env:SystemRoot + '\Temp'); $u='%UPROFILE%'; if ($u) { $dirs += (Join-Path $u 'AppData\Local\Temp') }; foreach ($t in $dirs) { if (Test-Path -LiteralPath $t) { Get-ChildItem -LiteralPath $t -Force -ErrorAction SilentlyContinue | Where-Object { -not $self.StartsWith($_.FullName, [StringComparison]::OrdinalIgnoreCase) } | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue } }"
-echo   [OK] Temporales del usuario y de Windows borrados. Los que estaban en uso quedan.
+:: Vaciado de todas las carpetas temporales de Windows. El codigo esta en la
+:: seccion LIMPIEZA al final de este archivo. Lo que esta en uso se saltea, y la
+:: carpeta desde la que corre el script tambien, por si se abrio desde un ZIP.
+echo   Vaciando temporales. Lo que Windows tiene en uso se saltea solo.
+set "OPT_SELF=%~dp0"
+set "OPT_PREFETCH=%PREFETCH%"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$t=[IO.File]::ReadAllText('%~f0'); $i=$t.IndexOf('#LIMPIEZA-' + 'INICIO#'); $j=$t.IndexOf('#LIMPIEZA-' + 'FIN#'); if ($i -ge 0 -and $j -gt $i) { Invoke-Expression $t.Substring($i, $j - $i) }"
+echo   [OK] Limpieza terminada.
 
 :: =========================================================================
 call :titulo "Ultimos pasos"
@@ -503,7 +563,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command "$ks='%UPS%\Software\Micr
 echo.
 echo ==========================================================================
 echo   LISTO. Hay que REINICIAR la PC para aplicar todo.
-echo   Usa "Reiniciar", no "Apagar": con el inicio rapido, apagar no recarga todo.
+if "%INICIORAPIDO%"=="S" echo   Usa "Reiniciar", no "Apagar": con el inicio rapido, apagar no recarga todo.
+echo.
+echo   Para buscar archivos: Windows Search queda apagado porque castiga el disco.
+echo   Everything, de voidtools.com, encuentra cualquier archivo al instante.
 echo.
 echo   Seguridad: Windows 10 recibe parches gratis hasta el 12/10/2027 si la PC
 echo   esta inscripta en ESU. Revisalo en Configuracion, Windows Update.
@@ -646,4 +709,84 @@ goto :visor_extension
 :asegurar_par
 for /f "tokens=1,2 delims=:" %%a in ("%~1") do call :asegurar %%a %%b
 goto :eof
+:: =========================================================================
+::  LIMPIEZA DE TEMPORALES (PowerShell). La ejecuta el paso 12. cmd nunca
+::  llega hasta aca: todo termina antes con "exit /b" o "goto :eof".
+:: =========================================================================
+#LIMPIEZA-INICIO#
+$ErrorActionPreference = 'SilentlyContinue'
+$self = $env:OPT_SELF
+$totalBytes = 0
+$totalSalteados = 0
 
+# Carpetas que jamas se vacian enteras, aunque alguien edite mal la lista.
+$disco = $env:SystemDrive + '\'
+$prohibidas = @($disco, $env:SystemRoot, (Join-Path $env:SystemRoot 'System32'), $env:ProgramData,
+    $env:ProgramFiles, ${env:ProgramFiles(x86)}, (Join-Path $disco 'Users'), $env:USERPROFILE) |
+    Where-Object { $_ } | ForEach-Object { $_.TrimEnd('\') }
+$perfiles = @(Get-CimInstance Win32_UserProfile | Where-Object { -not $_.Special -and $_.LocalPath -and [IO.Directory]::Exists($_.LocalPath) })
+$prohibidas += $perfiles | ForEach-Object { $_.LocalPath.TrimEnd('\') }
+
+# Borra el contenido de una carpeta. Saltea lo que esta en uso, nunca sigue
+# enlaces (junctions ni symlinks) y nunca toca la carpeta del script.
+function Vaciar([string]$Nombre, [string]$Carpeta, [string]$Patron = '*') {
+    if (-not $Carpeta -or -not [IO.Directory]::Exists($Carpeta)) { return }
+    if ($prohibidas -contains $Carpeta.TrimEnd('\')) { return }
+    $borrados = 0; $salteados = 0; $bytes = 0
+    $pendientes = New-Object System.Collections.Stack
+    $subcarpetas = New-Object System.Collections.Generic.List[string]
+    $pendientes.Push($Carpeta)
+    while ($pendientes.Count -gt 0) {
+        $dir = $pendientes.Pop()
+        $filtro = '*'
+        if ($dir -eq $Carpeta) { $filtro = $Patron }
+        try { $entradas = [IO.Directory]::GetFileSystemEntries($dir, $filtro) } catch { $salteados++; continue }
+        foreach ($e in $entradas) {
+            if ($self -and $e.StartsWith($self.TrimEnd('\'), [StringComparison]::OrdinalIgnoreCase)) { continue }
+            try { $attr = [IO.File]::GetAttributes($e) } catch { continue }
+            if ($attr -band [IO.FileAttributes]::ReparsePoint) { continue }
+            if ($attr -band [IO.FileAttributes]::Directory) { $pendientes.Push($e); $subcarpetas.Add($e); continue }
+            if ($attr -band [IO.FileAttributes]::ReadOnly) { try { [IO.File]::SetAttributes($e, [IO.FileAttributes]::Normal) } catch { } }
+            try {
+                $largo = (New-Object IO.FileInfo($e)).Length
+                [IO.File]::Delete($e)
+                $borrados++; $bytes += $largo
+            } catch { $salteados++ }
+        }
+    }
+    # Las subcarpetas que quedaron vacias, de la mas profunda a la mas cercana.
+    foreach ($d in ($subcarpetas | Sort-Object Length -Descending)) { try { [IO.Directory]::Delete($d, $false) } catch { } }
+    $script:totalBytes += $bytes
+    $script:totalSalteados += $salteados
+    $linea = '    ' + $Nombre.PadRight(44) + ([string][Math]::Round($bytes / 1MB, 1)).PadLeft(8) + ' MB'
+    if ($salteados) { $linea += '   (' + $salteados + ' en uso, salteados)' }
+    Write-Output $linea
+}
+
+Vaciar 'temp (Temp de Windows)' (Join-Path $env:SystemRoot 'Temp')
+foreach ($p in $perfiles) {
+    $quien = Split-Path $p.LocalPath -Leaf
+    Vaciar ('%temp% de ' + $quien) (Join-Path $p.LocalPath 'AppData\Local\Temp')
+    Vaciar ('Informes de errores de ' + $quien) (Join-Path $p.LocalPath 'AppData\Local\Microsoft\Windows\WER')
+}
+Vaciar 'Temp de la cuenta del sistema' (Join-Path $env:SystemRoot 'System32\config\systemprofile\AppData\Local\Temp')
+Vaciar 'Temp de la cuenta del sistema, 32 bits' (Join-Path $env:SystemRoot 'SysWOW64\config\systemprofile\AppData\Local\Temp')
+Vaciar 'Temp de LocalService' (Join-Path $env:SystemRoot 'ServiceProfiles\LocalService\AppData\Local\Temp')
+Vaciar 'Temp de NetworkService' (Join-Path $env:SystemRoot 'ServiceProfiles\NetworkService\AppData\Local\Temp')
+Vaciar 'Informes de errores de Windows' (Join-Path $env:ProgramData 'Microsoft\Windows\WER')
+Vaciar 'Volcados de pantallas azules (Minidump)' (Join-Path $env:SystemRoot 'Minidump')
+Vaciar 'Volcados de cuelgues de video' (Join-Path $env:SystemRoot 'LiveKernelReports')
+Vaciar 'Registros viejos de actualizaciones' (Join-Path $env:SystemRoot 'Logs\CBS') 'CbsPersist_*'
+$dmp = Join-Path $env:SystemRoot 'MEMORY.DMP'
+if ([IO.File]::Exists($dmp)) {
+    try { $largo = (New-Object IO.FileInfo($dmp)).Length; [IO.File]::Delete($dmp); $totalBytes += $largo
+          Write-Output ('    ' + 'Volcado de memoria completo'.PadRight(44) + ([string][Math]::Round($largo / 1MB, 1)).PadLeft(8) + ' MB') }
+    catch { $totalSalteados++ }
+}
+if ($env:OPT_PREFETCH -eq 'S') { Vaciar 'Prefetch' (Join-Path $env:SystemRoot 'Prefetch') }
+if (Get-Command Delete-DeliveryOptimizationCache -ErrorAction SilentlyContinue) {
+    Delete-DeliveryOptimizationCache -Force -ErrorAction SilentlyContinue | Out-Null
+    Write-Output ('    ' + 'Cache de Delivery Optimization'.PadRight(44) + '   vaciada')
+}
+Write-Output ('  TOTAL liberado: ' + [Math]::Round($totalBytes / 1MB, 1) + ' MB. Salteados por estar en uso: ' + $totalSalteados + '.')
+#LIMPIEZA-FIN#
