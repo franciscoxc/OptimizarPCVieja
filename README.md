@@ -303,11 +303,23 @@ Chrome. No se puede quitar desde Chrome; se quita borrando su valor en
 
 | Clásico | Acción |
 |---|---|
-| Visualizador de fotos | Se reasocia a JPG, PNG, GIF y BMP (nombre e ícono originales) y se registra en *Abrir con* y *Aplicaciones predeterminadas*. Se desinstala la app Fotos. |
+| Visualizador de fotos | Se reasocia a JPG (`.jpg`, `.jpeg`, `.jpe`, `.jfif`), PNG, GIF y BMP con nombre e ícono originales, y se registra para WebP, HEIC/HEIF y AVIF. Aparece en *Abrir con* y *Aplicaciones predeterminadas*. Se desinstala la app Fotos. |
 | Alt+Tab clásico | Íconos en lugar de miniaturas en vivo. |
 
 Paso manual: *Aplicaciones predeterminadas > Visor de fotos > Visualizador de fotos de Windows* (Windows 10 no permite
 fijarlo por script). Paint, Bloc de notas y la Herramienta Recortes clásica se conservan.
+
+Los formatos nuevos se decodifican con los códecs WIC de las extensiones de la Store
+([How-To Geek](https://www.howtogeek.com/345504/how-to-open-heic-files-on-windows-or-convert-them-to-jpeg/)); la opción 2
+muestra cuáles están instaladas:
+
+| Formato | Extensiones necesarias |
+|---|---|
+| WebP | *Extensiones de imagen WebP* (incluida en Windows 10). |
+| HEIC/HEIF | *Extensiones de imagen HEIF* (gratis) y *Extensiones de vídeo HEVC* (paga; existe una versión gratuita "del fabricante del dispositivo"). En Atom se decodifica por software: segundos por foto. |
+| AVIF | *Extensión de vídeo AV1* (gratis). |
+
+Alternativa para fotos de iPhone: *Ajustes > Fotos > Transferir a Mac o PC > Automático* (llegan como JPG).
 
 Descartados: calculadora de Windows 7 (no incluida en Windows 10) y flyouts clásicos de batería, reloj y volumen
 (sin evidencia de que funcionen en 22H2).
@@ -470,6 +482,7 @@ opcionales, Store, ubicación, luz nocturna y Restaurar sistema.
    - [ ] Sonido, red, hora, portapapeles.
    - [ ] Edge navega.
    - [ ] JPG con Visualizador de fotos (tras elegirlo); Alt+Tab con íconos.
+   - [ ] `.webp` abre con el Visualizador; `.heic` también, con HEIF y HEVC instaladas.
    - [ ] Resumen de limpieza por carpeta.
    - [ ] Prefetch conserva `Layout.ini`, `NTOSBOOT-B00DFAAD.pf`, `ReadyBoot`.
    - [ ] Win+Shift+S funciona.

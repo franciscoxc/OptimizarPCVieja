@@ -563,13 +563,20 @@ call :visor_tipo Jpeg jpegfile "Imagen JPEG" .jpg .jpeg .jpe .jfif
 call :visor_tipo Png pngfile "Imagen PNG" .png
 call :visor_tipo Gif giffile "Imagen GIF" .gif
 call :visor_tipo Bitmap Paint.Picture "Imagen de mapa de bits" .bmp .dib
+:: Formatos nuevos: el visualizador los abre con los codecs de las extensiones
+:: de la Store. WebP viene con Windows 10; HEIC y HEIF piden HEIF (gratis) y
+:: HEVC; AVIF pide AV1 (gratis). No tienen tipo clasico: usan el icono de JPEG.
+call :visor_tipo Webp jpegfile "Imagen WebP" .webp
+call :visor_tipo Heic jpegfile "Imagen HEIC" .heic .heif
+call :visor_tipo Avif jpegfile "Imagen AVIF" .avif
 reg add "HKLM\SOFTWARE\RegisteredApplications" /v "Windows Photo Viewer" /t REG_SZ /d "Software\Microsoft\Windows Photo Viewer\Capabilities" /f >nul 2>&1
 set "_app=HKLM\SOFTWARE\Classes\Applications\photoviewer.dll"
 reg add "%_app%\shell\open" /v MuiVerb /t REG_SZ /d "@photoviewer.dll,-3043" /f >nul 2>&1
 reg add "%_app%\shell\open\command" /ve /t REG_EXPAND_SZ /d "%%SystemRoot%%\System32\rundll32.exe \"%%ProgramFiles%%\Windows Photo Viewer\PhotoViewer.dll\", ImageView_Fullscreen %%1" /f >nul 2>&1
 reg add "%_app%\shell\open\DropTarget" /v Clsid /t REG_SZ /d "{FFE2A43C-56B9-4bf5-9A79-CC6D4285608A}" /f >nul 2>&1
-for %%e in (.jpg .jpeg .jpe .jfif .png .gif .bmp .dib .tif .tiff) do reg add "%_app%\SupportedTypes" /v %%e /t REG_SZ /d "" /f >nul 2>&1
-echo   [OK] Visualizador de fotos de Windows recuperado para JPG, PNG, GIF y BMP.
+for %%e in (.jpg .jpeg .jpe .jfif .png .gif .bmp .dib .tif .tiff .webp .heic .heif .avif) do reg add "%_app%\SupportedTypes" /v %%e /t REG_SZ /d "" /f >nul 2>&1
+echo   [OK] Visualizador de fotos de Windows para JPG (JPEG, JFIF), PNG, GIF, BMP,
+echo        WebP, HEIC y AVIF. HEIC y AVIF necesitan extensiones de la Store.
 :: La app Fotos nueva, para todos los usuarios.
 powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-AppxPackage -AllUsers -Name Microsoft.Windows.Photos -ErrorAction SilentlyContinue | ForEach-Object { Remove-AppxPackage -Package $_.PackageFullName -AllUsers -ErrorAction SilentlyContinue }; Get-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -eq 'Microsoft.Windows.Photos' } | ForEach-Object { Remove-AppxProvisionedPackage -Online -PackageName $_.PackageName -ErrorAction SilentlyContinue | Out-Null }"
 echo   [OK] App Fotos quitada. Si algun dia hace falta, se reinstala desde la Store.
@@ -1686,7 +1693,9 @@ Titulo 'Clasicos de Windows 7'
 $fotos = Get-AppxPackage -AllUsers -Name Microsoft.Windows.Photos
 L ('App Fotos nueva instalada:      ' + [bool]$fotos)
 $fa = 'HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows Photo Viewer\Capabilities\FileAssociations'
-L ('Visualizador clasico para .jpg / .png / .gif / .bmp: ' + (Leer $fa '.jpg') + ' / ' + (Leer $fa '.png') + ' / ' + (Leer $fa '.gif') + ' / ' + (Leer $fa '.bmp'))
+L ('Visualizador clasico registrado para: ' + ((@('.jpg', '.jpeg', '.jfif', '.png', '.gif', '.bmp', '.webp', '.heic', '.heif', '.avif') | Where-Object { (Leer $fa $_) -ne '(no existe)' }) -join ' '))
+$cod = foreach ($par in @(@('HEIF', 'Microsoft.HEIFImageExtension'), @('HEVC', 'Microsoft.HEVCVideoExtension*'), @('WebP', 'Microsoft.WebpImageExtension'), @('AV1', 'Microsoft.AV1VideoExtension'))) { $par[0] + ' ' + [bool](Get-AppxPackage -AllUsers -Name $par[1]) }
+L ('Codecs de la Store:             ' + ($cod -join ' | ') + '  (HEIC: HEIF y HEVC; AVIF: AV1)')
 L ('Programa predeterminado del usuario para .jpg: ' + (Leer ($U + '\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.jpg\UserChoice') 'ProgId'))
 L ('Alt+Tab clasico (AltTabSettings): ' + (Leer ($U + '\Software\Microsoft\Windows\CurrentVersion\Explorer') 'AltTabSettings'))
 
