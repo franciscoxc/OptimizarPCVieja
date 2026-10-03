@@ -144,7 +144,8 @@ Windows ignora los intentos de apagarlo por script. Se recorta todo lo que no pr
 | Protección en tiempo real | Análisis programados: prioridad baja, máximo 20% de CPU (de fábrica 50%) y solo con la PC inactiva |
 | Monitoreo de comportamiento | Análisis "de recuperación" al prender la PC: desactivados (es el valor de fábrica, se asegura) |
 | Protección en la nube | Notificaciones no críticas ("Analizamos tu PC y no encontramos nada"): ocultas |
-| Análisis de descargas y adjuntos | Ícono de la bandeja: oculto (los avisos críticos siguen apareciendo) |
+| Análisis de descargas y adjuntos | |
+| Ícono de la bandeja (versiones anteriores lo ocultaban: ahora vuelve) | |
 | SmartScreen, Firewall y Protección contra alteraciones | Herramienta de eliminación de software malintencionado (MRT) mensual: desactivada, porque es redundante con Defender en tiempo real y en HDD tarda minutos cada mes |
 | Actualización de firmas | |
 | **Nuevo:** bloqueo de PUA (aplicaciones potencialmente no deseadas) | |

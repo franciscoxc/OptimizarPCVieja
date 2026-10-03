@@ -322,10 +322,12 @@ call :titulo "5/11  Defender: solo lo imprescindible"
 :: Se recortan los analisis programados y lo que no protege.
 powershell -NoProfile -ExecutionPolicy Bypass -Command "Set-MpPreference -EnableLowCpuPriority $true -ErrorAction SilentlyContinue; Set-MpPreference -ScanAvgCPULoadFactor 20 -ErrorAction SilentlyContinue; Set-MpPreference -ScanOnlyIfIdleEnabled $true -ErrorAction SilentlyContinue; Set-MpPreference -DisableCatchupFullScan $true -ErrorAction SilentlyContinue; Set-MpPreference -DisableCatchupQuickScan $true -ErrorAction SilentlyContinue" >nul 2>&1
 call :dword "HKLM\SOFTWARE\Policies\Microsoft\Windows Defender Security Center\Notifications" DisableEnhancedNotifications 1
-call :dword "HKLM\SOFTWARE\Policies\Microsoft\Windows Defender Security Center\Systray" HideSystray 1
+:: El icono de la bandeja se queda: es la forma de ver de un vistazo que Defender
+:: anda. Si una version anterior de este script lo oculto, vuelve.
+call :borrar "HKLM\SOFTWARE\Policies\Microsoft\Windows Defender Security Center\Systray" HideSystray
 call :dword "HKLM\SOFTWARE\Policies\Microsoft\MRT" DontOfferThroughWUAU 1
 echo   [OK] Analisis programados: prioridad baja, maximo 20%% de CPU, solo con la PC inactiva.
-echo   [OK] Sin notificaciones no criticas ni icono en la bandeja.
+echo   [OK] Sin notificaciones no criticas. El icono de la bandeja queda visible.
 echo   [OK] Sin la herramienta MRT mensual, redundante con Defender en tiempo real.
 
 :: =========================================================================
