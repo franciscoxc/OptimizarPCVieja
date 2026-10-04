@@ -623,3 +623,7 @@ opcionales, Store, ubicación, luz nocturna y Restaurar sistema.
 - **Theft Deterrent:** [manual del referente](https://educaciondigital.neuquen.gov.ar/wp-content/uploads/2018/04/ManualdelReferente2016-1.pdf), [instalador para Windows 10](https://groups.google.com/g/tecnicosconectar/c/24jhzaqOYKA), [configuración del agente](http://itibonzi.blogspot.com/2014/05/como-activar-y-configurar-el-agente-tda.html).
 - **Visualizador de fotos:** [`.reg` de CharLS](https://github.com/team-charls/jpegls-wic-codec/blob/main/restore-windows-photo-viewer.reg), [gist](https://gist.github.com/ebrasha/02e5c6fa895e0e3f8c65103c89440092). Alt+Tab clásico: [Winaero](https://winaero.com/how-to-get-the-old-alt-tab-dialog-in-windows-10/).
 - **ESU 2027:** [BleepingComputer](https://www.bleepingcomputer.com/news/microsoft/microsoft-quietly-extends-free-windows-10-esu-support-to-october-2027/), [Help Net Security](https://www.helpnetsecurity.com/2026/06/26/microsoft-windows-10-free-security-updates-esu-program/).
+
+## Licencia
+
+[MIT](LICENSE). Se puede usar, copiar, modificar y redistribuir, también en colegios y talleres, manteniendo el aviso de copyright.
