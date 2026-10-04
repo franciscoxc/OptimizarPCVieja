@@ -252,6 +252,11 @@ Reinstalar: *Características opcionales > Agregar una característica*.
 | `C:\Windows\Temp` | Temporales del sistema. |
 | `%TEMP%` de cada usuario | Incluye la cuenta que elevó el script. |
 | Temp de `SYSTEM` (32/64 bits), `LocalService`, `NetworkService` | Servicios e instaladores. |
+| `C:\Windows\SystemTemp` | Temp de los procesos del sistema desde 2024 (`GetTempPath2`). Se vacía el contenido; la carpeta y sus permisos quedan ([Microsoft Q&A](https://learn.microsoft.com/en-us/answers/questions/3922760/files-in-c-windows-systemtemp)). |
+| `INetCache` de cada usuario y de `SYSTEM`, `LocalService`, `NetworkService` | Archivos temporales de Internet (WinINet: Office, componentes de Windows). `INetCookies` no se toca. |
+| `CrashDumps`, `D3DSCache`, caché de Escritorio remoto de cada usuario | Volcados de programas colgados y cachés que se regeneran. |
+| `Program Files [(x86)]\Microsoft\Temp`, `Microsoft\Edge\Temp`, `Google\Temp` | Restos de los instaladores de Edge y de Google ([Microsoft Q&A](https://learn.microsoft.com/en-us/answers/questions/4134915/what-is-c-program-files-x86-microsofttemp-it-is-ta)). |
+| `System32\DriverStore\Temp` | Temporales de instalación de drivers. `FileRepository` no se toca. |
 | WER de sistema y de usuarios | Informes de errores. |
 | `MEMORY.DMP`, `Minidump`, `LiveKernelReports` | Volcados; el primero puede pesar como la RAM. |
 | `C:\Windows\Logs\CBS\CbsPersist_*` | Registros viejos de CBS (el actual no se toca). |
@@ -260,7 +265,7 @@ Reinstalar: *Características opcionales > Agregar una característica*.
 | Caché y descargas de Adobe Reader | Si está instalado. |
 | Caché de Chrome y Edge, todos los usuarios y perfiles | `Cache`, `Code Cache`, `GPUCache`, `Media Cache`, `Dawn*Cache`; en la raíz, `ShaderCache`, `GrShaderCache`, `GraphiteDawnCache`. No se tocan cookies, contraseñas, autocompletar, historial, favoritos ni datos de sitios (Local Storage, IndexedDB, Service Workers): las sesiones siguen abiertas. Antes se cierran ambos navegadores como con la X. |
 
-Lo bloqueado se saltea y se cuenta. Al final muestra lo liberado por carpeta. Salvaguardas: no sigue junctions ni
+Lo bloqueado se saltea y se cuenta, separando "en uso" de "sin permiso". Al final muestra lo liberado por carpeta. Salvaguardas: no sigue junctions ni
 symlinks, no vacía raíces protegidas (`C:\Windows`, perfiles) y saltea la carpeta del script.
 
 Prefetch: vaciarlo entero agrega 4-15 s al arranque siguiente
@@ -274,7 +279,9 @@ Papelera: no se vacía, pero se activa el *Sensor de almacenamiento* para borrar
 [TenForums](https://www.tenforums.com/tutorials/122318-enable-disable-storage-sense-windows-10-a.html) y
 [Stealthpuppy](https://stealthpuppy.com/windows-10-storage-sense-intune/).
 
-No se tocan: caché de miniaturas, `SoftwareDistribution\Download`. `Windows.old`: *Liberador de espacio en
+No se tocan: caché de miniaturas, `SoftwareDistribution\Download`, `System32\spool\PRINTERS` (trabajos de impresión) y
+`WinSxS\Temp` / `WinSxS\InstallTemp`: guardan operaciones pendientes de reinicio (`PendingRenames`, `PendingDeletes`);
+borrarlas puede dejar una actualización a medias, y son de `TrustedInstaller`. Las limpia DISM (opción 3). `Windows.old`: *Liberador de espacio en
 disco > Limpiar archivos del sistema*.
 
 ### 13. Adobe Reader (si está instalado)

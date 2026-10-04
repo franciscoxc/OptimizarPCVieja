@@ -1321,6 +1321,7 @@ $ErrorActionPreference = 'SilentlyContinue'
 $self = $env:OPT_SELF
 $totalBytes = 0
 $totalSalteados = 0
+$totalSinPermiso = 0
 
 # Carpetas que jamas se vacian enteras, aunque alguien edite mal la lista.
 $disco = $env:SystemDrive + '\'
@@ -1334,10 +1335,10 @@ $prohibidas += $perfiles | ForEach-Object { $_.LocalPath.TrimEnd('\') }
 # coincide con $Patron y no con $Excepto. Saltea lo que esta en uso, nunca sigue
 # enlaces (junctions ni symlinks) y nunca toca la carpeta del script.
 function Vaciar([string]$Nombre, [string]$Carpeta, [string]$Patron = '*', [string]$Excepto = '', [switch]$Callado) {
-    $script:ultBytes = 0; $script:ultSalteados = 0
+    $script:ultBytes = 0; $script:ultSalteados = 0; $script:ultSinPermiso = 0
     if (-not $Carpeta -or -not [IO.Directory]::Exists($Carpeta)) { return }
     if ($prohibidas -contains $Carpeta.TrimEnd('\')) { return }
-    $borrados = 0; $salteados = 0; $bytes = 0
+    $borrados = 0; $salteados = 0; $sinPermiso = 0; $bytes = 0
     $pendientes = New-Object System.Collections.Stack
     $subcarpetas = New-Object System.Collections.Generic.List[string]
     $pendientes.Push($Carpeta)
@@ -1345,7 +1346,7 @@ function Vaciar([string]$Nombre, [string]$Carpeta, [string]$Patron = '*', [strin
         $dir = $pendientes.Pop()
         $filtro = '*'
         if ($dir -eq $Carpeta) { $filtro = $Patron }
-        try { $entradas = [IO.Directory]::GetFileSystemEntries($dir, $filtro) } catch { $salteados++; continue }
+        try { $entradas = [IO.Directory]::GetFileSystemEntries($dir, $filtro) } catch [UnauthorizedAccessException] { $sinPermiso++; continue } catch { $salteados++; continue }
         foreach ($e in $entradas) {
             if ($self -and $e.StartsWith($self.TrimEnd('\'), [StringComparison]::OrdinalIgnoreCase)) { continue }
             if ($Excepto -and $dir -eq $Carpeta -and ([IO.Path]::GetFileName($e) -like $Excepto)) { continue }
@@ -1357,28 +1358,33 @@ function Vaciar([string]$Nombre, [string]$Carpeta, [string]$Patron = '*', [strin
                 $largo = (New-Object IO.FileInfo($e)).Length
                 [IO.File]::Delete($e)
                 $borrados++; $bytes += $largo
-            } catch { $salteados++ }
+            } catch [UnauthorizedAccessException] { $sinPermiso++ } catch { $salteados++ }
         }
     }
     # Las subcarpetas que quedaron vacias, de la mas profunda a la mas cercana.
     foreach ($d in ($subcarpetas | Sort-Object Length -Descending)) { try { [IO.Directory]::Delete($d, $false) } catch { } }
     $script:totalBytes += $bytes
     $script:totalSalteados += $salteados
-    $script:ultBytes = $bytes; $script:ultSalteados = $salteados
-    if (-not $Callado) { Linea $Nombre $bytes $salteados }
+    $script:totalSinPermiso += $sinPermiso
+    $script:ultBytes = $bytes; $script:ultSalteados = $salteados; $script:ultSinPermiso = $sinPermiso
+    if (-not $Callado) { Linea $Nombre $bytes $salteados $sinPermiso }
 }
 
-function Linea([string]$Nombre, [double]$Bytes, [int]$Salteados) {
+function Linea([string]$Nombre, [double]$Bytes, [int]$Salteados, [int]$SinPermiso) {
     $linea = '    ' + $Nombre.PadRight(44) + ([string][Math]::Round($Bytes / 1MB, 1)).PadLeft(8) + ' MB'
     if ($Salteados) { $linea += '   (' + $Salteados + ' en uso, salteados)' }
+    if ($SinPermiso) { $linea += '   (' + $SinPermiso + ' sin permiso)' }
     Write-Output $linea
 }
 
-# Vacia varias carpetas y muestra una sola linea con el total.
+# Vacia varias carpetas y muestra una sola linea con el total. Si no existe
+# ninguna, no muestra nada.
 function VaciarVarias([string]$Nombre, [string[]]$Carpetas) {
-    $b = 0; $s = 0
-    foreach ($c in $Carpetas) { Vaciar $Nombre $c -Callado; $b += $script:ultBytes; $s += $script:ultSalteados }
-    Linea $Nombre $b $s
+    $hay = @($Carpetas | Where-Object { $_ -and [IO.Directory]::Exists($_) })
+    if (-not $hay.Count) { return }
+    $b = 0; $s = 0; $np = 0
+    foreach ($c in $hay) { Vaciar $Nombre $c -Callado; $b += $script:ultBytes; $s += $script:ultSalteados; $np += $script:ultSinPermiso }
+    Linea $Nombre $b $s $np
 }
 
 Vaciar 'temp (Temp de Windows)' (Join-Path $env:SystemRoot 'Temp')
@@ -1387,6 +1393,11 @@ foreach ($p in $perfiles) {
     Vaciar ('%temp% de ' + $quien) (Join-Path $p.LocalPath 'AppData\Local\Temp')
     Vaciar ('Informes de errores de ' + $quien) (Join-Path $p.LocalPath 'AppData\Local\Microsoft\Windows\WER')
     Vaciar ('Cache de Adobe Reader de ' + $quien) (Join-Path $p.LocalPath 'AppData\LocalLow\Adobe\AcroCef\DC\Acrobat\Cache')
+    Vaciar ('Archivos temporales de Internet de ' + $quien) (Join-Path $p.LocalPath 'AppData\Local\Microsoft\Windows\INetCache')
+    # Volcados de programas que se colgaron, cache de sombreadores de DirectX y
+    # cache de Escritorio remoto: todo se regenera solo.
+    VaciarVarias ('Volcados y caches de Windows de ' + $quien) @((Join-Path $p.LocalPath 'AppData\Local\CrashDumps'),
+        (Join-Path $p.LocalPath 'AppData\Local\D3DSCache'), (Join-Path $p.LocalPath 'AppData\Local\Microsoft\Terminal Server Client\Cache'))
     # Chrome y Edge: solo la cache, lo que el navegador vuelve a bajar o generar,
     # en todos sus perfiles. Cookies, contrasenas, autocompletar, historial y datos
     # de sitios (incluida la cache de Service Workers) no se tocan.
@@ -1404,6 +1415,18 @@ Vaciar 'Temp de la cuenta del sistema' (Join-Path $env:SystemRoot 'System32\conf
 Vaciar 'Temp de la cuenta del sistema, 32 bits' (Join-Path $env:SystemRoot 'SysWOW64\config\systemprofile\AppData\Local\Temp')
 Vaciar 'Temp de LocalService' (Join-Path $env:SystemRoot 'ServiceProfiles\LocalService\AppData\Local\Temp')
 Vaciar 'Temp de NetworkService' (Join-Path $env:SystemRoot 'ServiceProfiles\NetworkService\AppData\Local\Temp')
+# Temp de los procesos del sistema desde 2024 (GetTempPath2): se vacia el
+# contenido, la carpeta queda con sus permisos.
+Vaciar 'SystemTemp (Temp de procesos del sistema)' (Join-Path $env:SystemRoot 'SystemTemp')
+VaciarVarias 'Archivos temporales de Internet del sistema' @(
+    (Join-Path $env:SystemRoot 'System32\config\systemprofile\AppData\Local\Microsoft\Windows\INetCache'),
+    (Join-Path $env:SystemRoot 'SysWOW64\config\systemprofile\AppData\Local\Microsoft\Windows\INetCache'),
+    (Join-Path $env:SystemRoot 'ServiceProfiles\LocalService\AppData\Local\Microsoft\Windows\INetCache'),
+    (Join-Path $env:SystemRoot 'ServiceProfiles\NetworkService\AppData\Local\Microsoft\Windows\INetCache'))
+# Restos de los instaladores de Edge (Microsoft\Temp, Edge\Temp) y de Google.
+$pf = @($env:ProgramFiles, ${env:ProgramFiles(x86)}) | Where-Object { $_ } | Select-Object -Unique
+VaciarVarias 'Temp de instaladores de Microsoft y Google' @($pf | ForEach-Object { (Join-Path $_ 'Microsoft\Temp'), (Join-Path $_ 'Microsoft\Edge\Temp'), (Join-Path $_ 'Google\Temp') })
+Vaciar 'Temp del almacen de drivers' (Join-Path $env:SystemRoot 'System32\DriverStore\Temp')
 Vaciar 'Informes de errores de Windows' (Join-Path $env:ProgramData 'Microsoft\Windows\WER')
 Vaciar 'Volcados de pantallas azules (Minidump)' (Join-Path $env:SystemRoot 'Minidump')
 Vaciar 'Volcados de cuelgues de video' (Join-Path $env:SystemRoot 'LiveKernelReports')
@@ -1424,7 +1447,9 @@ if (Get-Command Delete-DeliveryOptimizationCache -ErrorAction SilentlyContinue) 
     Delete-DeliveryOptimizationCache -Force -ErrorAction SilentlyContinue | Out-Null
     Write-Output ('    ' + 'Cache de Delivery Optimization'.PadRight(44) + '   vaciada')
 }
-Write-Output ('  TOTAL liberado: ' + [Math]::Round($totalBytes / 1MB, 1) + ' MB. Salteados por estar en uso: ' + $totalSalteados + '.')
+$fin = '  TOTAL liberado: ' + [Math]::Round($totalBytes / 1MB, 1) + ' MB. Salteados por estar en uso: ' + $totalSalteados + '.'
+if ($totalSinPermiso) { $fin += ' Sin permiso: ' + $totalSinPermiso + '.' }
+Write-Output $fin
 #LIMPIEZA-FIN#
 #VERIFICAR-INICIO#
 # ---------------------------------------------------------------------------
