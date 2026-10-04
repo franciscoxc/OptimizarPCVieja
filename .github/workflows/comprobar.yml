@@ -1,0 +1,17 @@
+name: Comprobar el menu
+
+# Un cambio solo en el README no dispara la publicacion (rehacerla reinicia el
+# contador de descargas), pero igual puede desincronizar la tabla del menu.
+on:
+  push:
+    paths:
+      - README.md
+  pull_request:
+
+jobs:
+  comprobar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Comprobar el menu
+        run: python3 pruebas/menu.py

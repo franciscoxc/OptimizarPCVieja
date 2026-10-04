@@ -25,16 +25,16 @@ Después de la opción 1, el botón de encendido y la tapa apagan el equipo (sin
 | Tecla | Opción | Modifica |
 |---|---|---|
 | `1` | Optimizar. Incluye la revisión del script v1. | Sí |
-| `2` | Verificar: hardware, antirrobo CI, estado de cada ajuste. Reporte `.txt` junto al script. | No |
-| `3` | Limpiar WinSxS con DISM `/ResetBase`. Avanzado, irreversible, sin preguntas. Hasta 1 h. | Sí |
-| `4` | Desfragmentación completa. Horas. | Sí |
-| `5` | Revertir la opción 1 a valores de fábrica. | Sí |
-| `6` | Instalar WinRAR, VLC y Chrome con winget. | Sí |
-| `7` | Chrome de aula: cierra Chrome y borra todos sus perfiles; arranca sin pedir iniciar sesión. Pide confirmación. | Sí |
+| `2` | Limpiar WinSxS con DISM `/ResetBase`. Avanzado, irreversible. Pide confirmación. Hasta 1 h. | Sí |
+| `3` | Desfragmentación completa. Horas. | Sí |
+| `4` | Instalar WinRAR, VLC y Chrome con winget. | Sí |
+| `5` | Chrome de aula: cierra Chrome y borra todos sus perfiles; arranca sin pedir iniciar sesión. Pide confirmación. | Sí |
+| `6` | Revertir la opción 1 a valores de fábrica. | Sí |
+| `7` | Verificar: hardware, antirrobo CI, estado de cada ajuste. Reporte `.txt` junto al script. | No |
 | `0` | Salir. | |
 
-Cada opción vuelve al menú. `1` y `5` ofrecen reiniciar; si se pospone, el menú lo recuerda y lo ofrece al salir.
-Secuencia habitual: `1`, `6`.
+Cada opción vuelve al menú. `1` y `6` ofrecen reiniciar; si se pospone, el menú lo recuerda y lo ofrece al salir.
+Secuencia habitual: `1`, `4`.
 
 **Usuario destino.** Los ajustes de usuario se escriben en `HKEY_USERS\<SID>` del dueño del `explorer.exe` de la
 sesión, no en `HKCU`, que al elevar con otra cuenta apunta al administrador. La opción 1 muestra el usuario detectado.
@@ -48,7 +48,7 @@ Criterios:
 - Servicios: Manual siempre que se pueda; Automático (retrasado) si tienen que arrancar solos; Deshabilitado solo lo
   inútil en este hardware.
 - Nada residente que no aporte (ver [Caché de disco](#caché-de-disco-y-optimizaciones-de-windows)).
-- Sin puntos de restauración. La reversión es la opción 5.
+- Sin puntos de restauración. La reversión es la opción 6.
 
 Avisos de hardware al empezar: RAM baja, video sin driver (*Adaptador de pantalla básico*), antirrobo de Conectar
 Igualdad.
@@ -163,9 +163,9 @@ Sin exclusiones.
   de CloudStore (Bond CompactBinary v1, sin documentar; formato según
   [win-nightlight-cli](https://github.com/kvnxiao/win-nightlight-cli/blob/main/docs/nightlight-registry-format.md)),
   en el mismo envoltorio que ya tenga el usuario. Conserva temperatura y horarios existentes; si no había, 4000 K.
-  Con el *Adaptador de pantalla básico* Windows no la ofrece. La opción 5 la devuelve a fábrica.
+  Con el *Adaptador de pantalla básico* Windows no la ofrece. La opción 6 la devuelve a fábrica.
 - **Ubicación activada** para el equipo y el usuario (`ConsentStore\location` = `Allow`; se borran `DisableLocation` y
-  `DisableLocationScripting`): la luz nocturna la necesita para calcular la puesta y la salida del sol. La opción 5
+  `DisableLocationScripting`): la luz nocturna la necesita para calcular la puesta y la salida del sol. La opción 6
   no la apaga.
 
 ### 8. Memoria, disco y energía
@@ -229,7 +229,7 @@ desactivado.
 | Grabación de acciones de usuario | `App.StepsRecorder` | Quitar |
 | Reconocedor matemático | `MathRecognizer` | Quitar |
 | WordPad | `Microsoft.Windows.WordPad` | Quitar |
-| Reproductor de Windows Media | `Media.WindowsMediaPlayer` | Quitar (VLC, opción 6) |
+| Reproductor de Windows Media | `Media.WindowsMediaPlayer` | Quitar (VLC, opción 4) |
 | Internet Explorer 11 | `Browser.InternetExplorer` | Quitar (el modo IE de Edge puede dejar de funcionar) |
 | Asistencia rápida integrada | `App.Support.QuickAssist` | Quitar (reemplazada por la versión de la Store) |
 | Cliente OpenSSH | `OpenSSH.Client` | Quitar |
@@ -279,7 +279,7 @@ Papelera: no se vacía, pero se activa el *Sensor de almacenamiento* para borrar
 
 No se tocan: caché de miniaturas, `SoftwareDistribution\Download`, `System32\spool\PRINTERS` (trabajos de impresión) y
 `WinSxS\Temp` / `WinSxS\InstallTemp`: guardan operaciones pendientes de reinicio (`PendingRenames`, `PendingDeletes`);
-borrarlas puede dejar una actualización a medias, y son de `TrustedInstaller`. Las limpia DISM (opción 3). `Windows.old`: *Liberador de espacio en
+borrarlas puede dejar una actualización a medias, y son de `TrustedInstaller`. Las limpia DISM (opción 2). `Windows.old`: *Liberador de espacio en
 disco > Limpiar archivos del sistema*.
 
 ### 13. Adobe Reader (si está instalado)
@@ -296,7 +296,7 @@ Reader deja de recibir parches: asignar `.pdf` a Edge o Chrome, o desinstalarlo.
 
 Al final: estado de Defender, programas de inicio y reinicio.
 
-## Opción 6: Chrome, WinRAR y VLC
+## Opción 4: Chrome, WinRAR y VLC
 
 Orden: WinRAR, VLC, Chrome.
 
@@ -316,7 +316,7 @@ uBlock Origin Lite (`ddkjiahejlhfcafbddmgiahcphecmpfh`) se fuerza con la políti
 Chrome. No se puede quitar desde Chrome; se quita borrando su valor en
 `HKLM\SOFTWARE\Policies\Google\Chrome\ExtensionInstallForcelist`.
 
-## Opción 7: Chrome de aula
+## Opción 5: Chrome de aula
 
 Para PCs compartidas (colegio), donde quedan cuentas y sesiones abiertas. Pide confirmación (`S`).
 
@@ -335,8 +335,8 @@ Para PCs compartidas (colegio), donde quedan cuentas y sesiones abiertas. Pide c
 | `DefaultBrowserSettingEnabled` | `0` | No pregunta si es el navegador predeterminado. |
 | `ExtensionInstallForcelist` | uBlock Origin Lite | Se instala sola al abrir Chrome (con internet). |
 
-Resultado: Chrome abre directo en una pestaña nueva, sin perfiles ni cuentas. La opción 5 quita estas políticas
-(salvo uBlock); la opción 2 muestra `BrowserSignin`.
+Resultado: Chrome abre directo en una pestaña nueva, sin perfiles ni cuentas. La opción 6 quita estas políticas
+(salvo uBlock); la opción 7 muestra `BrowserSignin`.
 
 ## Clásicos de Windows 7
 
@@ -349,7 +349,7 @@ Paso manual: *Aplicaciones predeterminadas > Visor de fotos > Visualizador de fo
 fijarlo por script). Paint, Bloc de notas y la Herramienta Recortes clásica se conservan.
 
 Los formatos nuevos se decodifican con los códecs WIC de las extensiones de la Store
-([How-To Geek](https://www.howtogeek.com/345504/how-to-open-heic-files-on-windows-or-convert-them-to-jpeg/)); la opción 2
+([How-To Geek](https://www.howtogeek.com/345504/how-to-open-heic-files-on-windows-or-convert-them-to-jpeg/)); la opción 7
 muestra cuáles están instaladas:
 
 | Formato | Extensiones necesarias |
@@ -380,11 +380,11 @@ Descartados: calculadora de Windows 7 (no incluida en Windows 10) y flyouts clá
   lo detecta, avisa y lo marca en la lista de inicio.
 - Sin driver de video y sin necesidad de Windows: Linux liviano (Lubuntu, Linux Mint XFCE).
 
-## Opción 4: desfragmentación completa
+## Opción 3: desfragmentación completa
 
 La pasada automática ignora fragmentos de más de 64 MB y no consolida el espacio libre
 ([Microsoft](https://techcommunity.microsoft.com/blog/askperf/disk-fragmentation-and-system-performance/372921)).
-La opción 4 usa [`defrag`](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/defrag)
+La opción 3 usa [`defrag`](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/defrag)
 con prioridad normal (`/H`) y progreso (`/U`):
 
 | Paso | Parámetro | Acción |
@@ -399,10 +399,11 @@ En SSD solo envía TRIM. Avisa si hay menos de 15% libre. No mueve archivos en u
 para eso, desfragmentación en el arranque con [UltraDefrag](https://en.wikipedia.org/wiki/UltraDefrag) (7.1.4, última
 versión libre).
 
-## Opción 3: limpieza de WinSxS
+## Opción 2: limpieza de WinSxS
 
-`Dism.exe /Online /Cleanup-Image /StartComponentCleanup /ResetBase`, sin preguntas
+`Dism.exe /Online /Cleanup-Image /StartComponentCleanup /ResetBase`
 ([Microsoft Learn](https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/clean-up-the-winsxs-folder)).
+Pide confirmación antes de empezar: el menú responde a una tecla y esta opción está pegada a la 1.
 
 - Borra las versiones reemplazadas de los componentes ya, sin esperar los 30 días de la tarea automática.
 - `/ResetBase`: las actualizaciones instaladas pasan a ser la base y **no se pueden desinstalar**. Las siguientes sí.
@@ -418,7 +419,7 @@ versión libre).
   ([Microsoft Q&A](https://learn.microsoft.com/en-us/answers/questions/2192270/dism-startcomponentcleanup-give-error-0x800f0806-t)).
 - `/SPSuperseded` no se usa: es para Service Packs, que Windows 10 no tiene.
 
-Mantenimiento periódico: opción 3 y luego 4.
+Mantenimiento periódico: opción 2 y luego 3.
 
 ## Caché de disco y optimizaciones de Windows
 
@@ -442,7 +443,7 @@ La caché de archivos ya usa toda la RAM libre. Tweaks evaluados:
 | `fsutil behavior set mftzone` | No: útil solo con muchísimos archivos chicos. |
 | `IoPageLockLimit` | Ignorado por Windows. |
 | Caché de escritura | Sí (fábrica; se asegura). |
-| Sin vaciado del búfer de escritura | Sí, por decisión: menos espera por escritura a cambio de riesgo ante cortes de luz ([Raymond Chen](https://devblogs.microsoft.com/oldnewthing/20130416-00/?p=4643)). No en SSD; la opción 5 lo revierte. |
+| Sin vaciado del búfer de escritura | Sí, por decisión: menos espera por escritura a cambio de riesgo ante cortes de luz ([Raymond Chen](https://devblogs.microsoft.com/oldnewthing/20130416-00/?p=4643)). No en SSD; la opción 6 lo revierte. |
 | Paginación fija en 2 × RAM | Sí: el tamaño automático crece en caliente, provoca fallos de asignación en discos lentos ([Microsoft Learn](https://learn.microsoft.com/en-us/troubleshoot/windows-client/performance/slow-page-file-growth-memory-allocation-errors)) y fragmenta. Supera el 1,5 × RAM que Microsoft usa como mínimo. |
 
 **ReadyBoost.** Caché de lecturas chicas y dispersas en flash, justo lo que peor hace un HDD
@@ -453,7 +454,7 @@ Ayuda con 1 GB o menos; con 2 GB la diferencia medida va de +2% a -1%
 tienen [AES-NI](https://en.wikipedia.org/wiki/AES_instruction_set). No se automatiza. Prueba: tarjeta SD clase 10/A1
 de 4-16 GB, *Propiedades > ReadyBoost > Dedicar este dispositivo*; si en una semana no hay diferencia, quitarla.
 
-**Fragmentación, en orden de impacto:** desfragmentación semanal (activa) y opción 4; 15% libre como mínimo; paginación
+**Fragmentación, en orden de impacto:** desfragmentación semanal (activa) y opción 3; 15% libre como mínimo; paginación
 fija; revisar *Load/Unload Cycle Count* con [CrystalDiskInfo](https://crystalmark.info/en/software/crystaldiskinfo/)
 (si sube miles por día, el cabezal se estaciona; APM 254 corrige, pero requiere un programa residente:
 [detalle](https://commonemitter.blogspot.com/2019/09/disabling-hdd-apm.html)); SSD.
@@ -497,9 +498,9 @@ fija; revisar *Load/Unload Cycle Count* con [CrystalDiskInfo](https://crystalmar
 
 - **Wine (`cmd.exe`):** las 7 opciones de punta a punta con distintas combinaciones de respuestas; estado del v1
   simulado (incluidas políticas que apagan Defender y Windows Update), con verificación en el registro de cada valor en
-  `HKEY_USERS\<SID>`; ciclo optimizar, revertir y verificar; opción 6 con winget simulado (instalación nueva, al día,
+  `HKEY_USERS\<SID>`; ciclo optimizar, revertir y verificar; opción 4 con winget simulado (instalación nueva, al día,
   actualizado, sin winget). Con el estado del v1, la opción 1 repara los 5 valores y en la pasada siguiente informa
-  que no hay nada; en la opción 3, DISM corre con `DisableResetbase=0` y `SupersededActions=3`, y después vuelven los
+  que no hay nada; en la opción 2, DISM corre con `DisableResetbase=0` y `SupersededActions=3`, y después vuelven los
   valores originales.
 - **PowerShell:** los 39 bloques pasan el parser oficial. La quita de características opcionales se ejecutó contra una
   lista simulada de 22H2, con y sin impresora.
@@ -515,6 +516,8 @@ fija; revisar *Load/Unload Cycle Count* con [CrystalDiskInfo](https://crystalmar
 - **Netbook simulada:** G4 (N2600, 1 GB, sin driver, con antirrobo): tres avisos. Visualizador de fotos verificado
   contra el `.reg` de referencia.
 - **Formato:** ASCII y CRLF.
+- **Menú:** [`pruebas/menu.py`](pruebas/menu.py) compara el menú en pantalla, la cabecera del script, el despacho
+  de `choice` y la tabla de este README. Corre en la Action antes de publicar: si no coinciden, la release no se toca.
 
 Sin probar (Wine no los implementa): servicios, Defender, energía, caché de escritura, apps, características
 opcionales, Store, ubicación, luz nocturna y Restaurar sistema.
@@ -522,9 +525,9 @@ opcionales, Store, ubicación, luz nocturna y Restaurar sistema.
 ## Prueba en VM (UTM)
 
 1. VM Windows 10 x64 22H2, 2 GB de RAM, 2 núcleos, actualizada.
-2. Opción 2; guardar el reporte. Snapshot.
-3. (Opcional) Script v1 y opción 2; luego la opción 1 tiene que mostrar `[REPARADO]` en el paso 2.
-4. Volver al snapshot, opción 1, reiniciar, opción 2.
+2. Opción 7; guardar el reporte. Snapshot.
+3. (Opcional) Script v1 y opción 7; luego la opción 1 tiene que mostrar `[REPARADO]` en el paso 2.
+4. Volver al snapshot, opción 1, reiniciar, opción 7.
 5. Checklist:
    - [ ] Búsqueda del Inicio encuentra apps ("calc").
    - [ ] Escritura en Configuración y en Calculadora.
@@ -540,22 +543,22 @@ opcionales, Store, ubicación, luz nocturna y Restaurar sistema.
    - [ ] Win+Shift+S funciona.
    - [ ] Ventana visible al arrastrar; carpetas de fotos con íconos.
    - [ ] Adobe Reader: fuera del inicio; *Adobe Acrobat Update Service* deshabilitado.
-   - [ ] Opción 3 termina sin preguntas y muestra lo liberado; `DisableResetbase` queda como estaba.
+   - [ ] Opción 2 pide confirmación, termina y muestra lo liberado; `DisableResetbase` queda como estaba.
    - [ ] Menú de apagado sin *Suspender* ni *Hibernar*.
    - [ ] Botón de encendido apaga (en UTM: apagado normal de la VM). Tapa: en la netbook real.
    - [ ] *Protección del sistema*: desactivada.
-   - [ ] Opción 2: paginación 2 × RAM, caché de escritura activa, vaciado desactivado.
+   - [ ] Opción 7: paginación 2 × RAM, caché de escritura activa, vaciado desactivado.
    - [ ] Menú responde a una tecla; otras teclas se ignoran.
    - [ ] Apps en segundo plano: interruptor general apagado.
    - [ ] Store: actualizaciones automáticas apagadas y administradas; *Obtener actualizaciones* funciona.
    - [ ] *Características opcionales*: quedan Paint, Bloc de notas, PowerShell ISE e idiomas.
-   - [ ] *Pantalla > Configuración de luz nocturna*: programada, *Del atardecer al amanecer*. Opción 2: "del anochecer
+   - [ ] *Pantalla > Configuración de luz nocturna*: programada, *Del atardecer al amanecer*. Opción 7: "del anochecer
      al amanecer" y ubicación `Allow / Allow`.
-   - [ ] Opción 6: WinRAR, VLC y Chrome sin preguntas; uBlock Origin Lite en Chrome.
+   - [ ] Opción 4: WinRAR, VLC y Chrome sin preguntas; uBlock Origin Lite en Chrome.
    - [ ] Tras la opción 1, Chrome y Edge siguen con las sesiones abiertas y las contraseñas guardadas.
    - [ ] *Configuración > Sistema > Almacenamiento*: Sensor activado, Papelera a 30 días, Descargas en "Nunca".
-   - [ ] Opción 7: Chrome abre sin perfiles, sin pedir iniciar sesión, con uBlock Origin Lite.
-6. Opción 5 y verificar la vuelta a fábrica.
+   - [ ] Opción 5: Chrome abre sin perfiles, sin pedir iniciar sesión, con uBlock Origin Lite.
+6. Opción 6 y verificar la vuelta a fábrica.
 
 ## Fuentes
 

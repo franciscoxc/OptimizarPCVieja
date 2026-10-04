@@ -10,12 +10,12 @@ title Optimizar PC Vieja v2
 ::
 ::  Un solo archivo, con menu:
 ::    1. Optimizar la PC.
-::    2. Verificar el estado: solo mira, no cambia nada.
-::    3. Limpiar restos de Windows Update (DISM /ResetBase, irreversible).
-::    4. Desfragmentar a fondo.
-::    5. Revertir la optimizacion.
-::    6. Instalar Chrome, WinRAR y VLC (con winget).
-::    7. Chrome de aula: cerrar sesiones y borrar perfiles.
+::    2. Limpiar restos de Windows Update (DISM /ResetBase, irreversible).
+::    3. Desfragmentar a fondo.
+::    4. Instalar Chrome, WinRAR y VLC (con winget).
+::    5. Chrome de aula: cerrar sesiones y borrar perfiles.
+::    6. Revertir la optimizacion (deshace la opcion 1).
+::    7. Verificar el estado: solo mira, no cambia nada.
 ::
 ::  - Se ejecuta con doble clic: si no tiene permisos, los pide.
 ::  - Los ajustes de usuario se aplican al usuario que tiene la sesion
@@ -60,23 +60,23 @@ echo ==========================================================================
 if "%REINICIO_PENDIENTE%"=="1" echo   Falta REINICIAR para que se apliquen los cambios.
 echo.
 echo     1. Optimizar la PC
-echo     2. Verificar el estado (solo mira, no cambia nada)
-echo     3. Limpiar restos de Windows Update (avanzado, irreversible, hasta 1 h)
-echo     4. Desfragmentar a fondo (de vez en cuando, puede tardar horas)
-echo     5. Revertir la optimizacion
-echo     6. Instalar Chrome, WinRAR y VLC
-echo     7. Chrome de aula: cerrar sesiones y borrar perfiles
+echo     2. Limpiar restos de Windows Update (avanzado, irreversible, hasta 1 h)
+echo     3. Desfragmentar a fondo (de vez en cuando, puede tardar horas)
+echo     4. Instalar Chrome, WinRAR y VLC
+echo     5. Chrome de aula: cerrar sesiones y borrar perfiles
+echo     6. Revertir la optimizacion (deshace la opcion 1)
+echo     7. Verificar el estado (solo mira, no cambia nada)
 echo     0. Salir
 echo.
 :: choice responde a una sola tecla, sin Enter, e ignora cualquier otra.
 choice /c 12345670 /n /m "  Toca un numero: "
 if errorlevel 8 goto :salir
-if errorlevel 7 goto :op_chrome_aula
-if errorlevel 6 goto :op_instalar
-if errorlevel 5 goto :op_revertir
-if errorlevel 4 goto :op_desfragmentar
-if errorlevel 3 goto :op_limpiar_wu
-if errorlevel 2 goto :op_verificar
+if errorlevel 7 goto :op_verificar
+if errorlevel 6 goto :op_revertir
+if errorlevel 5 goto :op_chrome_aula
+if errorlevel 4 goto :op_instalar
+if errorlevel 3 goto :op_desfragmentar
+if errorlevel 2 goto :op_limpiar_wu
 if errorlevel 1 goto :op_optimizar
 goto :menu
 
@@ -159,7 +159,7 @@ echo          pero conviene descomprimir la carpeta primero.
 :zip_ok
 echo.
 echo   - No crea punto de restauracion: Restaurar sistema se desactiva. Si algo
-echo     sale mal, la vuelta atras es la opcion 5 del menu.
+echo     sale mal, la vuelta atras es la opcion 6 del menu.
 echo   - En un disco mecanico puede tardar entre 10 y 20 minutos. La primera vez,
 echo     bastante mas: quitar las caracteristicas opcionales es lento.
 echo   - Chrome y Edge se cierran solos durante la limpieza: guarda lo que haya abierto.
@@ -519,7 +519,7 @@ echo   [OK] Sin hibernacion ni inicio rapido: cada apagado es completo.
 echo   [OK] Suspender e Hibernar ya no aparecen en el menu de apagado.
 :: Restaurar sistema: desactivado. Cada punto cuesta escrituras de fondo y espacio
 :: en el disco, y en la practica se reinstala. La herramienta oficial borra sus
-:: puntos y libera el espacio. La vuelta atras es la opcion 5 del menu.
+:: puntos y libera el espacio. La vuelta atras es la opcion 6 del menu.
 powershell -NoProfile -ExecutionPolicy Bypass -Command "try { Disable-ComputerRestore -Drive ($env:SystemDrive + '\') -ErrorAction Stop; exit 0 } catch { exit 1 }" >nul 2>&1
 if errorlevel 1 goto :restaurar_error
 schtasks /change /tn "\Microsoft\Windows\SystemRestore\SR" /disable >nul 2>&1
@@ -688,7 +688,7 @@ goto :menu
 ::  Cada actualizacion guarda la version anterior de lo que reemplaza, en
 ::  C:\Windows\WinSxS. Windows las borra solo recien a los 30 dias y con una
 ::  tarea que se corta a la hora. Aca se hace completo con DISM:
-::  /StartComponentCleanup /ResetBase, sin preguntas: opcion avanzada.
+::  /StartComponentCleanup /ResetBase. Opcion avanzada: pide confirmacion.
 ::  No usa /SPSuperseded: limpia restos de Service Packs, y Windows 10 no tiene.
 :: =========================================================================
 :op_limpiar_wu
@@ -700,6 +700,12 @@ echo ==========================================================================
 echo.
 echo   DISM /StartComponentCleanup /ResetBase: las actualizaciones instaladas ya
 echo   no se podran desinstalar. Puede tardar mas de una hora: no apagues la PC.
+echo.
+:: Pregunta antes de empezar: el menu responde a una sola tecla, sin Enter, y
+:: esta opcion es la 2, pegada a la 1. Sin esto, un 2 por error arrancaba una
+:: hora de DISM que no se puede deshacer.
+choice /c SN /n /m "  Continuar? [S/N]: "
+if errorlevel 2 goto :menu
 echo.
 
 :: DISM trabaja con el Instalador de modulos de Windows. Si otra herramienta
@@ -750,7 +756,7 @@ set /a LIBERADO=LIBRE_DESPUES-LIBRE_ANTES
 if %LIBERADO% LSS 0 set "LIBERADO=0"
 echo   Espacio liberado: %LIBERADO% MB.
 echo   La limpieza automatica de Windows sigue activa y se encarga del resto.
-echo   Si vas a desfragmentar (opcion 4), ahora es el momento: hay menos que mover.
+echo   Si vas a desfragmentar (opcion 3), ahora es el momento: hay menos que mover.
 goto :menu
 
 :wu_error
@@ -791,7 +797,7 @@ echo.
 echo   Tipo de disco detectado: %MEDIO%
 echo   Espacio libre: %LIBRE_PCT%%%
 if %LIBRE_PCT% LSS 15 echo   AVISO: con menos de 15%% libre, Windows solo desfragmenta en parte. Antes,
-if %LIBRE_PCT% LSS 15 echo   libera espacio: Papelera, opcion 3 del menu o el Liberador de espacio.
+if %LIBRE_PCT% LSS 15 echo   libera espacio: Papelera, opcion 2 del menu o el Liberador de espacio.
 if /i "%MEDIO%"=="SSD" goto :desfrag_ssd
 if /i not "%MEDIO%"=="HDD" echo   AVISO: no se pudo confirmar que sea un disco mecanico. Si es un SSD, cancela.
 echo.
@@ -801,7 +807,7 @@ echo.
 echo   - En un Atom con disco lento puede tardar VARIAS HORAS. Dejala enchufada.
 echo   - Mientras tanto la PC va a andar lenta: mejor no usarla.
 echo   - Se puede cortar en cualquier momento con Ctrl+C. No se rompe nada.
-echo   - Conviene hacer antes las opciones 1 y 3: borran temporales y restos de
+echo   - Conviene hacer antes las opciones 1 y 2: borran temporales y restos de
 echo     actualizaciones, y hay menos que mover.
 echo.
 choice /c SN /n /m "  Empezar? [S/N]: "
@@ -1312,9 +1318,9 @@ goto :eof
 ::  SECCIONES EN POWERSHELL. cmd nunca llega hasta aca: todo termina antes
 ::  con "exit /b", "goto :menu" o "goto :eof".
 ::   - LIMPIEZA: vaciado de temporales (paso 11 de la opcion 1).
-::   - VERIFICAR: el reporte de la opcion 2.
+::   - VERIFICAR: el reporte de la opcion 7.
 ::   - LUZ: luz nocturna del anochecer al amanecer (paso 7 de la opcion 1).
-::   - AULA: borrado de perfiles de Chrome (opcion 7).
+::   - AULA: borrado de perfiles de Chrome (opcion 5).
 :: =========================================================================
 #LIMPIEZA-INICIO#
 $ErrorActionPreference = 'SilentlyContinue'
@@ -1453,7 +1459,7 @@ Write-Output $fin
 #LIMPIEZA-FIN#
 #VERIFICAR-INICIO#
 # ---------------------------------------------------------------------------
-# Reporte de la opcion 2, en PowerShell. cmd nunca llega aca.
+# Reporte de la opcion 7, en PowerShell. cmd nunca llega aca.
 # ---------------------------------------------------------------------------
 $ErrorActionPreference = 'SilentlyContinue'
 $lineas = New-Object System.Collections.Generic.List[string]
@@ -1791,8 +1797,8 @@ if ($r) {
 } else { L 'No esta instalado.' }
 L ('Programa predeterminado para .pdf: ' + (Leer ($U + '\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.pdf\UserChoice') 'ProgId'))
 
-# --- Programas de la opcion 6 ---------------------------------------------------
-Titulo 'Programas de la opcion 6'
+# --- Programas de la opcion 4 ---------------------------------------------------
+Titulo 'Programas de la opcion 4'
 foreach ($prog in 'WinRAR', 'VLC media player', 'Google Chrome') {
     $r = Get-ItemProperty -Path $u | Where-Object { $_.DisplayName -like ($prog + '*') } | Select-Object -First 1
     $ver = 'no instalado'
@@ -1923,5 +1929,5 @@ foreach ($p in $perfiles) {
 }
 if ($usuarios -eq 0) { Write-Output '  Chrome no tiene datos en ningun usuario de Windows: nada que borrar.' }
 else { Write-Output ('  [OK] Chrome: ' + $total + ' perfil(es) borrado(s) en ' + $usuarios + ' usuario(s) de Windows.') }
-if ($fallas) { Write-Output ('  [AVISO] En ' + $fallas + ' usuario(s) quedaron archivos en uso: reinicia y repeti la opcion 7.') }
+if ($fallas) { Write-Output ('  [AVISO] En ' + $fallas + ' usuario(s) quedaron archivos en uso: reinicia y repeti la opcion 5.') }
 #AULA-FIN#
