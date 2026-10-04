@@ -1,7 +1,6 @@
 # Optimizar PC Vieja
 
 [![Descargar OptimizarPC.bat](https://img.shields.io/badge/Descargar-OptimizarPC.bat-2ea44f?style=for-the-badge)](https://github.com/franciscoxc/OptimizarPCVieja/releases/latest/download/OptimizarPC.bat)
-[![ZIP](https://img.shields.io/badge/ZIP-OptimizarPC.zip-555555?style=for-the-badge)](https://github.com/franciscoxc/OptimizarPCVieja/releases/latest/download/OptimizarPC.zip)
 
 Script batch para Windows 10 22H2 (32 y 64 bits) en equipos con HDD y 2 GB de RAM, incluidas las netbooks Conectar
 Igualdad con Atom. Objetivo: máxima velocidad y mínimo uso de RAM sin desactivar la protección (Defender, Firewall,
@@ -17,8 +16,7 @@ UAC, SmartScreen, Windows Update).
 4. Reiniciar.
 
 Descarga: el navegador puede pedir confirmación para un `.bat`, y SmartScreen avisa al ejecutarlo (*Más información >
-Ejecutar de todas formas*). *Propiedades > Desbloquear* quita la marca de internet. El ZIP evita el aviso del
-navegador; el `.bat` extraído conserva la marca.
+Ejecutar de todas formas*). *Propiedades > Desbloquear* quita la marca de internet.
 
 Después de la opción 1, el botón de encendido y la tapa apagan el equipo (sin suspender).
 

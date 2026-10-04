@@ -1,8 +1,8 @@
 name: Publicar OptimizarPC
 
-# Publica OptimizarPC.bat (descarga directa) y OptimizarPC.zip (el .bat solo,
-# sin carpeta) como assets de la release "ultima". Los links del README usan
-# releases/latest/download/<archivo>, que no cambian entre versiones.
+# Publica OptimizarPC.bat como asset de la release "ultima", para descarga
+# directa. El link del README usa releases/latest/download/OptimizarPC.bat, que
+# no cambia entre versiones.
 on:
   push:
     paths:
@@ -23,16 +23,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Armar el ZIP
-        run: zip -j -X OptimizarPC.zip OptimizarPC.bat
-
       - name: Publicar como ultima version
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release delete ultima --cleanup-tag --yes || true
-          gh release create ultima OptimizarPC.bat OptimizarPC.zip \
+          gh release create ultima OptimizarPC.bat \
             --target "$GITHUB_SHA" \
             --title "OptimizarPC (ultima version)" \
-            --notes "OptimizarPC.bat: descarga directa. OptimizarPC.zip: el mismo .bat comprimido." \
+            --notes "Descarga OptimizarPC.bat y ejecutalo con doble clic." \
             --latest
