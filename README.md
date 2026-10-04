@@ -32,6 +32,7 @@ Después de la opción 1, el botón de encendido y la tapa apagan el equipo (sin
 | `4` | Desfragmentación completa. Horas. | Sí |
 | `5` | Revertir la opción 1 a valores de fábrica. | Sí |
 | `6` | Instalar WinRAR, VLC y Chrome con winget. | Sí |
+| `7` | Chrome de aula: cierra Chrome y borra todos sus perfiles; arranca sin pedir iniciar sesión. Pide confirmación. | Sí |
 | `0` | Salir. | |
 
 Cada opción vuelve al menú. `1` y `5` ofrecen reiniciar; si se pospone, el menú lo recuerda y lo ofrece al salir.
@@ -257,6 +258,7 @@ Reinstalar: *Características opcionales > Agregar una característica*.
 | Caché de Delivery Optimization | Actualizaciones ya instaladas. |
 | `C:\Windows\Prefetch\*.pf` | Solo entradas de programas (ver abajo). |
 | Caché y descargas de Adobe Reader | Si está instalado. |
+| Caché de Chrome y Edge, todos los usuarios y perfiles | `Cache`, `Code Cache`, `GPUCache`, `Media Cache`, `Dawn*Cache`; en la raíz, `ShaderCache`, `GrShaderCache`, `GraphiteDawnCache`. No se tocan cookies, contraseñas, autocompletar, historial, favoritos ni datos de sitios (Local Storage, IndexedDB, Service Workers): las sesiones siguen abiertas. Antes se cierran ambos navegadores como con la X. |
 
 Lo bloqueado se saltea y se cuenta. Al final muestra lo liberado por carpeta. Salvaguardas: no sigue junctions ni
 symlinks, no vacía raíces protegidas (`C:\Windows`, perfiles) y saltea la carpeta del script.
@@ -266,7 +268,13 @@ Prefetch: vaciarlo entero agrega 4-15 s al arranque siguiente
 [Ed Bott](https://edbott.com/2005/06/01/one-more-time-do-not-clean-out-your-prefetch-folder/)). Se conservan
 `NTOSBOOT-B00DFAAD.pf`, `Layout.ini`, `ReadyBoot` y `Ag*.db`.
 
-No se tocan: Papelera, caché de miniaturas, `SoftwareDistribution\Download`. `Windows.old`: *Liberador de espacio en
+Papelera: no se vacía, pero se activa el *Sensor de almacenamiento* para borrar lo que tenga más de 30 días
+(`StoragePolicy`: `01=1`, `08=1`, `256=30`, revisión semanal `2048=7`). También borra temporales que las apps no usan
+(`04=1`). Descargas nunca (`32=0`). Valores según
+[TenForums](https://www.tenforums.com/tutorials/122318-enable-disable-storage-sense-windows-10-a.html) y
+[Stealthpuppy](https://stealthpuppy.com/windows-10-storage-sense-intune/).
+
+No se tocan: caché de miniaturas, `SoftwareDistribution\Download`. `Windows.old`: *Liberador de espacio en
 disco > Limpiar archivos del sistema*.
 
 ### 13. Adobe Reader (si está instalado)
@@ -302,6 +310,28 @@ uBlock Origin Lite (`ddkjiahejlhfcafbddmgiahcphecmpfh`) se fuerza con la políti
 [`ExtensionInstallForcelist`](https://chromeenterprise.google/policies/extension-install-forcelist/) antes de instalar
 Chrome. No se puede quitar desde Chrome; se quita borrando su valor en
 `HKLM\SOFTWARE\Policies\Google\Chrome\ExtensionInstallForcelist`.
+
+## Opción 7: Chrome de aula
+
+Para PCs compartidas (colegio), donde quedan cuentas y sesiones abiertas. Pide confirmación (`S`).
+
+1. Cierra Chrome en todas las sesiones de Windows (`Stop-Process -Force`).
+2. Borra `AppData\Local\Google\Chrome\User Data` en cada usuario de Windows: todos los perfiles, con sus cuentas,
+   cookies, contraseñas, historial y favoritos. Se usa `rd /s /q`, que no sigue junctions.
+3. Crea `User Data\First Run` vacío: Chrome arranca sin la pantalla de primer uso.
+4. Políticas en `HKLM\SOFTWARE\Policies\Google\Chrome`:
+
+| Política | Valor | Efecto |
+|---|---|---|
+| [`BrowserSignin`](https://chromeenterprise.google/policies/browser-signin/) | `0` | No se puede iniciar sesión en Chrome. En los sitios web (Gmail, etc.) sí. |
+| `BrowserAddPersonEnabled` | `0` | No se pueden crear perfiles nuevos. |
+| `PromotionalTabsEnabled` | `0` | Sin pestañas de bienvenida ni promociones. |
+| `PrivacySandboxPromptEnabled` | `0` | Sin el aviso de privacidad de anuncios. |
+| `DefaultBrowserSettingEnabled` | `0` | No pregunta si es el navegador predeterminado. |
+| `ExtensionInstallForcelist` | uBlock Origin Lite | Se instala sola al abrir Chrome (con internet). |
+
+Resultado: Chrome abre directo en una pestaña nueva, sin perfiles ni cuentas. La opción 5 quita estas políticas
+(salvo uBlock); la opción 2 muestra `BrowserSignin`.
 
 ## Clásicos de Windows 7
 
@@ -460,19 +490,23 @@ fija; revisar *Load/Unload Cycle Count* con [CrystalDiskInfo](https://crystalmar
 
 ## Validación
 
-- **Wine (`cmd.exe`):** las 6 opciones de punta a punta con distintas combinaciones de respuestas; estado del v1
+- **Wine (`cmd.exe`):** las 7 opciones de punta a punta con distintas combinaciones de respuestas; estado del v1
   simulado (incluidas políticas que apagan Defender y Windows Update), con verificación en el registro de cada valor en
   `HKEY_USERS\<SID>`; ciclo optimizar, revertir y verificar; opción 6 con winget simulado (instalación nueva, al día,
   actualizado, sin winget). Con el estado del v1, la opción 1 repara los 5 valores y en la pasada siguiente informa
   que no hay nada; en la opción 3, DISM corre con `DisableResetbase=0` y `SupersededActions=3`, y después vuelven los
   valores originales.
-- **PowerShell:** los 37 bloques pasan el parser oficial. La quita de características opcionales se ejecutó contra una
+- **PowerShell:** los 39 bloques pasan el parser oficial. La quita de características opcionales se ejecutó contra una
   lista simulada de 22H2, con y sin impresora.
 - **Luz nocturna:** los blobs generados se decodificaron con un parser Bond independiente, partiendo de la referencia
   de win-nightlight-cli (envoltorio Bond), de un blob de Windows 10 (envoltorio viejo) y de ninguno. Con el blob
   viejo, el resultado coincide byte a byte con el *AutoOn* de Windows 10, salvo el FILETIME.
 - **Limpieza:** ejecutada sobre un árbol simulado con junctions, solo lectura, archivos bloqueados, la carpeta del
-  script, un intento de vaciar `C:\Windows` y una Prefetch de prueba.
+  script, un intento de vaciar `C:\Windows` y una Prefetch de prueba. Caché de navegadores: con perfiles simulados de
+  Chrome y Edge se vacían solo las cachés; cookies, `Login Data`, `Web Data`, historial, favoritos, Local Storage,
+  IndexedDB y Service Workers quedan intactos.
+- **Chrome de aula:** con dos usuarios simulados (uno con tres perfiles, otro sin Chrome) queda solo `First Run`;
+  también se probaron "sin Chrome" y "archivos en uso". En Wine, las cinco políticas quedan escritas.
 - **Netbook simulada:** G4 (N2600, 1 GB, sin driver, con antirrobo): tres avisos. Visualizador de fotos verificado
   contra el `.reg` de referencia.
 - **Formato:** ASCII y CRLF.
@@ -513,6 +547,9 @@ opcionales, Store, ubicación, luz nocturna y Restaurar sistema.
    - [ ] *Pantalla > Configuración de luz nocturna*: programada, *Del atardecer al amanecer*. Opción 2: "del anochecer
      al amanecer" y ubicación `Allow / Allow`.
    - [ ] Opción 6: WinRAR, VLC y Chrome sin preguntas; uBlock Origin Lite en Chrome.
+   - [ ] Tras la opción 1, Chrome y Edge siguen con las sesiones abiertas y las contraseñas guardadas.
+   - [ ] *Configuración > Sistema > Almacenamiento*: Sensor activado, Papelera a 30 días, Descargas en "Nunca".
+   - [ ] Opción 7: Chrome abre sin perfiles, sin pedir iniciar sesión, con uBlock Origin Lite.
 6. Opción 5 y verificar la vuelta a fábrica.
 
 ## Fuentes

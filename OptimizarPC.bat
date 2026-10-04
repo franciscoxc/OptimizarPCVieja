@@ -15,6 +15,7 @@ title Optimizar PC Vieja v2
 ::    4. Desfragmentar a fondo.
 ::    5. Revertir la optimizacion.
 ::    6. Instalar Chrome, WinRAR y VLC (con winget).
+::    7. Chrome de aula: cerrar sesiones y borrar perfiles.
 ::
 ::  - Se ejecuta con doble clic: si no tiene permisos, los pide.
 ::  - Los ajustes de usuario se aplican al usuario que tiene la sesion
@@ -64,11 +65,13 @@ echo     3. Limpiar restos de Windows Update (avanzado, irreversible, hasta 1 h)
 echo     4. Desfragmentar a fondo (de vez en cuando, puede tardar horas)
 echo     5. Revertir la optimizacion
 echo     6. Instalar Chrome, WinRAR y VLC
+echo     7. Chrome de aula: cerrar sesiones y borrar perfiles
 echo     0. Salir
 echo.
 :: choice responde a una sola tecla, sin Enter, e ignora cualquier otra.
-choice /c 1234560 /n /m "  Toca un numero: "
-if errorlevel 7 goto :salir
+choice /c 12345670 /n /m "  Toca un numero: "
+if errorlevel 8 goto :salir
+if errorlevel 7 goto :op_chrome_aula
 if errorlevel 6 goto :op_instalar
 if errorlevel 5 goto :op_revertir
 if errorlevel 4 goto :op_desfragmentar
@@ -159,6 +162,7 @@ echo   - No crea punto de restauracion: Restaurar sistema se desactiva. Si algo
 echo     sale mal, la vuelta atras es la opcion 5 del menu.
 echo   - En un disco mecanico puede tardar entre 10 y 20 minutos. La primera vez,
 echo     bastante mas: quitar las caracteristicas opcionales es lento.
+echo   - Chrome y Edge se cierran solos durante la limpieza: guarda lo que haya abierto.
 echo   - Al terminar hay que REINICIAR la PC.
 echo.
 choice /c SN /n /m "  Continuar? [S/N]: "
@@ -611,10 +615,27 @@ call :titulo "11/11  Limpieza de temporales"
 :: Vaciado de todas las carpetas temporales de Windows. El codigo esta en la
 :: seccion LIMPIEZA al final de este archivo. Lo que esta en uso se saltea, y la
 :: carpeta desde la que corre el script tambien, por si se abrio desde un ZIP.
+:: Chrome y Edge se cierran como con la X, para que su cache no este en uso.
+echo   Cerrando Chrome y Edge para vaciar su cache...
+taskkill /im chrome.exe >nul 2>&1
+taskkill /im msedge.exe >nul 2>&1
+ping -n 4 127.0.0.1 >nul
 echo   Vaciando temporales. Lo que Windows tiene en uso se saltea solo.
 set "OPT_SELF=%~dp0"
 powershell -NoProfile -ExecutionPolicy Bypass -Command "$t=[IO.File]::ReadAllText($env:OPT_RUTA); $i=$t.IndexOf('#LIMPIEZA-' + 'INICIO#'); $j=$t.IndexOf('#LIMPIEZA-' + 'FIN#'); if ($i -ge 0 -and $j -gt $i) { Invoke-Expression $t.Substring($i, $j - $i) }"
 echo   [OK] Limpieza terminada.
+:: Papelera: el Sensor de almacenamiento borra solo lo que tenga mas de 30 dias.
+:: Corre una vez por semana; tambien limpia temporales que las apps no usan.
+:: Descargas nunca se toca (32 = 0).
+set "_ss=%UHIVE%\Software\Microsoft\Windows\CurrentVersion\StorageSense\Parameters\StoragePolicy"
+call :dword "%_ss%" 01 1
+call :dword "%_ss%" 08 1
+call :dword "%_ss%" 256 30
+call :dword "%_ss%" 04 1
+call :dword "%_ss%" 32 0
+call :dword "%_ss%" 2048 7
+call :dword "%_ss%" StoragePoliciesNotified 1
+echo   [OK] Papelera: se vacia sola lo que tenga mas de 30 dias (revision semanal).
 
 :: =========================================================================
 call :titulo "Ultimos pasos"
@@ -888,9 +909,10 @@ call :borrar "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Search" Backgrou
 call :borrar "HKLM\SOFTWARE\Policies\Microsoft\WindowsStore" AutoDownload
 call :borrar "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsStore\WindowsUpdate" AutoDownload
 reg delete "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\CloudStore\Store\DefaultAccount\Current\default$windows.data.bluelightreduction.settings" /f >nul 2>&1
+for %%v in (01 04 08 32 256 2048 StoragePoliciesNotified) do call :borrar "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\StorageSense\Parameters\StoragePolicy" %%v
 echo   [OK] Noticias e intereses, Cortana, destacados, informe de errores, precarga,
-echo        apps en segundo plano, actualizacion de la Store y luz nocturna como de
-echo        fabrica. La ubicacion queda activada.
+echo        apps en segundo plano, actualizacion de la Store, luz nocturna y Sensor
+echo        de almacenamiento como de fabrica. La ubicacion queda activada.
 
 call :titulo "Interfaz y Explorador"
 set "_desk=%UHIVE%\Control Panel\Desktop"
@@ -945,7 +967,8 @@ call :borrar "%_edge%\Recommended" SleepingTabsEnabled
 call :borrar "%_edge%\Recommended" SleepingTabsTimeout
 call :borrar "HKLM\SOFTWARE\Policies\Microsoft\EdgeUpdate" CreateDesktopShortcutDefault
 call :borrar "HKLM\SOFTWARE\Policies\Google\Chrome" BackgroundModeEnabled
-echo   [OK] Politicas de Edge y Chrome quitadas.
+for %%v in (BrowserSignin BrowserAddPersonEnabled PromotionalTabsEnabled PrivacySandboxPromptEnabled DefaultBrowserSettingEnabled) do call :borrar "HKLM\SOFTWARE\Policies\Google\Chrome" %%v
+echo   [OK] Politicas de Edge y Chrome quitadas, incluidas las de Chrome de aula.
 
 call :titulo "Adobe Reader"
 powershell -NoProfile -ExecutionPolicy Bypass -Command "if (-not (Get-Service -Name AdobeARMservice -ErrorAction SilentlyContinue)) { Write-Output '  Adobe Reader no esta instalado: nada que revertir.'; exit 0 }; Set-Service -Name AdobeARMservice -StartupType Automatic -ErrorAction SilentlyContinue; Start-Service -Name AdobeARMservice -ErrorAction SilentlyContinue; Get-ScheduledTask -TaskName 'Adobe Acrobat Update Task*' -ErrorAction SilentlyContinue | Enable-ScheduledTask -ErrorAction SilentlyContinue | Out-Null; Write-Output '  [OK] Adobe Reader: actualizacion automatica activada otra vez.'; Write-Output '       Las entradas de inicio viejas no vuelven: Reader no las necesita.'"
@@ -985,7 +1008,7 @@ if errorlevel 1 goto :menu
 call :instalar RARLab.WinRAR "WinRAR"
 call :instalar VideoLAN.VLC "VLC"
 :: La politica va antes que Chrome: asi la primera vez que se abre ya la encuentra.
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$k='HKLM:\SOFTWARE\Policies\Google\Chrome\ExtensionInstallForcelist'; $id='ddkjiahejlhfcafbddmgiahcphecmpfh'; if (-not (Test-Path -LiteralPath $k)) { New-Item -Path $k -Force | Out-Null }; $ya=$false; $n=1; foreach ($v in (Get-ItemProperty -LiteralPath $k).PSObject.Properties) { if ($v.Name -match '^[0-9]+$') { if ([string]$v.Value -like ($id + '*')) { $ya=$true }; if ([int]$v.Name -ge $n) { $n=[int]$v.Name + 1 } } }; if (-not $ya) { New-ItemProperty -LiteralPath $k -Name ([string]$n) -Value ($id + ';https://clients2.google.com/service/update2/crx') -PropertyType String -Force | Out-Null }; Write-Output '  [OK] uBlock Origin Lite: Chrome la instala sola desde la Chrome Web Store.'"
+call :politica_ublock
 call :instalar Google.Chrome "Google Chrome"
 echo.
 echo   LISTO. uBlock Origin Lite aparece en Chrome al minuto de abrirlo por primera
@@ -995,8 +1018,53 @@ echo   otro idioma.
 goto :menu
 
 :: =========================================================================
+::  7. CHROME DE AULA
+::  Para PCs compartidas, como las de un colegio: cierra Chrome en todas las
+::  sesiones y borra todos sus perfiles en todos los usuarios de Windows
+::  (cuentas, sesiones abiertas, contrasenas, historial y favoritos). Chrome
+::  arranca limpio: sin pedir iniciar sesion, sin bienvenidas y con uBlock
+::  Origin Lite. La seccion AULA, al final del archivo, hace el borrado.
+:: =========================================================================
+:op_chrome_aula
+title Optimizar PC Vieja v2 - Chrome de aula
+cls
+echo ==========================================================================
+echo   CHROME DE AULA: CERRAR SESIONES Y BORRAR PERFILES
+echo ==========================================================================
+echo.
+echo   Cierra Chrome y borra TODOS sus perfiles, en todos los usuarios de Windows:
+echo   cuentas, sesiones abiertas, contrasenas, historial y favoritos. Chrome
+echo   vuelve a arrancar limpio, sin pedir iniciar sesion y con uBlock Origin Lite.
+echo.
+choice /c SN /n /m "  Borrar todo? [S/N]: "
+if errorlevel 2 goto :menu
+echo.
+:: Sin iniciar sesion en Chrome (en las paginas web si se puede), sin agregar
+:: personas, sin pestanas de bienvenida, sin el aviso de privacidad de anuncios
+:: y sin preguntar si es el navegador predeterminado.
+set "_chr=HKLM\SOFTWARE\Policies\Google\Chrome"
+call :dword "%_chr%" BrowserSignin 0
+call :dword "%_chr%" BrowserAddPersonEnabled 0
+call :dword "%_chr%" PromotionalTabsEnabled 0
+call :dword "%_chr%" PrivacySandboxPromptEnabled 0
+call :dword "%_chr%" DefaultBrowserSettingEnabled 0
+echo   [OK] Chrome ya no pide iniciar sesion ni muestra pantallas de bienvenida.
+call :politica_ublock
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$t=[IO.File]::ReadAllText($env:OPT_RUTA); $i=$t.IndexOf('#AULA-' + 'INICIO#'); $j=$t.IndexOf('#AULA-' + 'FIN#'); if ($i -ge 0 -and $j -gt $i) { Invoke-Expression $t.Substring($i, $j - $i) }"
+echo.
+echo   LISTO. Al abrir Chrome va directo al navegador; uBlock Origin Lite aparece
+echo   al minuto (hace falta internet).
+goto :menu
+
+:: =========================================================================
 ::  SUBRUTINAS
 :: =========================================================================
+
+:: uBlock Origin Lite forzada en Chrome (ExtensionInstallForcelist): Chrome la
+:: instala sola desde la Chrome Web Store. Si ya esta en la lista, no la repite.
+:politica_ublock
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$k='HKLM:\SOFTWARE\Policies\Google\Chrome\ExtensionInstallForcelist'; $id='ddkjiahejlhfcafbddmgiahcphecmpfh'; if (-not (Test-Path -LiteralPath $k)) { New-Item -Path $k -Force | Out-Null }; $ya=$false; $n=1; foreach ($v in (Get-ItemProperty -LiteralPath $k).PSObject.Properties) { if ($v.Name -match '^[0-9]+$') { if ([string]$v.Value -like ($id + '*')) { $ya=$true }; if ([int]$v.Name -ge $n) { $n=[int]$v.Name + 1 } } }; if (-not $ya) { New-ItemProperty -LiteralPath $k -Name ([string]$n) -Value ($id + ';https://clients2.google.com/service/update2/crx') -PropertyType String -Force | Out-Null }; Write-Output '  [OK] uBlock Origin Lite: Chrome la instala sola desde la Chrome Web Store.'"
+goto :eof
 
 :titulo
 echo.
@@ -1246,6 +1314,7 @@ goto :eof
 ::   - LIMPIEZA: vaciado de temporales (paso 11 de la opcion 1).
 ::   - VERIFICAR: el reporte de la opcion 2.
 ::   - LUZ: luz nocturna del anochecer al amanecer (paso 7 de la opcion 1).
+::   - AULA: borrado de perfiles de Chrome (opcion 7).
 :: =========================================================================
 #LIMPIEZA-INICIO#
 $ErrorActionPreference = 'SilentlyContinue'
@@ -1264,7 +1333,8 @@ $prohibidas += $perfiles | ForEach-Object { $_.LocalPath.TrimEnd('\') }
 # Borra el contenido de una carpeta: todo, o en la carpeta principal solo lo que
 # coincide con $Patron y no con $Excepto. Saltea lo que esta en uso, nunca sigue
 # enlaces (junctions ni symlinks) y nunca toca la carpeta del script.
-function Vaciar([string]$Nombre, [string]$Carpeta, [string]$Patron = '*', [string]$Excepto = '') {
+function Vaciar([string]$Nombre, [string]$Carpeta, [string]$Patron = '*', [string]$Excepto = '', [switch]$Callado) {
+    $script:ultBytes = 0; $script:ultSalteados = 0
     if (-not $Carpeta -or -not [IO.Directory]::Exists($Carpeta)) { return }
     if ($prohibidas -contains $Carpeta.TrimEnd('\')) { return }
     $borrados = 0; $salteados = 0; $bytes = 0
@@ -1294,9 +1364,21 @@ function Vaciar([string]$Nombre, [string]$Carpeta, [string]$Patron = '*', [strin
     foreach ($d in ($subcarpetas | Sort-Object Length -Descending)) { try { [IO.Directory]::Delete($d, $false) } catch { } }
     $script:totalBytes += $bytes
     $script:totalSalteados += $salteados
-    $linea = '    ' + $Nombre.PadRight(44) + ([string][Math]::Round($bytes / 1MB, 1)).PadLeft(8) + ' MB'
-    if ($salteados) { $linea += '   (' + $salteados + ' en uso, salteados)' }
+    $script:ultBytes = $bytes; $script:ultSalteados = $salteados
+    if (-not $Callado) { Linea $Nombre $bytes $salteados }
+}
+
+function Linea([string]$Nombre, [double]$Bytes, [int]$Salteados) {
+    $linea = '    ' + $Nombre.PadRight(44) + ([string][Math]::Round($Bytes / 1MB, 1)).PadLeft(8) + ' MB'
+    if ($Salteados) { $linea += '   (' + $Salteados + ' en uso, salteados)' }
     Write-Output $linea
+}
+
+# Vacia varias carpetas y muestra una sola linea con el total.
+function VaciarVarias([string]$Nombre, [string[]]$Carpetas) {
+    $b = 0; $s = 0
+    foreach ($c in $Carpetas) { Vaciar $Nombre $c -Callado; $b += $script:ultBytes; $s += $script:ultSalteados }
+    Linea $Nombre $b $s
 }
 
 Vaciar 'temp (Temp de Windows)' (Join-Path $env:SystemRoot 'Temp')
@@ -1305,6 +1387,18 @@ foreach ($p in $perfiles) {
     Vaciar ('%temp% de ' + $quien) (Join-Path $p.LocalPath 'AppData\Local\Temp')
     Vaciar ('Informes de errores de ' + $quien) (Join-Path $p.LocalPath 'AppData\Local\Microsoft\Windows\WER')
     Vaciar ('Cache de Adobe Reader de ' + $quien) (Join-Path $p.LocalPath 'AppData\LocalLow\Adobe\AcroCef\DC\Acrobat\Cache')
+    # Chrome y Edge: solo la cache, lo que el navegador vuelve a bajar o generar,
+    # en todos sus perfiles. Cookies, contrasenas, autocompletar, historial y datos
+    # de sitios (incluida la cache de Service Workers) no se tocan.
+    foreach ($nav in @(@('Chrome', 'AppData\Local\Google\Chrome\User Data'), @('Edge', 'AppData\Local\Microsoft\Edge\User Data'))) {
+        $ud = Join-Path $p.LocalPath $nav[1]
+        if (-not [IO.Directory]::Exists($ud)) { continue }
+        $carpetas = @('ShaderCache', 'GrShaderCache', 'GraphiteDawnCache') | ForEach-Object { Join-Path $ud $_ }
+        foreach ($perfil in @([IO.Directory]::GetDirectories($ud) | Where-Object { [IO.File]::Exists((Join-Path $_ 'Preferences')) })) {
+            $carpetas += @('Cache', 'Code Cache', 'GPUCache', 'Media Cache', 'DawnGraphiteCache', 'DawnWebGPUCache') | ForEach-Object { Join-Path $perfil $_ }
+        }
+        VaciarVarias ('Cache de ' + $nav[0] + ' de ' + $quien) $carpetas
+    }
 }
 Vaciar 'Temp de la cuenta del sistema' (Join-Path $env:SystemRoot 'System32\config\systemprofile\AppData\Local\Temp')
 Vaciar 'Temp de la cuenta del sistema, 32 bits' (Join-Path $env:SystemRoot 'SysWOW64\config\systemprofile\AppData\Local\Temp')
@@ -1567,6 +1661,8 @@ if ($nl) {
     if ($p -ge 0 -and $nl[$p] -eq 2 -and $nl[$p + 1] -eq 1) { $modo = if ($nl[$p + 2] -eq 0xC2 -and $nl[$p + 3] -eq 0x0A) { 'horario fijo' } else { 'del anochecer al amanecer' } }
 }
 L ('Luz nocturna:                   ' + $modo)
+$ss = $U + '\Software\Microsoft\Windows\CurrentVersion\StorageSense\Parameters\StoragePolicy'
+L ('Sensor de almacenamiento:       activo ' + (Leer $ss '01') + ' | papelera ' + (Leer $ss '08') + ', ' + (Leer $ss '256') + ' dias | descargas ' + (Leer $ss '32') + ' | cada ' + (Leer $ss '2048') + ' dias')
 
 # --- Disco y energia ----------------------------------------------------------
 Titulo 'Disco y energia'
@@ -1682,6 +1778,7 @@ $fl = Get-ItemProperty -LiteralPath 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Polic
 $ub = $false
 if ($fl) { $ub = [bool]($fl.PSObject.Properties | Where-Object { [string]$_.Value -like 'ddkjiahejlhfcafbddmgiahcphecmpfh*' }) }
 L ('uBlock Origin Lite (politica):  ' + $ub)
+L ('Chrome de aula (BrowserSignin): ' + (Leer 'HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Google\Chrome' 'BrowserSignin') + '  (0 = sin iniciar sesion en Chrome)')
 
 # --- Apps preinstaladas -------------------------------------------------------
 Titulo 'Apps preinstaladas que la v2 puede quitar (presentes)'
@@ -1780,3 +1877,26 @@ try {
     Write-Output '  [AVISO] No se pudo programar la luz nocturna: hacelo en Configuracion, Pantalla.'
 }
 #LUZ-FIN#
+#AULA-INICIO#
+# Cierra Chrome en todas las sesiones y borra su carpeta de datos (User Data)
+# en cada usuario de Windows. Despues deja el archivo "First Run", asi Chrome
+# arranca sin la pantalla de primer uso. rd no sigue enlaces (junctions).
+$ErrorActionPreference = 'SilentlyContinue'
+for ($k = 0; $k -lt 10 -and (Get-Process -Name chrome); $k++) { Get-Process -Name chrome | Stop-Process -Force; Start-Sleep -Milliseconds 500 }
+$perfiles = @(Get-CimInstance Win32_UserProfile | Where-Object { -not $_.Special -and $_.LocalPath -and [IO.Directory]::Exists($_.LocalPath) })
+$total = 0; $usuarios = 0; $fallas = 0
+foreach ($p in $perfiles) {
+    $ud = Join-Path $p.LocalPath 'AppData\Local\Google\Chrome\User Data'
+    if (-not [IO.Directory]::Exists($ud)) { continue }
+    $n = @([IO.Directory]::GetDirectories($ud) | Where-Object { [IO.File]::Exists((Join-Path $_ 'Preferences')) }).Count
+    for ($k = 0; $k -lt 3 -and [IO.Directory]::Exists($ud); $k++) { & cmd.exe /c rd /s /q "$ud" 2>$null; if ([IO.Directory]::Exists($ud)) { Start-Sleep -Seconds 2 } }
+    if ([IO.Directory]::Exists($ud)) { $fallas++ }
+    [IO.Directory]::CreateDirectory($ud) | Out-Null
+    [IO.File]::WriteAllBytes((Join-Path $ud 'First Run'), [byte[]]@())
+    $total += $n; $usuarios++
+    Write-Output ('    ' + (Split-Path $p.LocalPath -Leaf) + ': ' + $n + ' perfil(es) de Chrome borrado(s)')
+}
+if ($usuarios -eq 0) { Write-Output '  Chrome no tiene datos en ningun usuario de Windows: nada que borrar.' }
+else { Write-Output ('  [OK] Chrome: ' + $total + ' perfil(es) borrado(s) en ' + $usuarios + ' usuario(s) de Windows.') }
+if ($fallas) { Write-Output ('  [AVISO] En ' + $fallas + ' usuario(s) quedaron archivos en uso: reinicia y repeti la opcion 7.') }
+#AULA-FIN#
