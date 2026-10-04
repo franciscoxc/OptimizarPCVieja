@@ -14,8 +14,7 @@ title Optimizar PC Vieja v2
 ::    3. Limpiar restos de Windows Update (DISM /ResetBase, irreversible).
 ::    4. Desfragmentar a fondo.
 ::    5. Revertir la optimizacion.
-::    6. Deshacer lo perjudicial del script original (v1).
-::    7. Instalar Chrome, WinRAR y VLC (con winget).
+::    6. Instalar Chrome, WinRAR y VLC (con winget).
 ::
 ::  - Se ejecuta con doble clic: si no tiene permisos, los pide.
 ::  - Los ajustes de usuario se aplican al usuario que tiene la sesion
@@ -64,15 +63,13 @@ echo     2. Verificar el estado (solo mira, no cambia nada)
 echo     3. Limpiar restos de Windows Update (avanzado, irreversible, hasta 1 h)
 echo     4. Desfragmentar a fondo (de vez en cuando, puede tardar horas)
 echo     5. Revertir la optimizacion
-echo     6. Deshacer lo perjudicial del script original (v1)
-echo     7. Instalar Chrome, WinRAR y VLC
+echo     6. Instalar Chrome, WinRAR y VLC
 echo     0. Salir
 echo.
 :: choice responde a una sola tecla, sin Enter, e ignora cualquier otra.
-choice /c 12345670 /n /m "  Toca un numero: "
-if errorlevel 8 goto :salir
-if errorlevel 7 goto :op_instalar
-if errorlevel 6 goto :op_deshacer_v1
+choice /c 1234560 /n /m "  Toca un numero: "
+if errorlevel 7 goto :salir
+if errorlevel 6 goto :op_instalar
 if errorlevel 5 goto :op_revertir
 if errorlevel 4 goto :op_desfragmentar
 if errorlevel 3 goto :op_limpiar_wu
@@ -267,25 +264,31 @@ echo   [OK] Tareas de mantenimiento y seguridad activas.
 powershell -NoProfile -ExecutionPolicy Bypass -Command "$cs=Get-CimInstance Win32_ComputerSystem; if (-not $cs.AutomaticManagedPagefile -and -not (Get-CimInstance Win32_PageFileSetting)) { Set-CimInstance -InputObject $cs -Property @{AutomaticManagedPagefile=$true}; Write-Output '  [REPARADO] No habia archivo de paginacion: ahora lo administra Windows.' }"
 
 :: =========================================================================
-call :titulo "2/11  Corrigiendo el script original v1"
+call :titulo "2/11  Script original v1: revisando lo perjudicial"
 :: =========================================================================
-:: SysMain maneja la compresion de memoria: con 2 GB de RAM es clave.
-call :servicio SysMain auto
-sc start SysMain >nul 2>&1
-:: Sin este servicio no se puede escribir en el Inicio, Configuracion ni apps UWP.
-call :servicio TabletInputService demand
-sc start TabletInputService >nul 2>&1
+:: Solo se repara lo que quedo en un estado perjudicial; lo que esta bien no
+:: se toca. Delivery Optimization ya se reviso en el paso 1. Los placebos
+:: IOPageLockLimit y DontVerifyRandomDrivers no hacen dano: se dejan.
+set "_reparado=0"
+:: SysMain: compresion de memoria. Teclado tactil: escritura en el Inicio,
+:: Configuracion y apps UWP. Biometria: huella. Ubicacion: luz nocturna.
+call :asegurar SysMain auto
+call :asegurar TabletInputService demand
+call :asegurar WbioSrvc demand
+call :asegurar lfsvc demand
 :: Con poca RAM, fijar el kernel en memoria le saca RAM a los programas.
-call :dword "%_mm%" DisablePagingExecutive 0
-:: Placebos que Windows ignora: se borran.
-reg delete "%_mm%" /v IOPageLockLimit /f >nul 2>&1
-reg delete "%_mm%" /v DontVerifyRandomDrivers /f >nul 2>&1
+call :leer "%_mm%" DisablePagingExecutive
+if /i "%_r%"=="0x1" (
+    call :dword "%_mm%" DisablePagingExecutive 0
+    set "_reparado=1"
+    echo   [REPARADO] DisablePagingExecutive estaba en 1: vuelve a 0.
+)
+if "%_reparado%"=="0" echo   [OK] Nada perjudicial del v1: SysMain, teclado tactil, biometria, ubicacion
+if "%_reparado%"=="0" echo        y DisablePagingExecutive estan bien.
 :: Compresion de memoria activa y sin precarga de apps UWP en RAM.
+sc start SysMain >nul 2>&1
 powershell -NoProfile -ExecutionPolicy Bypass -Command "Enable-MMAgent -MemoryCompression -ErrorAction SilentlyContinue; Disable-MMAgent -ApplicationPreLaunch -ErrorAction SilentlyContinue" >nul 2>&1
-echo   [OK] SysMain y compresion de memoria activos.
-echo   [OK] Teclado tactil y escritura en el Inicio restaurados.
-echo   [OK] DisablePagingExecutive en 0; placebos IOPageLockLimit y DontVerifyRandomDrivers borrados.
-echo   [OK] Delivery Optimization habilitado; su P2P se apaga con la politica oficial en el paso 7.
+echo   [OK] Compresion de memoria activa.
 
 :: =========================================================================
 call :titulo "3/11  Servicios: Manual siempre que se pueda"
@@ -687,10 +690,38 @@ if errorlevel 1 reg add "HKLM\SYSTEM\CurrentControlSet\Services\TrustedInstaller
 echo   [REPARADO] El Instalador de modulos de Windows estaba deshabilitado: vuelve a Manual.
 :wu_instalador_ok
 
+if not exist "%SystemRoot%\WinSxS\pending.xml" goto :wu_sin_pendientes
+echo   [!] Hay cambios de Windows esperando un reinicio: DISM no puede limpiar.
+echo       Reinicia la PC y volve a elegir esta opcion.
+goto :menu
+:wu_sin_pendientes
+
+:: Windows 10 trae DisableResetbase en 1: asi /ResetBase no rebasa, solo
+:: comprime. Durante la limpieza va en 0, con SupersededActions en 3 (1 antes
+:: de 1903), como hace W10UI de abbodi1406. Al terminar se restauran los
+:: valores originales: el mantenimiento automatico sigue como de fabrica. Se
+:: detiene el Instalador de modulos para que tome la configuracion nueva.
+set "_sxs=HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\SideBySide\Configuration"
+set "_bld=0"
+for /f "tokens=3" %%b in ('reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion" /v CurrentBuildNumber 2^>nul ^| findstr /i "CurrentBuildNumber"') do set "_bld=%%b"
+set "_sa_nuevo=3"
+if %_bld% LSS 18362 set "_sa_nuevo=1"
+call :leer "%_sxs%" DisableResetbase
+set "_drb=%_r%"
+call :leer "%_sxs%" SupersededActions
+set "_sa=%_r%"
+net stop wuauserv >nul 2>&1
+net stop trustedinstaller >nul 2>&1
+reg add "%_sxs%" /v DisableResetbase /t REG_DWORD /d 0 /f >nul 2>&1
+reg add "%_sxs%" /v SupersededActions /t REG_DWORD /d %_sa_nuevo% /f >nul 2>&1
+
 call :titulo "1/2  Limpieza de las versiones viejas (WinSxS)"
 call :libre LIBRE_ANTES
 Dism.exe /Online /Cleanup-Image /StartComponentCleanup /ResetBase
-if not "%errorlevel%"=="0" goto :wu_error
+set "DISM_RC=%errorlevel%"
+if defined _drb (reg add "%_sxs%" /v DisableResetbase /t REG_DWORD /d %_drb% /f >nul 2>&1) else (reg delete "%_sxs%" /v DisableResetbase /f >nul 2>&1)
+if defined _sa (reg add "%_sxs%" /v SupersededActions /t REG_DWORD /d %_sa% /f >nul 2>&1) else (reg delete "%_sxs%" /v SupersededActions /f >nul 2>&1)
+if not "%DISM_RC%"=="0" goto :wu_error
 call :libre LIBRE_DESPUES
 
 call :titulo "2/2  Resultado"
@@ -702,7 +733,6 @@ echo   Si vas a desfragmentar (opcion 4), ahora es el momento: hay menos que mov
 goto :menu
 
 :wu_error
-set "DISM_RC=%errorlevel%"
 set "DISM_HEX=%DISM_RC%"
 for /f "usebackq delims=" %%h in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "'0x{0:X8}' -f [int]$env:DISM_RC"`) do set "DISM_HEX=%%h"
 echo.
@@ -935,81 +965,7 @@ echo ==========================================================================
 goto :fin_con_reinicio
 
 :: =========================================================================
-::  6. DESHACER LO PERJUDICIAL DEL SCRIPT ORIGINAL (v1)
-::  Deshace SOLO lo que el "Optimizador Extremo" (v1) hacia mal con 2 GB de RAM
-::  y disco mecanico. No hace falta si se usa la opcion 1: ya lo incluye.
-:: =========================================================================
-:op_deshacer_v1
-title Optimizar PC Vieja v2 - Deshacer lo perjudicial del v1
-set "_mm=HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management"
-
-cls
-echo ==========================================================================
-echo   DESHACER LO PERJUDICIAL DEL SCRIPT ORIGINAL
-echo ==========================================================================
-echo.
-echo   Esto va a:
-echo    1. Volver a activar SysMain y la compresion de memoria.
-echo    2. Devolver el teclado tactil: sin el no se puede escribir en el Inicio.
-echo    3. Reparar Delivery Optimization para no romper Windows Update, y
-echo       apagar su P2P de la forma correcta.
-echo    4. Volver DisablePagingExecutive a 0.
-echo    5. Volver la biometria a Manual, por si la PC tiene lector de huellas.
-echo    6. Borrar los placebos IOPageLockLimit y DontVerifyRandomDrivers.
-echo.
-choice /c SN /n /m "  Continuar? [S/N]: "
-if errorlevel 2 goto :menu
-echo.
-
-:: 1. SysMain: maneja la compresion de memoria. Con 2 GB de RAM, comprimir en
-::    RAM es mucho mas rapido que paginar a un disco mecanico.
-sc config SysMain start= auto >nul 2>&1
-sc start SysMain >nul 2>&1
-powershell -NoProfile -ExecutionPolicy Bypass -Command "Enable-MMAgent -MemoryCompression -ErrorAction SilentlyContinue" >nul 2>&1
-echo   [OK] SysMain en Automatico y compresion de memoria activada.
-
-:: 2. TabletInputService: en Windows 10 actual, de el depende escribir en el
-::    menu Inicio, en Configuracion y en las apps UWP. Valor de fabrica: Manual.
-sc config TabletInputService start= demand >nul 2>&1
-sc start TabletInputService >nul 2>&1
-echo   [OK] Servicio de teclado tactil en Manual, su valor de fabrica.
-
-:: 3. Delivery Optimization: deshabilitado puede romper Windows Update. Vuelve
-::    a su valor de fabrica, Automatico retrasado, y el P2P se apaga con la
-::    politica oficial, que era lo que buscaba el script original.
-reg add "HKLM\SYSTEM\CurrentControlSet\Services\DoSvc" /v Start /t REG_DWORD /d 2 /f >nul 2>&1
-reg add "HKLM\SYSTEM\CurrentControlSet\Services\DoSvc" /v DelayedAutostart /t REG_DWORD /d 1 /f >nul 2>&1
-reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\DeliveryOptimization" /v DODownloadMode /t REG_DWORD /d 0 /f >nul 2>&1
-echo   [OK] Delivery Optimization reparado, sin compartir actualizaciones por P2P.
-
-:: 4. DisablePagingExecutive=1 fija el kernel en RAM; con poca memoria eso
-::    empuja a tus programas al disco. Valor de fabrica: 0.
-reg add "%_mm%" /v DisablePagingExecutive /t REG_DWORD /d 0 /f >nul 2>&1
-echo   [OK] DisablePagingExecutive en 0.
-
-:: 5. Biometria y ubicacion: deshabilitadas rompen Windows Hello con huella y
-::    la luz nocturna. En Manual no gastan nada mientras no se usan.
-sc config WbioSrvc start= demand >nul 2>&1
-echo   [OK] Biometria en Manual, su valor de fabrica.
-sc config lfsvc start= demand >nul 2>&1
-echo   [OK] Ubicacion en Manual, su valor de fabrica: la usa la luz nocturna.
-
-:: 6. Placebos: Windows los ignora. Se borran para no dejar basura.
-reg delete "%_mm%" /v IOPageLockLimit /f >nul 2>&1
-reg delete "%_mm%" /v DontVerifyRandomDrivers /f >nul 2>&1
-echo   [OK] IOPageLockLimit y DontVerifyRandomDrivers borrados.
-
-echo.
-echo   Se dejan como estaban, porque estaban bien: telemetria, Xbox, Bluetooth,
-echo   mapas, Retail Demo, NTFS y CompactOS desactivado.
-echo.
-echo ==========================================================================
-echo   LISTO. Hay que REINICIAR la PC. Usa "Reiniciar", no "Apagar".
-echo ==========================================================================
-goto :fin_con_reinicio
-
-:: =========================================================================
-::  7. INSTALAR CHROME, WINRAR Y VLC
+::  6. INSTALAR CHROME, WINRAR Y VLC
 ::  Con winget, el instalador de programas que trae Windows 10, en silencio y
 ::  sin preguntas. Del mas chico al mas grande: WinRAR, VLC y Chrome. A Chrome
 ::  se le agrega uBlock Origin Lite con la politica oficial de instalacion
@@ -1135,6 +1091,7 @@ if /i "%~2"=="auto" set "_t=Automatico"
 if /i "%~2"=="delayed-auto" set "_t=Automatico retrasado"
 if /i "%~2"=="demand" set "_t=Manual"
 echo   [REPARADO] %~1 estaba deshabilitado: vuelve a %_t%
+set "_reparado=1"
 call :servicio %~1 %~2
 goto :eof
 
@@ -1713,8 +1670,8 @@ if ($r) {
 } else { L 'No esta instalado.' }
 L ('Programa predeterminado para .pdf: ' + (Leer ($U + '\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.pdf\UserChoice') 'ProgId'))
 
-# --- Programas de la opcion 7 ---------------------------------------------------
-Titulo 'Programas de la opcion 7'
+# --- Programas de la opcion 6 ---------------------------------------------------
+Titulo 'Programas de la opcion 6'
 foreach ($prog in 'WinRAR', 'VLC media player', 'Google Chrome') {
     $r = Get-ItemProperty -Path $u | Where-Object { $_.DisplayName -like ($prog + '*') } | Select-Object -First 1
     $ver = 'no instalado'

@@ -26,17 +26,16 @@ Después de la opción 1, el botón de encendido y la tapa apagan el equipo (sin
 
 | Tecla | Opción | Modifica |
 |---|---|---|
-| `1` | Optimizar. Incluye las correcciones del script v1. | Sí |
+| `1` | Optimizar. Incluye la revisión del script v1. | Sí |
 | `2` | Verificar: hardware, antirrobo CI, estado de cada ajuste. Reporte `.txt` junto al script. | No |
 | `3` | Limpiar WinSxS con DISM `/ResetBase`. Avanzado, irreversible, sin preguntas. Hasta 1 h. | Sí |
 | `4` | Desfragmentación completa. Horas. | Sí |
 | `5` | Revertir la opción 1 a valores de fábrica. | Sí |
-| `6` | Deshacer lo perjudicial del script v1. | Sí |
-| `7` | Instalar WinRAR, VLC y Chrome con winget. | Sí |
+| `6` | Instalar WinRAR, VLC y Chrome con winget. | Sí |
 | `0` | Salir. | |
 
-Cada opción vuelve al menú. `1`, `5` y `6` ofrecen reiniciar; si se pospone, el menú lo recuerda y lo ofrece al salir.
-Secuencia habitual: `1`, `7`.
+Cada opción vuelve al menú. `1` y `5` ofrecen reiniciar; si se pospone, el menú lo recuerda y lo ofrece al salir.
+Secuencia habitual: `1`, `6`.
 
 **Usuario destino.** Los ajustes de usuario se escriben en `HKEY_USERS\<SID>` del dueño del `explorer.exe` de la
 sesión, no en `HKCU`, que al elevar con otra cuenta apunta al administrador. La opción 1 muestra el usuario detectado.
@@ -71,20 +70,25 @@ Igualdad.
 | Tareas | Asegura activas: `ScheduledDefrag`, `StartComponentCleanup`, `DiskDiagnosticResolver`, análisis de Defender. |
 | Paginación | Verifica que exista. |
 
-### 2. Correcciones al script v1
+### 2. Revisión del script v1
 
-| Ajuste del v1 | Veredicto | v2 |
+Se lee el estado de cada cambio del v1 y se repara solo lo que está en un valor perjudicial (`[REPARADO]` en
+pantalla); si no hay nada, lo informa. Lo correcto o inocuo no se toca.
+
+| Ajuste del v1 | Veredicto | Si se encuentra |
 |---|---|---|
-| `SysMain` deshabilitado | Perjudicial: gestiona la compresión de memoria y el prefetch de arranque. | Automático; compresión activada. |
+| `SysMain` deshabilitado | Perjudicial: gestiona la compresión de memoria y el prefetch de arranque. | Automático. |
 | `TabletInputService` deshabilitado | Perjudicial: rompe la escritura en Inicio, Configuración y apps UWP. | Manual (fábrica). |
-| `DoSvc` con `Start=4` | Perjudicial: puede romper Windows Update; Medic lo revierte. | Fábrica + `DODownloadMode=0` (sin P2P). |
+| `WbioSrvc` deshabilitado | Perjudicial: rompe la huella. | Manual (fábrica). |
+| `lfsvc` deshabilitado | Perjudicial: rompe la luz nocturna del anochecer al amanecer. | Manual (fábrica). |
 | `DisablePagingExecutive=1` | Perjudicial con poca RAM: fija el kernel en memoria. | `0`. |
-| `IOPageLockLimit` | Placebo: ignorado desde Windows 2000 SP1. | Se borra. |
-| `DontVerifyRandomDrivers` | Placebo: Driver Verifier solo corre si se activa. | Se borra. |
+| `DoSvc` con `Start=4` | Perjudicial: puede romper Windows Update. | Fábrica (paso 1) + `DODownloadMode=0` (sin P2P). |
+| `IOPageLockLimit`, `DontVerifyRandomDrivers` | Placebos: Windows los ignora. | Sin cambios. |
 | `compact /CompactOS:never` | Correcto en HDD. | Se mantiene; descomprime solo si estaba comprimido y hay 6 GB libres. |
-| `DisableLastAccess`, `Disable8dot3` | Correctos. | Se mantienen. |
-| `lfsvc` (ubicación) y `WbioSrvc` (biometría) deshabilitados | Perjudicial: rompen la luz nocturna del anochecer al amanecer y la huella. | Manual (fábrica). |
-| Telemetría, Xbox, Bluetooth, Mapas, Retail Demo | Correctos. | Se mantienen; Retail Demo vuelve a Manual (fábrica). |
+| `DisableLastAccess`, `Disable8dot3` | Correctos. | Sin cambios. |
+| Telemetría, Xbox, Bluetooth, Mapas, Retail Demo | Correctos. | Sin cambios (la opción 1 aplica su propia configuración de servicios). |
+
+La compresión de memoria se activa siempre (paso 8).
 
 ### 3. Servicios
 
@@ -226,7 +230,7 @@ desactivado.
 | Grabación de acciones de usuario | `App.StepsRecorder` | Quitar |
 | Reconocedor matemático | `MathRecognizer` | Quitar |
 | WordPad | `Microsoft.Windows.WordPad` | Quitar |
-| Reproductor de Windows Media | `Media.WindowsMediaPlayer` | Quitar (VLC, opción 7) |
+| Reproductor de Windows Media | `Media.WindowsMediaPlayer` | Quitar (VLC, opción 6) |
 | Internet Explorer 11 | `Browser.InternetExplorer` | Quitar (el modo IE de Edge puede dejar de funcionar) |
 | Asistencia rápida integrada | `App.Support.QuickAssist` | Quitar (reemplazada por la versión de la Store) |
 | Cliente OpenSSH | `OpenSSH.Client` | Quitar |
@@ -279,7 +283,7 @@ Reader deja de recibir parches: asignar `.pdf` a Edge o Chrome, o desinstalarlo.
 
 Al final: estado de Defender, programas de inicio y reinicio.
 
-## Opción 7: Chrome, WinRAR y VLC
+## Opción 6: Chrome, WinRAR y VLC
 
 Orden: WinRAR, VLC, Chrome.
 
@@ -367,6 +371,13 @@ versión libre).
 
 - Borra las versiones reemplazadas de los componentes ya, sin esperar los 30 días de la tarea automática.
 - `/ResetBase`: las actualizaciones instaladas pasan a ser la base y **no se pueden desinstalar**. Las siguientes sí.
+- Windows 10 trae `DisableResetbase=1` en `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\SideBySide\Configuration`:
+  con ese valor, `/ResetBase` se ignora y solo se comprime. Durante la limpieza se usan `DisableResetbase=0` y
+  `SupersededActions=3` (1 antes de 1903), los valores de [W10UI](https://github.com/abbodi1406/BatUtil/tree/master/W10UI)
+  de abbodi1406; al terminar se restauran los originales. Se detienen `wuauserv` y `TrustedInstaller` para que tome
+  la configuración. Valores sin documentación de Microsoft.
+- Si existe `WinSxS\pending.xml` (cambios esperando reinicio), no ejecuta DISM y pide reiniciar.
+- Una segunda pasada es rápida: ya no queda qué borrar.
 - Libera espacio; no acelera. En Atom con HDD, hasta 1 h con el disco al 100%.
 - Error `0x800F0806`: hay una operación pendiente de reinicio
   ([Microsoft Q&A](https://learn.microsoft.com/en-us/answers/questions/2192270/dism-startcomponentcleanup-give-error-0x800f0806-t)).
@@ -449,11 +460,13 @@ fija; revisar *Load/Unload Cycle Count* con [CrystalDiskInfo](https://crystalmar
 
 ## Validación
 
-- **Wine (`cmd.exe`):** las 7 opciones de punta a punta con distintas combinaciones de respuestas; estado del v1
+- **Wine (`cmd.exe`):** las 6 opciones de punta a punta con distintas combinaciones de respuestas; estado del v1
   simulado (incluidas políticas que apagan Defender y Windows Update), con verificación en el registro de cada valor en
-  `HKEY_USERS\<SID>`; ciclo optimizar, revertir y verificar; opción 7 con winget simulado (instalación nueva, al día,
-  actualizado, sin winget).
-- **PowerShell:** los 38 bloques pasan el parser oficial. La quita de características opcionales se ejecutó contra una
+  `HKEY_USERS\<SID>`; ciclo optimizar, revertir y verificar; opción 6 con winget simulado (instalación nueva, al día,
+  actualizado, sin winget). Con el estado del v1, la opción 1 repara los 5 valores y en la pasada siguiente informa
+  que no hay nada; en la opción 3, DISM corre con `DisableResetbase=0` y `SupersededActions=3`, y después vuelven los
+  valores originales.
+- **PowerShell:** los 37 bloques pasan el parser oficial. La quita de características opcionales se ejecutó contra una
   lista simulada de 22H2, con y sin impresora.
 - **Luz nocturna:** los blobs generados se decodificaron con un parser Bond independiente, partiendo de la referencia
   de win-nightlight-cli (envoltorio Bond), de un blob de Windows 10 (envoltorio viejo) y de ninguno. Con el blob
@@ -471,7 +484,7 @@ opcionales, Store, ubicación, luz nocturna y Restaurar sistema.
 
 1. VM Windows 10 x64 22H2, 2 GB de RAM, 2 núcleos, actualizada.
 2. Opción 2; guardar el reporte. Snapshot.
-3. (Opcional) Script v1, opción 2, opción 6.
+3. (Opcional) Script v1 y opción 2; luego la opción 1 tiene que mostrar `[REPARADO]` en el paso 2.
 4. Volver al snapshot, opción 1, reiniciar, opción 2.
 5. Checklist:
    - [ ] Búsqueda del Inicio encuentra apps ("calc").
@@ -488,7 +501,7 @@ opcionales, Store, ubicación, luz nocturna y Restaurar sistema.
    - [ ] Win+Shift+S funciona.
    - [ ] Ventana visible al arrastrar; carpetas de fotos con íconos.
    - [ ] Adobe Reader: fuera del inicio; *Adobe Acrobat Update Service* deshabilitado.
-   - [ ] Opción 3 termina sin preguntas y muestra lo liberado.
+   - [ ] Opción 3 termina sin preguntas y muestra lo liberado; `DisableResetbase` queda como estaba.
    - [ ] Menú de apagado sin *Suspender* ni *Hibernar*.
    - [ ] Botón de encendido apaga (en UTM: apagado normal de la VM). Tapa: en la netbook real.
    - [ ] *Protección del sistema*: desactivada.
@@ -499,7 +512,7 @@ opcionales, Store, ubicación, luz nocturna y Restaurar sistema.
    - [ ] *Características opcionales*: quedan Paint, Bloc de notas, PowerShell ISE e idiomas.
    - [ ] *Pantalla > Configuración de luz nocturna*: programada, *Del atardecer al amanecer*. Opción 2: "del anochecer
      al amanecer" y ubicación `Allow / Allow`.
-   - [ ] Opción 7: WinRAR, VLC y Chrome sin preguntas; uBlock Origin Lite en Chrome.
+   - [ ] Opción 6: WinRAR, VLC y Chrome sin preguntas; uBlock Origin Lite en Chrome.
 6. Opción 5 y verificar la vuelta a fábrica.
 
 ## Fuentes
