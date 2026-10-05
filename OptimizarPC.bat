@@ -131,7 +131,7 @@ for /f "usebackq tokens=1-5,* delims=|" %%a in (`powershell -NoProfile -Executio
 ::    unos 3,2 GB y el video se queda con un pedazo): suspension a la hora,
 ::    tapa que suspende, Suspender en el menu y Bluetooth en Manual;
 ::  - eso y placa de video con driver: efectos visuales en "mejor apariencia";
-::  - disco del sistema SSD: miniaturas e indexador de busqueda de fabrica.
+::  - disco del sistema SSD: indexador de busqueda de fabrica.
 set "PERFIL_4GB=0"
 if %RAM_INST% GEQ 3584 set "PERFIL_4GB=1"
 set "EFECTOS=0"
@@ -156,7 +156,7 @@ echo   Procesador: %CPU_NOMBRE%
 if not "%RAM_MB%"=="9999" echo   RAM: %RAM_MB% MB visibles, %RAM_INST% MB instalados. Disco del sistema: %DISCO_TIPO%.
 if "%PERFIL_4GB%"=="1" echo   Perfil 4 GB o mas: suspende a la hora y con la tapa, Bluetooth en Manual.
 if "%EFECTOS%"=="1" echo   Video con driver: efectos visuales en "mejor apariencia".
-if "%SSD%"=="1" echo   Disco SSD: miniaturas e indexador de busqueda como de fabrica.
+if "%SSD%"=="1" echo   Disco SSD: indexador de busqueda como de fabrica.
 if %RAM_MB% GEQ 1500 goto :ram_ok
 echo   AVISO: tiene menos de 2 GB de RAM. Windows 10 de 64 bits pide 2 GB como minimo.
 echo          Estos Atom aceptan hasta 2 GB: ampliarla es la mejora mas barata que hay.
@@ -462,18 +462,15 @@ call :dword "%_adv%" TaskbarAnimations 1
 call :dword "%UHIVE%\Software\Microsoft\Windows\DWM" EnableAeroPeek 1
 call :dword "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" EnableTransparency 1
 call :borrar "HKLM\SOFTWARE\Policies\Microsoft\Windows\System" DisableAcrylicBackgroundOnLogon
-:: Con miniaturas (SSD) es "mejor apariencia" completa; con iconos, personalizada.
-set "_vfx=3"
-if "%SSD%"=="1" set "_vfx=1"
-call :dword "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects" VisualFXSetting %_vfx%
+:: Las miniaturas van siempre, asi que es "mejor apariencia" completa.
+call :dword "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects" VisualFXSetting 1
 echo   [OK] Efectos visuales en "mejor apariencia": hay 4 GB o mas y el video tiene driver.
 echo   [OK] Menus rapidos (100 ms en vez de 400).
 :visual_listo
-:: Miniaturas: en un disco mecanico, abrir una carpeta con fotos o videos obliga
-:: a leer cada archivo para dibujar su miniatura. En un SSD no se nota.
-set "_iconos=1"
-if "%SSD%"=="1" set "_iconos=0"
-call :dword "%_adv%" IconsOnly %_iconos%
+:: Miniaturas siempre, aun en disco mecanico: sin la vista previa no se
+:: encuentran las fotos, y eso pesa mas que la lectura extra al abrir la carpeta.
+:: Se escribe 0 para que tambien vuelvan en una PC donde una version anterior las apago.
+call :dword "%_adv%" IconsOnly 0
 :: El Explorador abre en "Este equipo" y no rastrea los programas abiertos.
 call :dword "%_adv%" LaunchTo 1
 call :dword "%_adv%" Start_TrackProgs 0
@@ -481,7 +478,7 @@ call :dword "%_adv%" Start_TrackProgs 0
 reg delete "%UCLS%\Local Settings\Software\Microsoft\Windows\Shell\BagMRU" /f >nul 2>&1
 reg delete "%UCLS%\Local Settings\Software\Microsoft\Windows\Shell\Bags" /f >nul 2>&1
 call :sz "%UCLS%\Local Settings\Software\Microsoft\Windows\Shell\Bags\AllFolders\Shell" FolderType NotSpecified
-if "%SSD%"=="1" (echo   [OK] Explorador: abre en Este equipo, muestra miniaturas y no adivina el tipo de) else (echo   [OK] Explorador: abre en Este equipo, muestra iconos en vez de miniaturas y no)
+echo   [OK] Explorador: abre en Este equipo, muestra miniaturas y no
 echo        adivina el tipo de cada carpeta.
 :: Ubicacion: la luz nocturna la usa para saber a que hora anochece. Se borran
 :: las politicas que la apagan y se permite para el equipo y para el usuario.

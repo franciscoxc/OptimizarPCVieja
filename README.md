@@ -67,7 +67,6 @@ Cada ajuste depende del recurso que realmente cuesta: la RAM, la placa de video 
 | RAM ≥ 4 GB | *Suspender* en el menú de apagado | Oculto | Visible |
 | RAM ≥ 4 GB | Bluetooth (`bthserv`, `BTAGService`, `BthAvctpSvc`) | Deshabilitado | Manual (fábrica) |
 | RAM ≥ 4 GB y video con driver | Efectos visuales | Mejor rendimiento | Mejor apariencia (`UserPreferencesMask=9E3E078012000000`), transparencias, desenfoque del inicio de sesión, Alt+Tab moderno |
-| Disco del sistema SSD | Miniaturas | Íconos | Miniaturas |
 | Disco del sistema SSD | Indexador (`WSearch`) | Deshabilitado | Automático (retrasado), fábrica |
 
 Fijo en todos: botón de encendido apaga, botón de suspensión no hace nada, sin hibernación, `MenuShowDelay` en 100 ms,
@@ -175,7 +174,8 @@ Sin exclusiones.
 - Efectos visuales en "mejor rendimiento", excepto: contenido de ventana al arrastrar; suavizado de fuentes;
   animación al minimizar y maximizar, solo con driver de video. Con 4 GB y driver: "mejor apariencia" (ver
   [Perfiles](#perfiles-según-el-hardware)).
-- Íconos en lugar de miniaturas (`IconsOnly=1`): en HDD cada miniatura obliga a leer el archivo. Con SSD, miniaturas.
+- Miniaturas siempre (`IconsOnly=0`), también en HDD: sin vista previa no se encuentran las fotos. Si una versión
+  anterior las había apagado, vuelven.
 - Sin transparencias, animaciones de menús y barra de tareas, Aero Peek ni desenfoque acrílico del inicio de sesión
   (`DisableAcrylicBackgroundOnLogon`), salvo en "mejor apariencia".
 - `MenuShowDelay`: 400 a 100 ms.
