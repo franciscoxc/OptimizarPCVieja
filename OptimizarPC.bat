@@ -237,16 +237,16 @@ call :quitar_si_vale "HKLM\SOFTWARE\Policies\Microsoft\Windows\System" EnableSma
 call :quitar_si_vale "HKLM\SOFTWARE\Policies\Microsoft\Edge" SmartScreenEnabled 0x0 "Una politica apagaba SmartScreen en Edge"
 call :quitar_si_vale "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\AppHost" EnableWebContentEvaluation 0x0 "SmartScreen para apps de la Store estaba apagado"
 call :leer "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer" SmartScreenEnabled
-if /i "%_r%"=="Off" call :fijar_sz "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer" SmartScreenEnabled Warn "SmartScreen para apps y archivos estaba apagado"
+if /i "%_r%"=="Off" call :sz "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer" SmartScreenEnabled Warn "SmartScreen para apps y archivos estaba apagado"
 
 :: UAC: solo se repara si estaba apagado o en "no notificar nunca"
 set "_uac=HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System"
 call :leer "%_uac%" EnableLUA
-if "%_r%"=="0x0" call :fijar_dword "%_uac%" EnableLUA 1 "UAC estaba desactivado"
+if "%_r%"=="0x0" call :dword "%_uac%" EnableLUA 1 "UAC estaba desactivado"
 call :leer "%_uac%" ConsentPromptBehaviorAdmin
-if "%_r%"=="0x0" call :fijar_dword "%_uac%" ConsentPromptBehaviorAdmin 5 "UAC estaba en no notificar nunca"
+if "%_r%"=="0x0" call :dword "%_uac%" ConsentPromptBehaviorAdmin 5 "UAC estaba en no notificar nunca"
 call :leer "%_uac%" PromptOnSecureDesktop
-if "%_r%"=="0x0" call :fijar_dword "%_uac%" PromptOnSecureDesktop 1 "UAC no usaba el escritorio seguro"
+if "%_r%"=="0x0" call :dword "%_uac%" PromptOnSecureDesktop 1 "UAC no usaba el escritorio seguro"
 
 :: DEP: AlwaysOff -> OptIn (valor de fabrica). Si hay BitLocker, se suspende
 :: por un reinicio para que el cambio en el arranque no pida la clave.
@@ -823,11 +823,10 @@ echo   Si vas a desfragmentar (opcion 3), ahora es el momento: hay menos que mov
 goto :menu
 
 :wu_error
-set "DISM_HEX=%DISM_RC%"
-for /f "usebackq delims=" %%h in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "'0x{0:X8}' -f [int]$env:DISM_RC"`) do set "DISM_HEX=%%h"
+call :a_hex %DISM_RC%
 echo.
-echo   [!] DISM termino con el error %DISM_HEX%.
-if /i "%DISM_HEX%"=="0x800F0806" echo       Hay una actualizacion esperando un reinicio.
+echo   [!] DISM termino con el error %_hex%.
+if /i "%_hex%"=="0x800F0806" echo       Hay una actualizacion esperando un reinicio.
 echo       Lo mas comun: una actualizacion a medio instalar. Reinicia la PC, deja
 echo       que Windows Update termine y volve a elegir esta opcion.
 echo       El detalle queda en C:\Windows\Logs\DISM\dism.log.
@@ -1149,28 +1148,18 @@ set "_r="
 for /f "tokens=3" %%v in ('reg query "%~1" /v %~2 2^>nul ^| findstr /i /c:"%~2"') do set "_r=%%v"
 goto :eof
 
-:: Escribe un DWORD. Uso: call :dword "clave" valor dato
+:: Escribe un DWORD. Uso: call :dword "clave" valor dato ["aviso de reparado"]
 :dword
 reg add "%~1" /v %~2 /t REG_DWORD /d %~3 /f >nul 2>&1
 if errorlevel 1 echo   [AVISO] No se pudo escribir %~2
+if not errorlevel 1 if not "%~4"=="" echo   [REPARADO] %~4
 goto :eof
 
-:: Escribe un texto. Uso: call :sz "clave" valor dato
+:: Escribe un texto. Uso: call :sz "clave" valor dato ["aviso de reparado"]
 :sz
 reg add "%~1" /v %~2 /t REG_SZ /d "%~3" /f >nul 2>&1
 if errorlevel 1 echo   [AVISO] No se pudo escribir %~2
-goto :eof
-
-:: Escribe un DWORD y avisa que se reparo algo. Uso: call :fijar_dword "clave" valor dato "aviso"
-:fijar_dword
-reg add "%~1" /v %~2 /t REG_DWORD /d %~3 /f >nul 2>&1
-echo   [REPARADO] %~4
-goto :eof
-
-:: Escribe un texto y avisa que se reparo algo. Uso: call :fijar_sz "clave" valor dato "aviso"
-:fijar_sz
-reg add "%~1" /v %~2 /t REG_SZ /d "%~3" /f >nul 2>&1
-echo   [REPARADO] %~4
+if not errorlevel 1 if not "%~4"=="" echo   [REPARADO] %~4
 goto :eof
 
 :: Borra una politica si existe y avisa. Uso: call :quitar_politica "clave" valor "que afectaba"
@@ -1364,9 +1353,10 @@ goto :eof
 
 :: Pasa un codigo de error a hexadecimal, como lo publica Microsoft. Deja _hex.
 :a_hex
-set "_hex=%~1"
-set "_HEX_IN=%~1"
-for /f "usebackq delims=" %%h in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "'0x{0:X8}' -f [int]$env:_HEX_IN"`) do set "_hex=%%h"
+:: Sin PowerShell: cmd deja el ultimo codigo de salida en hexa en =ExitCode, y en
+:: una PC de 2 GB con disco mecanico abrir PowerShell solo para esto tarda segundos.
+cmd /c exit %~1
+set "_hex=0x%=ExitCode%"
 goto :eof
 
 :: Borra un valor si existe. Uso: call :borrar "clave" valor
