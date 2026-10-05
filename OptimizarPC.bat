@@ -109,18 +109,35 @@ call :detectar_usuario
 set "BUILD=0"
 for /f "tokens=3" %%b in ('reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion" /v CurrentBuildNumber 2^>nul ^| findstr /i "CurrentBuildNumber"') do set "BUILD=%%b"
 
-:: Hardware: RAM, placa de video sin driver y antirrobo de Conectar Igualdad
-:: (Theft Deterrent). El driver basico de Microsoft se instala como display.inf.
+:: Hardware: RAM (visible e instalada), placa de video sin driver, antirrobo de
+:: Conectar Igualdad (Theft Deterrent) y tipo de disco del sistema. El driver
+:: basico de Microsoft se instala como display.inf.
 set "RAM_MB=9999"
 set "GPU_BASICA=0"
 set "ANTIRROBO=0"
+set "RAM_INST=0"
+set "DISCO_TIPO=desconocido"
 set "CPU_NOMBRE=desconocido"
-for /f "usebackq tokens=1-3,* delims=|" %%a in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "$r=[math]::Round((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory/1MB); $g=0; Get-CimInstance Win32_VideoController | ForEach-Object { if ($_.InfFilename -eq 'display.inf' -or $_.Name -match 'Basic Display') { $g=1 } }; $t=0; foreach ($d in $env:ProgramFiles, ${env:ProgramFiles(x86)}) { if ($d -and (Test-Path -LiteralPath (Join-Path $d 'Intel Learning Series\Theft Deterrent'))) { $t=1 } }; if (Get-Service | Where-Object { ($_.Name + ' ' + $_.DisplayName) -match 'Theft|Deterrent|TDAgent' }) { $t=1 }; foreach ($k in 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run','HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Run') { $i=Get-Item -LiteralPath $k -ErrorAction SilentlyContinue; if ($i -and ($i.Property -match 'Theft|Deterrent|TDAgent')) { $t=1 } }; $c=(Get-CimInstance Win32_Processor | Select-Object -First 1).Name -replace '\s+',' '; [string]$r + '|' + $g + '|' + $t + '|' + $c.Trim()"`) do (
+for /f "usebackq tokens=1-5,* delims=|" %%a in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "$r=[math]::Round((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory/1MB); $g=0; Get-CimInstance Win32_VideoController | ForEach-Object { if ($_.InfFilename -eq 'display.inf' -or $_.Name -match 'Basic Display') { $g=1 } }; $t=0; foreach ($d in $env:ProgramFiles, ${env:ProgramFiles(x86)}) { if ($d -and (Test-Path -LiteralPath (Join-Path $d 'Intel Learning Series\Theft Deterrent'))) { $t=1 } }; if (Get-Service | Where-Object { ($_.Name + ' ' + $_.DisplayName) -match 'Theft|Deterrent|TDAgent' }) { $t=1 }; foreach ($k in 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run','HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Run') { $i=Get-Item -LiteralPath $k -ErrorAction SilentlyContinue; if ($i -and ($i.Property -match 'Theft|Deterrent|TDAgent')) { $t=1 } }; $ri=[math]::Round((Get-CimInstance Win32_PhysicalMemory -ErrorAction SilentlyContinue | Measure-Object -Property Capacity -Sum).Sum / 1MB); if ($ri -lt 256) { $ri=$r }; $m='desconocido'; $n=(Get-Partition -DriveLetter $env:SystemDrive[0] -ErrorAction SilentlyContinue).DiskNumber; $d=Get-PhysicalDisk -ErrorAction SilentlyContinue | Where-Object { $_.DeviceId -eq [string]$n } | Select-Object -First 1; if ($d -and ([string]$d.MediaType -eq 'SSD' -or [string]$d.MediaType -eq 'HDD')) { $m=[string]$d.MediaType }; $c=(Get-CimInstance Win32_Processor | Select-Object -First 1).Name -replace '\s+',' '; [string]$r + '|' + $g + '|' + $t + '|' + $ri + '|' + $m + '|' + $c.Trim()"`) do (
     set "RAM_MB=%%a"
     set "GPU_BASICA=%%b"
     set "ANTIRROBO=%%c"
-    set "CPU_NOMBRE=%%d"
+    set "RAM_INST=%%d"
+    set "DISCO_TIPO=%%e"
+    set "CPU_NOMBRE=%%f"
 )
+:: Perfiles segun el hardware:
+::  - RAM instalada de 4 GB o mas (se suman los modulos: Windows de 32 bits ve
+::    unos 3,2 GB y el video se queda con un pedazo): suspension a la hora,
+::    tapa que suspende, Suspender en el menu y Bluetooth en Manual;
+::  - eso y placa de video con driver: efectos visuales en "mejor apariencia";
+::  - disco del sistema SSD: miniaturas e indexador de busqueda de fabrica.
+set "PERFIL_4GB=0"
+if %RAM_INST% GEQ 3584 set "PERFIL_4GB=1"
+set "EFECTOS=0"
+if "%PERFIL_4GB%"=="1" if not "%GPU_BASICA%"=="1" set "EFECTOS=1"
+set "SSD=0"
+if /i "%DISCO_TIPO%"=="SSD" set "SSD=1"
 
 :: -------------------------------------------------------------------------
 :: Presentacion y preguntas
@@ -136,7 +153,10 @@ echo   Compilacion de Windows: %BUILD%
 if %BUILD% GEQ 22000 echo   AVISO: esto parece Windows 11. El script esta pensado para Windows 10.
 if %BUILD% LSS 19041 echo   AVISO: Windows 10 muy viejo. Conviene actualizar a 22H2 primero.
 echo   Procesador: %CPU_NOMBRE%
-if not "%RAM_MB%"=="9999" echo   RAM: %RAM_MB% MB
+if not "%RAM_MB%"=="9999" echo   RAM: %RAM_MB% MB visibles, %RAM_INST% MB instalados. Disco del sistema: %DISCO_TIPO%.
+if "%PERFIL_4GB%"=="1" echo   Perfil 4 GB o mas: suspende a la hora y con la tapa, Bluetooth en Manual.
+if "%EFECTOS%"=="1" echo   Video con driver: efectos visuales en "mejor apariencia".
+if "%SSD%"=="1" echo   Disco SSD: miniaturas e indexador de busqueda como de fabrica.
 if %RAM_MB% GEQ 1500 goto :ram_ok
 echo   AVISO: tiene menos de 2 GB de RAM. Windows 10 de 64 bits pide 2 GB como minimo.
 echo          Estos Atom aceptan hasta 2 GB: ampliarla es la mejora mas barata que hay.
@@ -297,11 +317,20 @@ echo   [OK] Compresion de memoria activa.
 :: =========================================================================
 call :titulo "3/11  Servicios: Manual siempre que se pueda"
 :: =========================================================================
-:: Deshabilitados: telemetria, indexador, Xbox, Bluetooth y Registro remoto.
-for %%s in (DiagTrack dmwappushservice WSearch RemoteRegistry) do call :servicio %%s disabled
+:: Deshabilitados: telemetria, Xbox y Registro remoto.
+for %%s in (DiagTrack dmwappushservice RemoteRegistry) do call :servicio %%s disabled
 for %%s in (XblAuthManager XblGameSave XboxNetApiSvc XboxGipSvc xbgm) do call :servicio %%s disabled
-for %%s in (bthserv BTAGService BthAvctpSvc) do call :servicio %%s disabled
-echo   [OK] Deshabilitados: telemetria, indexador de busqueda, Xbox, Bluetooth y Registro remoto.
+echo   [OK] Deshabilitados: telemetria, Xbox y Registro remoto.
+:: Indexador de busqueda: en un disco mecanico lee y relee el disco; en un SSD
+:: no molesta y queda como de fabrica.
+if "%SSD%"=="1" (call :servicio WSearch delayed-auto) else (call :servicio WSearch disabled)
+if "%SSD%"=="1" (echo   [OK] Indexador de busqueda: como de fabrica, el disco es SSD.) else (echo   [OK] Indexador de busqueda: deshabilitado, castiga al disco mecanico.)
+:: Bluetooth: con 4 GB o mas queda en Manual, su valor de fabrica (sin adaptador
+:: no gasta nada); con menos, deshabilitado.
+set "_bt=disabled"
+if "%PERFIL_4GB%"=="1" set "_bt=demand"
+for %%s in (bthserv BTAGService BthAvctpSvc) do call :servicio %%s %_bt%
+if "%PERFIL_4GB%"=="1" (echo   [OK] Bluetooth: Manual, su valor de fabrica.) else (echo   [OK] Bluetooth: deshabilitado.)
 :: Manual: arrancan solo cuando algo los necesita.
 for %%s in (PcaSvc TrkWks iphlpsvc DPS CDPSvc MapsBroker edgeupdate lfsvc WbioSrvc RetailDemo) do call :servicio %%s demand
 echo   [OK] En Manual: PcaSvc, TrkWks, iphlpsvc, DPS, CDPSvc, MapsBroker, edgeupdate,
@@ -393,16 +422,17 @@ call :titulo "7/11  Interfaz y Explorador"
 :: =========================================================================
 set "_desk=%UHIVE%\Control Panel\Desktop"
 set "_adv=%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced"
+call :sz "%_desk%" DragFullWindows 1
+call :sz "%_desk%" MenuShowDelay 100
+call :sz "%_desk%" FontSmoothing 2
+call :dword "%_desk%" FontSmoothingType 2
+if "%EFECTOS%"=="1" goto :visual_apariencia
 :: Efectos visuales en "mejor rendimiento", salvo:
 ::  - el suavizado de fuentes: no es un efecto, es lo que hace legible el texto;
 ::  - mostrar el contenido de la ventana mientras se arrastra;
 ::  - la animacion al minimizar y maximizar, solo si la placa de video tiene
 ::    driver: con el adaptador basico la dibuja el procesador y va a los saltos.
 reg add "%_desk%" /v UserPreferencesMask /t REG_BINARY /d 9012038010000000 /f >nul 2>&1
-call :sz "%_desk%" DragFullWindows 1
-call :sz "%_desk%" MenuShowDelay 100
-call :sz "%_desk%" FontSmoothing 2
-call :dword "%_desk%" FontSmoothingType 2
 set "_minanim=1"
 if "%GPU_BASICA%"=="1" set "_minanim=0"
 call :sz "%_desk%\WindowMetrics" MinAnimate %_minanim%
@@ -410,14 +440,40 @@ call :dword "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEf
 call :dword "%_adv%" ListviewAlphaSelect 0
 call :dword "%_adv%" ListviewShadow 0
 call :dword "%_adv%" TaskbarAnimations 0
-:: Iconos en vez de miniaturas: en un disco mecanico, abrir una carpeta con fotos
-:: o videos obliga a leer cada archivo para dibujar su miniatura.
-call :dword "%_adv%" IconsOnly 1
 call :dword "%UHIVE%\Software\Microsoft\Windows\DWM" EnableAeroPeek 0
 call :dword "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" EnableTransparency 0
 :: Sin el desenfoque "acrilico" de la pantalla de inicio de sesion: otro efecto de
 :: transparencia, y sin aceleracion de video lo calcula el procesador.
 call :dword "HKLM\SOFTWARE\Policies\Microsoft\Windows\System" DisableAcrylicBackgroundOnLogon 1
+echo   [OK] Efectos visuales al minimo. Quedan el suavizado de fuentes y el contenido
+echo        de la ventana al arrastrar.
+if "%_minanim%"=="1" echo   [OK] Animacion al minimizar y maximizar: activada, el video tiene driver.
+if "%_minanim%"=="0" echo   [OK] Animacion al minimizar y maximizar: apagada, el video no tiene driver.
+echo   [OK] Menus mas rapidos, sin transparencias, animaciones ni desenfoque al iniciar sesion.
+goto :visual_listo
+:visual_apariencia
+:: 4 GB o mas y video con driver: "mejor apariencia", con todos los efectos,
+:: transparencias y el desenfoque del inicio de sesion. Los menus siguen rapidos.
+reg add "%_desk%" /v UserPreferencesMask /t REG_BINARY /d 9E3E078012000000 /f >nul 2>&1
+call :sz "%_desk%\WindowMetrics" MinAnimate 1
+call :dword "%_adv%" ListviewAlphaSelect 1
+call :dword "%_adv%" ListviewShadow 1
+call :dword "%_adv%" TaskbarAnimations 1
+call :dword "%UHIVE%\Software\Microsoft\Windows\DWM" EnableAeroPeek 1
+call :dword "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" EnableTransparency 1
+call :borrar "HKLM\SOFTWARE\Policies\Microsoft\Windows\System" DisableAcrylicBackgroundOnLogon
+:: Con miniaturas (SSD) es "mejor apariencia" completa; con iconos, personalizada.
+set "_vfx=3"
+if "%SSD%"=="1" set "_vfx=1"
+call :dword "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects" VisualFXSetting %_vfx%
+echo   [OK] Efectos visuales en "mejor apariencia": hay 4 GB o mas y el video tiene driver.
+echo   [OK] Menus rapidos (100 ms en vez de 400).
+:visual_listo
+:: Miniaturas: en un disco mecanico, abrir una carpeta con fotos o videos obliga
+:: a leer cada archivo para dibujar su miniatura. En un SSD no se nota.
+set "_iconos=1"
+if "%SSD%"=="1" set "_iconos=0"
+call :dword "%_adv%" IconsOnly %_iconos%
 :: El Explorador abre en "Este equipo" y no rastrea los programas abiertos.
 call :dword "%_adv%" LaunchTo 1
 call :dword "%_adv%" Start_TrackProgs 0
@@ -425,12 +481,7 @@ call :dword "%_adv%" Start_TrackProgs 0
 reg delete "%UCLS%\Local Settings\Software\Microsoft\Windows\Shell\BagMRU" /f >nul 2>&1
 reg delete "%UCLS%\Local Settings\Software\Microsoft\Windows\Shell\Bags" /f >nul 2>&1
 call :sz "%UCLS%\Local Settings\Software\Microsoft\Windows\Shell\Bags\AllFolders\Shell" FolderType NotSpecified
-echo   [OK] Efectos visuales al minimo. Quedan el suavizado de fuentes y el contenido
-echo        de la ventana al arrastrar.
-if "%_minanim%"=="1" echo   [OK] Animacion al minimizar y maximizar: activada, el video tiene driver.
-if "%_minanim%"=="0" echo   [OK] Animacion al minimizar y maximizar: apagada, el video no tiene driver.
-echo   [OK] Menus mas rapidos, sin transparencias, animaciones ni desenfoque al iniciar sesion.
-echo   [OK] Explorador: abre en Este equipo, muestra iconos en vez de miniaturas y no
+if "%SSD%"=="1" (echo   [OK] Explorador: abre en Este equipo, muestra miniaturas y no adivina el tipo de) else (echo   [OK] Explorador: abre en Este equipo, muestra iconos en vez de miniaturas y no)
 echo        adivina el tipo de cada carpeta.
 :: Ubicacion: la luz nocturna la usa para saber a que hora anochece. Se borran
 :: las politicas que la apagan y se permite para el equipo y para el usuario.
@@ -450,11 +501,12 @@ fsutil behavior set DisableLastAccess 1 >nul 2>&1
 fsutil behavior set Disable8dot3 1 >nul 2>&1
 echo   [OK] NTFS sin registro de ultimo acceso ni nombres cortos 8.3.
 
-:: Archivo de paginacion fijo en el doble de la RAM instalada (con 2 GB, 4096 MB).
+:: Archivo de paginacion fijo en el doble de la RAM instalada (con 2 GB, 4096 MB),
+:: con tope de 8 GB: con 8 GB de RAM, el doble serian 16 GB de disco sin uso.
 :: El automatico arranca chico y crece cuando hace falta: en un disco lento,
 :: mientras crece, los programas pueden fallar por falta de memoria (Microsoft),
 :: y crecer y achicarse lo fragmenta. Fijo, nunca cambia de tamano. Rige al reiniciar.
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$cs=Get-CimInstance Win32_ComputerSystem; $ram=[math]::Round((Get-CimInstance Win32_PhysicalMemory -ErrorAction SilentlyContinue | Measure-Object -Property Capacity -Sum).Sum / 1MB); if ($ram -lt 256) { $ram=[math]::Ceiling($cs.TotalPhysicalMemory / 512MB) * 512 }; $mb=[int]($ram * 2); $nombre=$env:SystemDrive + '\pagefile.sys'; $pf=Get-CimInstance Win32_PageFileSetting | Where-Object { $_.Name -eq $nombre } | Select-Object -First 1; if (-not $cs.AutomaticManagedPagefile -and $pf -and $pf.InitialSize -eq $mb -and $pf.MaximumSize -eq $mb) { Write-Output ('  [OK] Archivo de paginacion: ya estaba fijo en ' + $mb + ' MB.'); exit 0 }; $actual=0; Get-CimInstance Win32_PageFileUsage | Where-Object { $_.Name -eq $nombre } | ForEach-Object { $actual=[int]$_.AllocatedBaseSize }; $libre=[math]::Floor((Get-PSDrive -Name $env:SystemDrive.Substring(0,1)).Free / 1MB) + $actual; if ($libre -lt ($mb + 2048)) { Write-Output '  [AVISO] Poco espacio libre: el archivo de paginacion queda como esta.'; exit 0 }; try { Set-CimInstance -InputObject $cs -Property @{AutomaticManagedPagefile=$false} -ErrorAction Stop; $pf=Get-CimInstance Win32_PageFileSetting | Where-Object { $_.Name -eq $nombre } | Select-Object -First 1; if ($pf) { Set-CimInstance -InputObject $pf -Property @{InitialSize=[uint32]$mb; MaximumSize=[uint32]$mb} -ErrorAction Stop } else { New-CimInstance -ClassName Win32_PageFileSetting -Property @{Name=$nombre; InitialSize=[uint32]$mb; MaximumSize=[uint32]$mb} -ErrorAction Stop | Out-Null }; Write-Output ('  [OK] Archivo de paginacion fijo en ' + $mb + ' MB, el doble de la RAM: no crece ni se fragmenta.') } catch { Set-CimInstance -InputObject $cs -Property @{AutomaticManagedPagefile=$true} -ErrorAction SilentlyContinue; Write-Output '  [AVISO] No se pudo configurar el archivo de paginacion: queda automatico.' }"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$cs=Get-CimInstance Win32_ComputerSystem; $ram=[math]::Round((Get-CimInstance Win32_PhysicalMemory -ErrorAction SilentlyContinue | Measure-Object -Property Capacity -Sum).Sum / 1MB); if ($ram -lt 256) { $ram=[math]::Ceiling($cs.TotalPhysicalMemory / 512MB) * 512 }; $mb=[int][math]::Min($ram * 2, 8192); $nombre=$env:SystemDrive + '\pagefile.sys'; $pf=Get-CimInstance Win32_PageFileSetting | Where-Object { $_.Name -eq $nombre } | Select-Object -First 1; if (-not $cs.AutomaticManagedPagefile -and $pf -and $pf.InitialSize -eq $mb -and $pf.MaximumSize -eq $mb) { Write-Output ('  [OK] Archivo de paginacion: ya estaba fijo en ' + $mb + ' MB.'); exit 0 }; $actual=0; Get-CimInstance Win32_PageFileUsage | Where-Object { $_.Name -eq $nombre } | ForEach-Object { $actual=[int]$_.AllocatedBaseSize }; $libre=[math]::Floor((Get-PSDrive -Name $env:SystemDrive.Substring(0,1)).Free / 1MB) + $actual; if ($libre -lt ($mb + 2048)) { Write-Output '  [AVISO] Poco espacio libre: el archivo de paginacion queda como esta.'; exit 0 }; try { Set-CimInstance -InputObject $cs -Property @{AutomaticManagedPagefile=$false} -ErrorAction Stop; $pf=Get-CimInstance Win32_PageFileSetting | Where-Object { $_.Name -eq $nombre } | Select-Object -First 1; if ($pf) { Set-CimInstance -InputObject $pf -Property @{InitialSize=[uint32]$mb; MaximumSize=[uint32]$mb} -ErrorAction Stop } else { New-CimInstance -ClassName Win32_PageFileSetting -Property @{Name=$nombre; InitialSize=[uint32]$mb; MaximumSize=[uint32]$mb} -ErrorAction Stop | Out-Null }; Write-Output ('  [OK] Archivo de paginacion fijo en ' + $mb + ' MB, el doble de la RAM con tope de 8 GB: no crece ni se fragmenta.') } catch { Set-CimInstance -InputObject $cs -Property @{AutomaticManagedPagefile=$true} -ErrorAction SilentlyContinue; Write-Output '  [AVISO] No se pudo configurar el archivo de paginacion: queda automatico.' }"
 
 :: Cache de escritura del disco: activada y SIN vaciado del bufer. Asi Windows no
 :: espera a que el disco confirme cada escritura: se gana tiempo. El costo: ante
@@ -487,9 +539,15 @@ echo   [OK] El sistema no esta comprimido con CompactOS: nada que hacer.
 :: planes de Windows, por si alguien cambia de plan despues:
 ::  - el disco nunca se apaga solo: despertarlo congela la PC varios segundos;
 ::  - suspende sola a las 4 horas sin uso: le da tiempo de sobra al mantenimiento
-::    automatico de Windows, que corre con la PC prendida y sin uso. Nunca hiberna;
-::  - boton de encendido y tapa: apagado completo; boton de suspension: nada;
+::    automatico de Windows, que corre con la PC prendida y sin uso. Con 4 GB o
+::    mas, a la hora: esas PCs lo terminan antes. Nunca hiberna;
+::  - boton de encendido: apagado completo; tapa: apagado completo, o suspender
+::    con 4 GB o mas; boton de suspension: nada;
 ::  - bateria critica: apagado completo, la unica salida prolija sin hibernacion.
+set "_susp=14400"
+set "_tapa=3"
+if "%PERFIL_4GB%"=="1" set "_susp=3600"
+if "%PERFIL_4GB%"=="1" set "_tapa=1"
 for %%p in (381b4222-f694-41f0-9685-ff5bb260df2e 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c a1841308-3541-4fab-bc81-f71556f20b4a) do call :energia_plan %%p
 :: Plan de Alto rendimiento en todas las PCs, notebooks incluidas. Si el plan no
 :: existe, se crea a partir del original de Windows. Si tampoco se puede, queda
@@ -505,18 +563,20 @@ echo   [OK] Plan de energia: Alto rendimiento, tambien en notebooks.
 call :energia_plan SCHEME_CURRENT
 powercfg /setactive SCHEME_CURRENT >nul 2>&1
 echo   [OK] El disco nunca se apaga solo y la PC nunca hiberna.
-echo   [OK] Suspension a las 4 horas sin uso: da tiempo al mantenimiento de Windows.
-echo   [OK] Boton de encendido y tapa: apagado completo. Boton de suspension: nada.
+if "%PERFIL_4GB%"=="1" (echo   [OK] Suspension a la hora sin uso.) else (echo   [OK] Suspension a las 4 horas sin uso: da tiempo al mantenimiento de Windows.)
+if "%PERFIL_4GB%"=="1" (echo   [OK] Tapa: suspende. Boton de encendido: apagado completo. Boton de suspension: nada.) else (echo   [OK] Boton de encendido y tapa: apagado completo. Boton de suspension: nada.)
 echo   [OK] Bateria critica: apagado completo.
 :: Sin hibernacion ni inicio rapido: cada apagado es completo, cada arranque es
 :: limpio y se borra hiberfil.sys: el 40% de la RAM, unos 800 MB con 2 GB.
 powercfg /hibernate off >nul 2>&1
 call :dword "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Power" HiberbootEnabled 0
-:: Suspender e Hibernar, fuera del menu de apagado.
-call :dword "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\FlyoutMenuSettings" ShowSleepOption 0
+:: Hibernar, fuera del menu de apagado. Suspender tambien, salvo con 4 GB o mas.
+set "_menususp=0"
+if "%PERFIL_4GB%"=="1" set "_menususp=1"
+call :dword "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\FlyoutMenuSettings" ShowSleepOption %_menususp%
 call :dword "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\FlyoutMenuSettings" ShowHibernateOption 0
 echo   [OK] Sin hibernacion ni inicio rapido: cada apagado es completo.
-echo   [OK] Suspender e Hibernar ya no aparecen en el menu de apagado.
+if "%PERFIL_4GB%"=="1" (echo   [OK] Menu de apagado: Suspender queda, Hibernar no aparece.) else (echo   [OK] Suspender e Hibernar ya no aparecen en el menu de apagado.)
 :: Restaurar sistema: desactivado. Cada punto cuesta escrituras de fondo y espacio
 :: en el disco, y en la practica se reinstala. La herramienta oficial borra sus
 :: puntos y libera el espacio. La vuelta atras es la opcion 6 del menu.
@@ -587,9 +647,10 @@ echo        WebP, HEIC y AVIF. HEIC y AVIF necesitan extensiones de la Store.
 :: La app Fotos nueva, para todos los usuarios.
 powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-AppxPackage -AllUsers -Name Microsoft.Windows.Photos -ErrorAction SilentlyContinue | ForEach-Object { Remove-AppxPackage -Package $_.PackageFullName -AllUsers -ErrorAction SilentlyContinue }; Get-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -eq 'Microsoft.Windows.Photos' } | ForEach-Object { Remove-AppxProvisionedPackage -Online -PackageName $_.PackageName -ErrorAction SilentlyContinue | Out-Null }"
 echo   [OK] App Fotos quitada. Si algun dia hace falta, se reinstala desde la Store.
-:: Alt+Tab clasico: iconos en vez de miniaturas en vivo de cada ventana.
-call :dword "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Explorer" AltTabSettings 1
-echo   [OK] Alt+Tab clasico activado.
+:: Alt+Tab clasico: iconos en vez de miniaturas en vivo de cada ventana. Con
+:: 4 GB y video con driver queda el moderno: las miniaturas las dibuja la placa.
+if "%EFECTOS%"=="1" (call :borrar "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Explorer" AltTabSettings) else (call :dword "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Explorer" AltTabSettings 1)
+if "%EFECTOS%"=="1" (echo   [OK] Alt+Tab moderno, con miniaturas: el video tiene driver.) else (echo   [OK] Alt+Tab clasico activado.)
 :: Caracteristicas opcionales (Configuracion > Aplicaciones > Caracteristicas
 :: opcionales): no corren de fondo, pero ocupan disco. Quedan Paint, Bloc de
 :: notas, PowerShell ISE, los idiomas y, con impresora, Fax y Escaner y la
@@ -651,11 +712,13 @@ echo.
 echo ==========================================================================
 echo   LISTO. Hay que REINICIAR la PC para aplicar todo.
 echo.
+if "%SSD%"=="1" goto :fin_busqueda_listo
 echo   Para buscar archivos: Windows Search queda apagado porque castiga el disco.
 echo   Everything, de voidtools.com, encuentra cualquier archivo al instante.
 echo.
-echo   Energia: cerrar la tapa o apretar el boton de encendido ahora APAGA la PC,
-echo   sin suspender. Guarda lo que estes haciendo antes.
+:fin_busqueda_listo
+if "%PERFIL_4GB%"=="1" (echo   Energia: el boton de encendido ahora APAGA la PC; cerrar la tapa la suspende.) else (echo   Energia: cerrar la tapa o apretar el boton de encendido ahora APAGA la PC,)
+if not "%PERFIL_4GB%"=="1" echo   sin suspender. Guarda lo que estes haciendo antes.
 echo.
 echo   Seguridad: Windows 10 recibe parches gratis hasta el 12/10/2027 si la PC
 echo   esta inscripta en ESU. Revisalo en Configuracion, Windows Update.
@@ -947,7 +1010,7 @@ call :titulo "Cache de escritura del disco"
 powershell -NoProfile -ExecutionPolicy Bypass -Command "$n=(Get-Partition -DriveLetter $env:SystemDrive.Substring(0,1) -ErrorAction SilentlyContinue).DiskNumber; $d=Get-PhysicalDisk -ErrorAction SilentlyContinue | Where-Object { $_.DeviceId -eq [string]$n } | Select-Object -First 1; $w=Get-CimInstance Win32_DiskDrive -ErrorAction SilentlyContinue | Where-Object { $_.Index -eq $n } | Select-Object -First 1; if (-not $w -or -not $w.PNPDeviceID) { Write-Output '  No se encontro el disco del sistema: nada que revertir.'; exit 0 }; $k='Registry::HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Enum\' + $w.PNPDeviceID + '\Device Parameters\Disk'; Remove-ItemProperty -LiteralPath $k -Name CacheIsPowerProtected -ErrorAction SilentlyContinue; Write-Output '  [OK] El vaciado del bufer de escritura vuelve a estar activo, como de fabrica.'"
 
 call :titulo "Archivo de paginacion"
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$cs=Get-CimInstance Win32_ComputerSystem; if ($cs.AutomaticManagedPagefile) { Write-Output '  [OK] El archivo de paginacion ya es automatico.'; exit 0 }; $ram=[math]::Round((Get-CimInstance Win32_PhysicalMemory -ErrorAction SilentlyContinue | Measure-Object -Property Capacity -Sum).Sum / 1MB); if ($ram -lt 256) { $ram=[math]::Ceiling($cs.TotalPhysicalMemory / 512MB) * 512 }; $mb=[int]($ram * 2); $nombre=$env:SystemDrive + '\pagefile.sys'; $pf=Get-CimInstance Win32_PageFileSetting | Where-Object { $_.Name -eq $nombre } | Select-Object -First 1; if ($pf -and $pf.InitialSize -eq $mb -and $pf.MaximumSize -eq $mb) { Set-CimInstance -InputObject $cs -Property @{AutomaticManagedPagefile=$true}; Write-Output '  [OK] El archivo de paginacion vuelve a ser automatico, como de fabrica.' } else { Write-Output '  [OK] El archivo de paginacion lo configuro alguien a mano: se deja como esta.' }"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$cs=Get-CimInstance Win32_ComputerSystem; if ($cs.AutomaticManagedPagefile) { Write-Output '  [OK] El archivo de paginacion ya es automatico.'; exit 0 }; $ram=[math]::Round((Get-CimInstance Win32_PhysicalMemory -ErrorAction SilentlyContinue | Measure-Object -Property Capacity -Sum).Sum / 1MB); if ($ram -lt 256) { $ram=[math]::Ceiling($cs.TotalPhysicalMemory / 512MB) * 512 }; $mb=[int][math]::Min($ram * 2, 8192); $nombre=$env:SystemDrive + '\pagefile.sys'; $pf=Get-CimInstance Win32_PageFileSetting | Where-Object { $_.Name -eq $nombre } | Select-Object -First 1; if ($pf -and (@($mb, [int]($ram * 2)) -contains [int]$pf.InitialSize) -and $pf.MaximumSize -eq $pf.InitialSize) { Set-CimInstance -InputObject $cs -Property @{AutomaticManagedPagefile=$true}; Write-Output '  [OK] El archivo de paginacion vuelve a ser automatico, como de fabrica.' } else { Write-Output '  [OK] El archivo de paginacion lo configuro alguien a mano: se deja como esta.' }"
 
 call :titulo "Energia"
 :: Herramienta oficial: vuelve los planes de Windows a fabrica, con sus botones,
@@ -1189,18 +1252,21 @@ goto :visor_extension
 :: Aplica los ajustes de energia a un plan. Uso: call :energia_plan GUID
 :: (o SCHEME_CURRENT, el plan activo).
 :: Valores de botones y tapa: 0 nada, 1 suspender, 2 hibernar, 3 apagar.
+:: Suspension y tapa salen de _susp y _tapa (por defecto, 4 h y apagar).
 :: Tiempos en segundos: 0 es nunca.
 :energia_plan
 powercfg /setacvalueindex %1 SUB_DISK DISKIDLE 0 >nul 2>&1
 powercfg /setdcvalueindex %1 SUB_DISK DISKIDLE 0 >nul 2>&1
-powercfg /setacvalueindex %1 SUB_SLEEP STANDBYIDLE 14400 >nul 2>&1
-powercfg /setdcvalueindex %1 SUB_SLEEP STANDBYIDLE 14400 >nul 2>&1
+if not defined _susp set "_susp=14400"
+if not defined _tapa set "_tapa=3"
+powercfg /setacvalueindex %1 SUB_SLEEP STANDBYIDLE %_susp% >nul 2>&1
+powercfg /setdcvalueindex %1 SUB_SLEEP STANDBYIDLE %_susp% >nul 2>&1
 powercfg /setacvalueindex %1 SUB_SLEEP HIBERNATEIDLE 0 >nul 2>&1
 powercfg /setdcvalueindex %1 SUB_SLEEP HIBERNATEIDLE 0 >nul 2>&1
 powercfg /setacvalueindex %1 SUB_BUTTONS PBUTTONACTION 3 >nul 2>&1
 powercfg /setdcvalueindex %1 SUB_BUTTONS PBUTTONACTION 3 >nul 2>&1
-powercfg /setacvalueindex %1 SUB_BUTTONS LIDACTION 3 >nul 2>&1
-powercfg /setdcvalueindex %1 SUB_BUTTONS LIDACTION 3 >nul 2>&1
+powercfg /setacvalueindex %1 SUB_BUTTONS LIDACTION %_tapa% >nul 2>&1
+powercfg /setdcvalueindex %1 SUB_BUTTONS LIDACTION %_tapa% >nul 2>&1
 powercfg /setacvalueindex %1 SUB_BUTTONS SBUTTONACTION 0 >nul 2>&1
 powercfg /setdcvalueindex %1 SUB_BUTTONS SBUTTONACTION 0 >nul 2>&1
 powercfg /setdcvalueindex %1 SUB_BATTERY BATACTIONCRIT 3 >nul 2>&1
@@ -1496,7 +1562,13 @@ $ver = Leer 'HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion' 'D
 L ('Fecha:            ' + (Get-Date -Format 'yyyy-MM-dd HH:mm'))
 L ('Equipo:           ' + $env:COMPUTERNAME)
 L ('Windows:          ' + $os.Caption + ' ' + $ver + ' (compilacion ' + $os.BuildNumber + ', ' + $os.OSArchitecture + ')')
-L ('RAM:              ' + [Math]::Round($cs.TotalPhysicalMemory / 1GB, 1) + ' GB')
+$ramInst = [Math]::Round((Get-CimInstance Win32_PhysicalMemory | Measure-Object -Property Capacity -Sum).Sum / 1MB)
+L ('RAM:              ' + [Math]::Round($cs.TotalPhysicalMemory / 1GB, 1) + ' GB visibles, ' + $ramInst + ' MB instalados')
+$nd0 = (Get-Partition -DriveLetter $env:SystemDrive.Substring(0, 1)).DiskNumber
+$md0 = [string](Get-PhysicalDisk | Where-Object { $_.DeviceId -eq [string]$nd0 } | Select-Object -First 1).MediaType
+$basica = [bool](Get-CimInstance Win32_VideoController | Where-Object { $_.InfFilename -eq 'display.inf' -or $_.Name -match 'Basic Display' })
+$p4 = $ramInst -ge 3584
+L ('Perfil opcion 1:  4 GB o mas: ' + $p4 + ' | mejor apariencia: ' + ($p4 -and -not $basica) + ' | disco del sistema: ' + $md0)
 Get-PhysicalDisk | ForEach-Object { L ('Disco:            ' + $_.FriendlyName + ' - ' + $_.MediaType + ' - ' + [Math]::Round($_.Size / 1GB) + ' GB') }
 $c = Get-PSDrive -Name $env:SystemDrive.Substring(0, 1)
 L ('Libre en ' + $env:SystemDrive + '       ' + [Math]::Round($c.Free / 1GB, 1) + ' GB')
@@ -1583,9 +1655,9 @@ Get-CimInstance Win32_PageFileUsage | ForEach-Object { L ('Archivo de paginacion
 Titulo 'Servicios (inicio / estado / lo que espera la v2)'
 $espera = [ordered]@{
     'SysMain' = 'Automatico'; 'TabletInputService' = 'Manual'; 'DoSvc' = 'Auto retrasado'
-    'DiagTrack' = 'DESHABILITADO'; 'dmwappushservice' = 'DESHABILITADO'; 'WSearch' = 'DESHABILITADO'; 'RemoteRegistry' = 'DESHABILITADO'
+    'DiagTrack' = 'DESHABILITADO'; 'dmwappushservice' = 'DESHABILITADO'; 'WSearch' = 'segun disco'; 'RemoteRegistry' = 'DESHABILITADO'
     'XblAuthManager' = 'DESHABILITADO'; 'XblGameSave' = 'DESHABILITADO'; 'XboxNetApiSvc' = 'DESHABILITADO'; 'XboxGipSvc' = 'DESHABILITADO'; 'xbgm' = 'DESHABILITADO'
-    'bthserv' = 'DESHABILITADO'; 'BTAGService' = 'DESHABILITADO'; 'BthAvctpSvc' = 'DESHABILITADO'
+    'bthserv' = 'segun RAM'; 'BTAGService' = 'segun RAM'; 'BthAvctpSvc' = 'segun RAM'
     'PcaSvc' = 'Manual'; 'TrkWks' = 'Manual'; 'iphlpsvc' = 'Manual'; 'DPS' = 'Manual'; 'CDPSvc' = 'Manual'; 'MapsBroker' = 'Manual'; 'edgeupdate' = 'Manual'
     'lfsvc' = 'Manual'; 'WbioSrvc' = 'Manual'; 'RetailDemo' = 'Manual'
     'BITS' = 'Auto retrasado'; 'WpnService' = 'Auto retrasado'
@@ -1727,7 +1799,7 @@ L ('Boton de encendido:             ' + (Energia SUB_BUTTONS PBUTTONACTION))
 L ('Cerrar la tapa:                 ' + (Energia SUB_BUTTONS LIDACTION))
 L ('Boton de suspension:            ' + (Energia SUB_BUTTONS SBUTTONACTION))
 L ('Bateria critica:                ' + (Energia SUB_BATTERY BATACTIONCRIT))
-L ('Suspender tras (seg, 0 nunca, 14400 = 4 h): ' + (Energia SUB_SLEEP STANDBYIDLE))
+L ('Suspender tras (seg, 14400 = 4 h, 3600 = 1 h): ' + (Energia SUB_SLEEP STANDBYIDLE))
 L ('Hibernar tras (seg, 0 nunca):   ' + (Energia SUB_SLEEP HIBERNATEIDLE))
 L ('Apagar disco tras (seg, 0 nunca): ' + (Energia SUB_DISK DISKIDLE))
 $fm = 'HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\FlyoutMenuSettings'

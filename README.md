@@ -18,7 +18,8 @@ UAC, SmartScreen, Windows Update).
 Descarga: el navegador puede pedir confirmación para un `.bat`, y SmartScreen avisa al ejecutarlo (*Más información >
 Ejecutar de todas formas*). *Propiedades > Desbloquear* quita la marca de internet.
 
-Después de la opción 1, el botón de encendido y la tapa apagan el equipo (sin suspender).
+Después de la opción 1, el botón de encendido apaga el equipo. La tapa también, salvo con 4 GB o más de RAM: ahí
+suspende (ver [Perfiles](#perfiles-según-el-hardware)).
 
 ## Menú
 
@@ -52,6 +53,26 @@ Criterios:
 
 Avisos de hardware al empezar: RAM baja, video sin driver (*Adaptador de pantalla básico*), antirrobo de Conectar
 Igualdad.
+
+### Perfiles según el hardware
+
+Cada ajuste depende del recurso que realmente cuesta: la RAM, la placa de video o el disco. La RAM se mide instalada
+(suma de módulos, `Win32_PhysicalMemory`): la visible puede dar 3,9 GB porque el video reserva una parte, y Windows de
+32 bits ve unos 3,2 GB. Umbral: 3,5 GB.
+
+| Condición | Ajuste | Base (2 GB, HDD, sin driver) | Con la condición |
+|---|---|---|---|
+| RAM ≥ 4 GB | Suspensión automática | 4 h | 1 h |
+| RAM ≥ 4 GB | Tapa | Apagar | Suspender |
+| RAM ≥ 4 GB | *Suspender* en el menú de apagado | Oculto | Visible |
+| RAM ≥ 4 GB | Bluetooth (`bthserv`, `BTAGService`, `BthAvctpSvc`) | Deshabilitado | Manual (fábrica) |
+| RAM ≥ 4 GB y video con driver | Efectos visuales | Mejor rendimiento | Mejor apariencia (`UserPreferencesMask=9E3E078012000000`), transparencias, desenfoque del inicio de sesión, Alt+Tab moderno |
+| Disco del sistema SSD | Miniaturas | Íconos | Miniaturas |
+| Disco del sistema SSD | Indexador (`WSearch`) | Deshabilitado | Automático (retrasado), fábrica |
+
+Fijo en todos: botón de encendido apaga, botón de suspensión no hace nada, sin hibernación, `MenuShowDelay` en 100 ms,
+paginación en 2 × RAM con tope de 8 GB. Sin video con driver, los efectos los dibuja el procesador, así que quedan al
+mínimo aunque haya RAM. La opción 7 muestra el perfil detectado.
 
 ### 1. Seguridad (solo repara)
 
@@ -94,9 +115,9 @@ La compresión de memoria se activa siempre (paso 8).
 | Inicio | Servicios | Motivo |
 |---|---|---|
 | Deshabilitado | `DiagTrack`, `dmwappushservice` | Telemetría. |
-| Deshabilitado | `WSearch` | Indexa leyendo el disco. El Inicio sigue encontrando apps (20H2+); se pierde la búsqueda instantánea de archivos. Alternativa: [Everything](https://www.voidtools.com/) (lee la MFT). |
+| Deshabilitado (HDD) | `WSearch` | Indexa leyendo el disco; con SSD queda de fábrica. El Inicio sigue encontrando apps (20H2+); se pierde la búsqueda instantánea de archivos. Alternativa: [Everything](https://www.voidtools.com/) (lee la MFT). |
 | Deshabilitado | `XblAuthManager`, `XblGameSave`, `XboxNetApiSvc`, `XboxGipSvc`, `xbgm` | Xbox. |
-| Deshabilitado | `bthserv`, `BTAGService`, `BthAvctpSvc` | Bluetooth. |
+| Deshabilitado (< 4 GB) | `bthserv`, `BTAGService`, `BthAvctpSvc` | Bluetooth. Con 4 GB o más, Manual (fábrica): sin adaptador no consume nada. |
 | Deshabilitado | `RemoteRegistry` | Fábrica; se asegura. |
 | Deshabilitado | `AdobeARMservice` | Actualizador de Adobe Reader, si está. |
 | Manual | `PcaSvc`, `TrkWks`, `iphlpsvc`, `DPS`, `CDPSvc`, `MapsBroker`, `edgeupdate` | No necesitan arrancar con Windows. Edge se actualiza por tareas programadas. Con `DPS` en Manual, los solucionadores de problemas no andan hasta que el servicio se inicia. |
@@ -152,10 +173,11 @@ Sin exclusiones.
 ### 7. Interfaz y Explorador
 
 - Efectos visuales en "mejor rendimiento", excepto: contenido de ventana al arrastrar; suavizado de fuentes;
-  animación al minimizar y maximizar, solo con driver de video.
-- Íconos en lugar de miniaturas (`IconsOnly=1`): en HDD cada miniatura obliga a leer el archivo.
+  animación al minimizar y maximizar, solo con driver de video. Con 4 GB y driver: "mejor apariencia" (ver
+  [Perfiles](#perfiles-según-el-hardware)).
+- Íconos en lugar de miniaturas (`IconsOnly=1`): en HDD cada miniatura obliga a leer el archivo. Con SSD, miniaturas.
 - Sin transparencias, animaciones de menús y barra de tareas, Aero Peek ni desenfoque acrílico del inicio de sesión
-  (`DisableAcrylicBackgroundOnLogon`).
+  (`DisableAcrylicBackgroundOnLogon`), salvo en "mejor apariencia".
 - `MenuShowDelay`: 400 a 100 ms.
 - El Explorador abre en *Este equipo* (Acceso rápido calcula recientes en disco).
 - Sin detección automática del tipo de carpeta (WinUtil). Efecto secundario: se reinician las vistas guardadas.
@@ -171,7 +193,8 @@ Sin exclusiones.
 ### 8. Memoria, disco y energía
 
 - Compresión de memoria activada.
-- Archivo de paginación fijo en 2 × RAM (2 GB: 4096 MB). Sin espacio suficiente, queda como estaba.
+- Archivo de paginación fijo en 2 × RAM con tope de 8 GB (2 GB: 4096 MB; 8 GB: 8192 MB). Sin espacio suficiente, queda
+  como estaba.
 - Caché de escritura activada y vaciado del búfer desactivado (`UserWriteCacheSetting=1`,
   `CacheIsPowerProtected=1`), salvo en SSD. Riesgo asumido: pérdida de datos ante un corte de luz.
 - NTFS: `DisableLastAccess`, `Disable8dot3`.
@@ -183,13 +206,14 @@ Energía, aplicada a Equilibrado, Alto rendimiento, Economizador y al plan activ
 |---|---|---|
 | Plan | Alto rendimiento, también en notebooks | Sin limitación de CPU. Menos autonomía. |
 | Apagar disco | Nunca | Despertar un HDD tarda segundos. |
-| Suspender | A las 4 h, con cargador y con batería | Margen para el mantenimiento automático. |
+| Suspender | A las 4 h (1 h con 4 GB o más), con cargador y con batería | Margen para el mantenimiento automático. |
 | Hibernar | Nunca | Hibernación desactivada. |
-| Botón de encendido / tapa | Apagar | |
+| Botón de encendido | Apagar | |
+| Tapa | Apagar (suspender con 4 GB o más) | |
 | Botón de suspensión | Nada | Panel de control no ofrece "Apagar" para ese botón. |
 | Batería crítica | Apagar | Sin hibernación, apagar es la salida limpia. |
 | Hibernación e inicio rápido | Desactivados | Borra `hiberfil.sys` (40% de la RAM). |
-| Menú de apagado | Sin *Suspender* ni *Hibernar* | Se reactivan en *Opciones de energía > Elegir el comportamiento de los botones*. |
+| Menú de apagado | Sin *Hibernar*; sin *Suspender* salvo con 4 GB o más | Se reactivan en *Opciones de energía > Elegir el comportamiento de los botones*. |
 
 Inicio rápido: acelera el arranque en HDD, pero el kernel nunca se reinicia; con drivers viejos arrastra errores
 (caso de `ntoskrnl.exe` al 10-15% de CPU: [HP Community](https://h30434.www3.hp.com/t5/Notebook-Boot-and-Lockup/Fast-startup-causing-high-cpu-usage/td-p/7888113)).
@@ -343,7 +367,7 @@ Resultado: Chrome abre directo en una pestaña nueva, sin perfiles ni cuentas. L
 | Clásico | Acción |
 |---|---|
 | Visualizador de fotos | Se reasocia a JPG (`.jpg`, `.jpeg`, `.jpe`, `.jfif`), PNG, GIF y BMP con nombre e ícono originales, y se registra para WebP, HEIC/HEIF y AVIF. Aparece en *Abrir con* y *Aplicaciones predeterminadas*. Se desinstala la app Fotos. |
-| Alt+Tab clásico | Íconos en lugar de miniaturas en vivo. |
+| Alt+Tab clásico | Íconos en lugar de miniaturas en vivo. Con 4 GB y driver de video queda el moderno. |
 
 Paso manual: *Aplicaciones predeterminadas > Visor de fotos > Visualizador de fotos de Windows* (Windows 10 no permite
 fijarlo por script). Paint, Bloc de notas y la Herramienta Recortes clásica se conservan.
@@ -444,7 +468,7 @@ La caché de archivos ya usa toda la RAM libre. Tweaks evaluados:
 | `IoPageLockLimit` | Ignorado por Windows. |
 | Caché de escritura | Sí (fábrica; se asegura). |
 | Sin vaciado del búfer de escritura | Sí, por decisión: menos espera por escritura a cambio de riesgo ante cortes de luz ([Raymond Chen](https://devblogs.microsoft.com/oldnewthing/20130416-00/?p=4643)). No en SSD; la opción 6 lo revierte. |
-| Paginación fija en 2 × RAM | Sí: el tamaño automático crece en caliente, provoca fallos de asignación en discos lentos ([Microsoft Learn](https://learn.microsoft.com/en-us/troubleshoot/windows-client/performance/slow-page-file-growth-memory-allocation-errors)) y fragmenta. Supera el 1,5 × RAM que Microsoft usa como mínimo. |
+| Paginación fija en 2 × RAM, tope 8 GB | Sí: el tamaño automático crece en caliente, provoca fallos de asignación en discos lentos ([Microsoft Learn](https://learn.microsoft.com/en-us/troubleshoot/windows-client/performance/slow-page-file-growth-memory-allocation-errors)) y fragmenta. Supera el 1,5 × RAM que Microsoft usa como mínimo. |
 
 **ReadyBoost.** Caché de lecturas chicas y dispersas en flash, justo lo que peor hace un HDD
 ([Wikipedia](https://en.wikipedia.org/wiki/ReadyBoost), [Microsoft](https://learn.microsoft.com/en-us/archive/blogs/tomarcher/readyboost-qa)).
@@ -501,7 +525,9 @@ fija; revisar *Load/Unload Cycle Count* con [CrystalDiskInfo](https://crystalmar
   `HKEY_USERS\<SID>`; ciclo optimizar, revertir y verificar; opción 4 con winget simulado (instalación nueva, al día,
   actualizado, sin winget). Con el estado del v1, la opción 1 repara los 5 valores y en la pasada siguiente informa
   que no hay nada; en la opción 2, DISM corre con `DisableResetbase=0` y `SupersededActions=3`, y después vuelven los
-  valores originales.
+  valores originales. Perfiles: la opción 1 corrió como PC de 2 GB con HDD y sin driver, y como PC de 8 GB con SSD y
+  driver; en cada caso se verificaron los servicios, los efectos visuales, las miniaturas, el menú de apagado y los
+  valores de `powercfg` (suspensión, tapa y botones).
 - **PowerShell:** los 39 bloques pasan el parser oficial. La quita de características opcionales se ejecutó contra una
   lista simulada de 22H2, con y sin impresora.
 - **Luz nocturna:** los blobs generados se decodificaron con un parser Bond independiente, partiendo de la referencia
@@ -544,10 +570,11 @@ opcionales, Store, ubicación, luz nocturna y Restaurar sistema.
    - [ ] Ventana visible al arrastrar; carpetas de fotos con íconos.
    - [ ] Adobe Reader: fuera del inicio; *Adobe Acrobat Update Service* deshabilitado.
    - [ ] Opción 2 pide confirmación, termina y muestra lo liberado; `DisableResetbase` queda como estaba.
-   - [ ] Menú de apagado sin *Suspender* ni *Hibernar*.
+   - [ ] Menú de apagado sin *Hibernar*; *Suspender* solo con 4 GB o más.
+   - [ ] Opción 7: la línea "Perfil opción 1" coincide con la RAM, el video y el disco de la PC.
    - [ ] Botón de encendido apaga (en UTM: apagado normal de la VM). Tapa: en la netbook real.
    - [ ] *Protección del sistema*: desactivada.
-   - [ ] Opción 7: paginación 2 × RAM, caché de escritura activa, vaciado desactivado.
+   - [ ] Opción 7: paginación 2 × RAM (tope 8 GB), caché de escritura activa, vaciado desactivado.
    - [ ] Menú responde a una tecla; otras teclas se ignoran.
    - [ ] Apps en segundo plano: interruptor general apagado.
    - [ ] Store: actualizaciones automáticas apagadas y administradas; *Obtener actualizaciones* funciona.
