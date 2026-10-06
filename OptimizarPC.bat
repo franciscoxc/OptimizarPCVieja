@@ -103,29 +103,8 @@ exit /b 0
 :: =========================================================================
 :op_optimizar
 title Optimizar PC Vieja v2 - Optimizar
-call :detectar_usuario
-
-:: Version de Windows
-set "BUILD=0"
-for /f "tokens=3" %%b in ('reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion" /v CurrentBuildNumber 2^>nul ^| findstr /i "CurrentBuildNumber"') do set "BUILD=%%b"
-
-:: Hardware: RAM (visible e instalada), placa de video sin driver, antirrobo de
-:: Conectar Igualdad (Theft Deterrent) y tipo de disco del sistema. El driver
-:: basico de Microsoft se instala como display.inf.
-set "RAM_MB=9999"
-set "GPU_BASICA=0"
-set "ANTIRROBO=0"
-set "RAM_INST=0"
-set "DISCO_TIPO=desconocido"
-set "CPU_NOMBRE=desconocido"
-for /f "usebackq tokens=1-5,* delims=|" %%a in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "$r=[math]::Round((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory/1MB); $g=0; Get-CimInstance Win32_VideoController | ForEach-Object { if ($_.InfFilename -eq 'display.inf' -or $_.Name -match 'Basic Display') { $g=1 } }; $t=0; foreach ($d in $env:ProgramFiles, ${env:ProgramFiles(x86)}) { if ($d -and (Test-Path -LiteralPath (Join-Path $d 'Intel Learning Series\Theft Deterrent'))) { $t=1 } }; if (Get-Service | Where-Object { ($_.Name + ' ' + $_.DisplayName) -match 'Theft|Deterrent|TDAgent' }) { $t=1 }; foreach ($k in 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run','HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Run') { $i=Get-Item -LiteralPath $k -ErrorAction SilentlyContinue; if ($i -and ($i.Property -match 'Theft|Deterrent|TDAgent')) { $t=1 } }; $ri=[math]::Round((Get-CimInstance Win32_PhysicalMemory -ErrorAction SilentlyContinue | Measure-Object -Property Capacity -Sum).Sum / 1MB); if ($ri -lt 256) { $ri=$r }; $m='desconocido'; $n=(Get-Partition -DriveLetter $env:SystemDrive[0] -ErrorAction SilentlyContinue).DiskNumber; $d=Get-PhysicalDisk -ErrorAction SilentlyContinue | Where-Object { $_.DeviceId -eq [string]$n } | Select-Object -First 1; if ($d -and ([string]$d.MediaType -eq 'SSD' -or [string]$d.MediaType -eq 'HDD')) { $m=[string]$d.MediaType }; $c=(Get-CimInstance Win32_Processor | Select-Object -First 1).Name -replace '\s+',' '; [string]$r + '|' + $g + '|' + $t + '|' + $ri + '|' + $m + '|' + $c.Trim()"`) do (
-    set "RAM_MB=%%a"
-    set "GPU_BASICA=%%b"
-    set "ANTIRROBO=%%c"
-    set "RAM_INST=%%d"
-    set "DISCO_TIPO=%%e"
-    set "CPU_NOMBRE=%%f"
-)
+:: Usuario de la sesion, version de Windows y hardware (seccion EQUIPO).
+call :detectar
 :: Perfiles segun el hardware:
 ::  - RAM instalada de 4 GB o mas (se suman los modulos: Windows de 32 bits ve
 ::    unos 3,2 GB y el video se queda con un pedazo): suspension a la hora,
@@ -223,9 +202,7 @@ set "_wd=HKLM\SOFTWARE\Policies\Microsoft\Windows Defender"
 for %%v in (DisableAntiSpyware DisableAntiVirus DisableRoutinelyTakingAction ServiceKeepAlive) do call :quitar_politica "%_wd%" %%v "Defender"
 for %%v in (DisableRealtimeMonitoring DisableBehaviorMonitoring DisableOnAccessProtection DisableScanOnRealtimeEnable DisableIOAVProtection) do call :quitar_politica "%_wd%\Real-Time Protection" %%v "Defender en tiempo real"
 for %%v in (SpynetReporting SubmitSamplesConsent DisableBlockAtFirstSeen) do call :quitar_politica "%_wd%\Spynet" %%v "proteccion en la nube"
-:: Bloqueo de aplicaciones potencialmente no deseadas: adware, toolbars, "optimizadores"
-powershell -NoProfile -ExecutionPolicy Bypass -Command "Set-MpPreference -PUAProtection Enabled -ErrorAction SilentlyContinue" >nul 2>&1
-echo   [OK] Defender: politicas revisadas y bloqueo de PUA activado.
+echo   [OK] Defender: politicas revisadas.
 
 :: Firewall
 for %%p in (DomainProfile StandardProfile PublicProfile) do call :quitar_si_vale "HKLM\SOFTWARE\Policies\Microsoft\WindowsFirewall\%%p" EnableFirewall 0x0 "Una politica apagaba el firewall"
@@ -283,9 +260,6 @@ echo   [OK] Reproduccion automatica desactivada.
 :: Defender.
 for %%t in ("\Microsoft\Windows\Defrag\ScheduledDefrag" "\Microsoft\Windows\Servicing\StartComponentCleanup" "\Microsoft\Windows\DiskDiagnostic\Microsoft-Windows-DiskDiagnosticResolver" "\Microsoft\Windows\Windows Defender\Windows Defender Scheduled Scan" "\Microsoft\Windows\Windows Defender\Windows Defender Cache Maintenance" "\Microsoft\Windows\Windows Defender\Windows Defender Cleanup" "\Microsoft\Windows\Windows Defender\Windows Defender Verification" "\Microsoft\Windows\WindowsUpdate\Scheduled Start") do schtasks /change /tn %%t /enable >nul 2>&1
 echo   [OK] Tareas de mantenimiento y seguridad activas.
-
-:: Archivo de paginacion: con 2 GB de RAM es obligatorio
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$cs=Get-CimInstance Win32_ComputerSystem; if (-not $cs.AutomaticManagedPagefile -and -not (Get-CimInstance Win32_PageFileSetting)) { Set-CimInstance -InputObject $cs -Property @{AutomaticManagedPagefile=$true}; Write-Output '  [REPARADO] No habia archivo de paginacion: ahora lo administra Windows.' }"
 
 :: =========================================================================
 call :titulo "2/11  Script original v1: revisando lo perjudicial"
@@ -354,13 +328,17 @@ echo        informe de errores, WinSAT y Xbox.
 call :titulo "5/11  Defender: solo lo imprescindible"
 :: =========================================================================
 :: Se queda: tiempo real, comportamiento, nube, descargas, firmas, SmartScreen.
-:: Se recortan los analisis programados y lo que no protege.
-powershell -NoProfile -ExecutionPolicy Bypass -Command "Set-MpPreference -EnableLowCpuPriority $true -ErrorAction SilentlyContinue; Set-MpPreference -ScanAvgCPULoadFactor 20 -ErrorAction SilentlyContinue; Set-MpPreference -ScanOnlyIfIdleEnabled $true -ErrorAction SilentlyContinue; Set-MpPreference -DisableCatchupFullScan $true -ErrorAction SilentlyContinue; Set-MpPreference -DisableCatchupQuickScan $true -ErrorAction SilentlyContinue" >nul 2>&1
+:: Se suma el bloqueo de aplicaciones potencialmente no deseadas: adware, toolbars,
+:: "optimizadores". Se recortan los analisis programados y lo que no protege.
+:: Un Set-MpPreference por ajuste: si esta version de Windows no conoce uno, los
+:: demas se aplican igual.
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Set-MpPreference -PUAProtection Enabled -ErrorAction SilentlyContinue; Set-MpPreference -EnableLowCpuPriority $true -ErrorAction SilentlyContinue; Set-MpPreference -ScanAvgCPULoadFactor 20 -ErrorAction SilentlyContinue; Set-MpPreference -ScanOnlyIfIdleEnabled $true -ErrorAction SilentlyContinue; Set-MpPreference -DisableCatchupFullScan $true -ErrorAction SilentlyContinue; Set-MpPreference -DisableCatchupQuickScan $true -ErrorAction SilentlyContinue" >nul 2>&1
 call :dword "HKLM\SOFTWARE\Policies\Microsoft\Windows Defender Security Center\Notifications" DisableEnhancedNotifications 1
 :: El icono de la bandeja se queda: es la forma de ver de un vistazo que Defender
 :: anda. Si una version anterior de este script lo oculto, vuelve.
 call :borrar "HKLM\SOFTWARE\Policies\Microsoft\Windows Defender Security Center\Systray" HideSystray
 call :dword "HKLM\SOFTWARE\Policies\Microsoft\MRT" DontOfferThroughWUAU 1
+echo   [OK] Bloqueo de aplicaciones potencialmente no deseadas (PUA) activado.
 echo   [OK] Analisis programados: prioridad baja, maximo 20%% de CPU, solo con la PC inactiva.
 echo   [OK] Sin notificaciones no criticas. El icono de la bandeja queda visible.
 echo   [OK] Sin la herramienta MRT mensual, redundante con Defender en tiempo real.
@@ -488,7 +466,7 @@ call :sz "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager
 call :sz "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\location" Value Allow
 echo   [OK] Ubicacion activada: la luz nocturna la usa para el horario del sol.
 :: Luz nocturna del anochecer al amanecer (seccion LUZ, al final del archivo).
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$t=[IO.File]::ReadAllText($env:OPT_RUTA); $i=$t.IndexOf('#LUZ-' + 'INICIO#'); $j=$t.IndexOf('#LUZ-' + 'FIN#'); if ($i -ge 0 -and $j -gt $i) { Invoke-Expression $t.Substring($i, $j - $i) }"
+call :ps LUZ
 if "%GPU_BASICA%"=="1" echo        Con el adaptador de video basico, Windows no ofrece la luz nocturna.
 
 :: =========================================================================
@@ -498,39 +476,9 @@ fsutil behavior set DisableLastAccess 1 >nul 2>&1
 fsutil behavior set Disable8dot3 1 >nul 2>&1
 echo   [OK] NTFS sin registro de ultimo acceso ni nombres cortos 8.3.
 
-:: Archivo de paginacion fijo en el doble de la RAM instalada (con 2 GB, 4096 MB),
-:: con tope de 8 GB: con 8 GB de RAM, el doble serian 16 GB de disco sin uso.
-:: El automatico arranca chico y crece cuando hace falta: en un disco lento,
-:: mientras crece, los programas pueden fallar por falta de memoria (Microsoft),
-:: y crecer y achicarse lo fragmenta. Fijo, nunca cambia de tamano. Rige al reiniciar.
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$cs=Get-CimInstance Win32_ComputerSystem; $ram=[math]::Round((Get-CimInstance Win32_PhysicalMemory -ErrorAction SilentlyContinue | Measure-Object -Property Capacity -Sum).Sum / 1MB); if ($ram -lt 256) { $ram=[math]::Ceiling($cs.TotalPhysicalMemory / 512MB) * 512 }; $mb=[int][math]::Min($ram * 2, 8192); $nombre=$env:SystemDrive + '\pagefile.sys'; $pf=Get-CimInstance Win32_PageFileSetting | Where-Object { $_.Name -eq $nombre } | Select-Object -First 1; if (-not $cs.AutomaticManagedPagefile -and $pf -and $pf.InitialSize -eq $mb -and $pf.MaximumSize -eq $mb) { Write-Output ('  [OK] Archivo de paginacion: ya estaba fijo en ' + $mb + ' MB.'); exit 0 }; $actual=0; Get-CimInstance Win32_PageFileUsage | Where-Object { $_.Name -eq $nombre } | ForEach-Object { $actual=[int]$_.AllocatedBaseSize }; $libre=[math]::Floor((Get-PSDrive -Name $env:SystemDrive.Substring(0,1)).Free / 1MB) + $actual; if ($libre -lt ($mb + 2048)) { Write-Output '  [AVISO] Poco espacio libre: el archivo de paginacion queda como esta.'; exit 0 }; try { Set-CimInstance -InputObject $cs -Property @{AutomaticManagedPagefile=$false} -ErrorAction Stop; $pf=Get-CimInstance Win32_PageFileSetting | Where-Object { $_.Name -eq $nombre } | Select-Object -First 1; if ($pf) { Set-CimInstance -InputObject $pf -Property @{InitialSize=[uint32]$mb; MaximumSize=[uint32]$mb} -ErrorAction Stop } else { New-CimInstance -ClassName Win32_PageFileSetting -Property @{Name=$nombre; InitialSize=[uint32]$mb; MaximumSize=[uint32]$mb} -ErrorAction Stop | Out-Null }; Write-Output ('  [OK] Archivo de paginacion fijo en ' + $mb + ' MB, el doble de la RAM con tope de 8 GB: no crece ni se fragmenta.') } catch { Set-CimInstance -InputObject $cs -Property @{AutomaticManagedPagefile=$true} -ErrorAction SilentlyContinue; Write-Output '  [AVISO] No se pudo configurar el archivo de paginacion: queda automatico.' }"
-
-:: Cache de escritura del disco: activada y SIN vaciado del bufer. Asi Windows no
-:: espera a que el disco confirme cada escritura: se gana tiempo. El costo: ante
-:: un corte de luz se pueden perder o corromper los ultimos cambios. Decision
-:: tomada: aca importa el tiempo. En un SSD no se toca. Rige al reiniciar.
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$n=(Get-Partition -DriveLetter $env:SystemDrive.Substring(0,1) -ErrorAction SilentlyContinue).DiskNumber; $d=Get-PhysicalDisk -ErrorAction SilentlyContinue | Where-Object { $_.DeviceId -eq [string]$n } | Select-Object -First 1; $w=Get-CimInstance Win32_DiskDrive -ErrorAction SilentlyContinue | Where-Object { $_.Index -eq $n } | Select-Object -First 1; if ($d -and [string]$d.MediaType -eq 'SSD') { Write-Output '  [OK] Cache de escritura: el disco es un SSD, queda como esta.'; exit 0 }; if (-not $w -or -not $w.PNPDeviceID) { Write-Output '  [AVISO] No se encontro el disco del sistema: la cache de escritura queda como esta.'; exit 0 }; $k='Registry::HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Enum\' + $w.PNPDeviceID + '\Device Parameters\Disk'; try { if (-not (Test-Path -LiteralPath $k)) { New-Item -Path $k -Force -ErrorAction Stop | Out-Null }; Set-ItemProperty -LiteralPath $k -Name UserWriteCacheSetting -Value 1 -Type DWord -ErrorAction Stop; Set-ItemProperty -LiteralPath $k -Name CacheIsPowerProtected -Value 1 -Type DWord -ErrorAction Stop; Write-Output '  [OK] Cache de escritura del disco activada y sin vaciado del bufer: rige al reiniciar.' } catch { Write-Output '  [AVISO] No se pudo configurar la cache de escritura del disco.' }"
-
-:: CompactOS: en HDD conviene el sistema sin comprimir. Solo se descomprime si
-:: estaba comprimido y hay espacio; si no, se saltea: tarda varios minutos igual.
-set "COMPACTO=0"
-set "LIBRE_GB=0"
-for /f "usebackq tokens=1,2" %%a in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "$c=0; foreach ($f in 'System32\shell32.dll','System32\mshtml.dll','explorer.exe') { $p=Join-Path $env:windir $f; if ((Test-Path -LiteralPath $p) -and ((Get-Item -LiteralPath $p -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) { $c=1 } }; $d=Get-PSDrive -Name $env:SystemDrive.Substring(0,1); [string]$c + ' ' + [string][math]::Floor($d.Free/1GB)"`) do (
-    set "COMPACTO=%%a"
-    set "LIBRE_GB=%%b"
-)
-if not "%COMPACTO%"=="1" goto :compact_no
-if %LIBRE_GB% LSS 6 goto :compact_sin_espacio
-echo   El sistema esta comprimido con CompactOS: descomprimiendo, puede tardar...
-compact /CompactOS:never >nul 2>&1
-echo   [OK] Sistema descomprimido.
-goto :compact_listo
-:compact_sin_espacio
-echo   [AVISO] El sistema esta comprimido pero quedan menos de 6 GB libres: se deja asi.
-goto :compact_listo
-:compact_no
-echo   [OK] El sistema no esta comprimido con CompactOS: nada que hacer.
-:compact_listo
+:: Archivo de paginacion, cache de escritura del disco, CompactOS y Restaurar
+:: sistema, en la seccion DISCO.
+call :ps DISCO
 
 :: Energia: la prioridad es la velocidad, no el ahorro. Se aplica a los tres
 :: planes de Windows, por si alguien cambia de plan despues:
@@ -574,18 +522,6 @@ call :dword "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\FlyoutMenuS
 call :dword "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\FlyoutMenuSettings" ShowHibernateOption 0
 echo   [OK] Sin hibernacion ni inicio rapido: cada apagado es completo.
 if "%PERFIL_4GB%"=="1" (echo   [OK] Menu de apagado: Suspender queda, Hibernar no aparece.) else (echo   [OK] Suspender e Hibernar ya no aparecen en el menu de apagado.)
-:: Restaurar sistema: desactivado. Cada punto cuesta escrituras de fondo y espacio
-:: en el disco, y en la practica se reinstala. La herramienta oficial borra sus
-:: puntos y libera el espacio. La vuelta atras es la opcion 6 del menu.
-powershell -NoProfile -ExecutionPolicy Bypass -Command "try { Disable-ComputerRestore -Drive ($env:SystemDrive + '\') -ErrorAction Stop; exit 0 } catch { exit 1 }" >nul 2>&1
-if errorlevel 1 goto :restaurar_error
-schtasks /change /tn "\Microsoft\Windows\SystemRestore\SR" /disable >nul 2>&1
-echo   [OK] Restaurar sistema desactivado: se borraron sus puntos y se libero su espacio.
-goto :restaurar_listo
-:restaurar_error
-echo   [AVISO] No se pudo desactivar Restaurar sistema. Se puede a mano en Propiedades
-echo           del sistema, Proteccion del sistema, Configurar.
-:restaurar_listo
 
 :: =========================================================================
 call :titulo "9/11  Navegadores"
@@ -609,17 +545,6 @@ reg delete "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Run" /v OneDrive /
 taskkill /f /im OneDrive.exe >nul 2>&1
 echo   [OK] OneDrive ya no arranca con Windows. No se desinstalo.
 :onedrive_listo
-if "%QUITARAPPS%"=="N" goto :apps_listo
-echo   Quitando apps preinstaladas para todos los usuarios, puede tardar...
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$apps='Microsoft.549981C3F5F10','Microsoft.BingNews','Microsoft.BingSearch','Microsoft.Copilot','Microsoft.GetHelp','Microsoft.Getstarted','Microsoft.Messaging','Microsoft.Microsoft3DViewer','Microsoft.MicrosoftOfficeHub','Microsoft.MicrosoftSolitaireCollection','Microsoft.MicrosoftStickyNotes','Microsoft.MixedReality.Portal','Microsoft.MSPaint','Microsoft.Office.OneNote','Microsoft.OneConnect','Microsoft.OutlookForWindows','Microsoft.People','Microsoft.PowerAutomateDesktop','Microsoft.Print3D','Microsoft.SkypeApp','Microsoft.Todos','Microsoft.Wallet','Microsoft.WindowsAlarms','Microsoft.WindowsFeedbackHub','Microsoft.WindowsMaps','microsoft.windowscommunicationsapps','Microsoft.YourPhone','Microsoft.ZuneMusic','Microsoft.ZuneVideo','Microsoft.GamingApp','Microsoft.XboxApp','Microsoft.Xbox.TCUI','Microsoft.XboxGameOverlay','Microsoft.XboxGamingOverlay','Microsoft.XboxIdentityProvider','Microsoft.XboxSpeechToTextOverlay','Clipchamp.Clipchamp','MicrosoftTeams','king.com.*'; $prov=Get-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue; foreach ($a in $apps) { Get-AppxPackage -AllUsers -Name $a -ErrorAction SilentlyContinue | Sort-Object PackageFullName -Unique | ForEach-Object { Write-Output ('    - ' + $_.Name); Remove-AppxPackage -Package $_.PackageFullName -AllUsers -ErrorAction SilentlyContinue }; $prov | Where-Object { $_.DisplayName -like $a } | ForEach-Object { Remove-AppxProvisionedPackage -Online -PackageName $_.PackageName -ErrorAction SilentlyContinue | Out-Null } }"
-echo   [OK] Apps preinstaladas quitadas.
-:: Sin Correo, Calendario ni Contactos, sus servicios de sincronizacion no tienen
-:: nada que hacer. Son servicios por usuario: se deshabilita la plantilla y rige
-:: desde el proximo inicio de sesion.
-for %%s in (OneSyncSvc PimIndexMaintenanceSvc UnistoreSvc UserDataSvc MessagingService) do call :servicio %%s disabled
-echo   [OK] Deshabilitados sus servicios de sincronizacion: OneSyncSvc,
-echo        PimIndexMaintenanceSvc, UnistoreSvc, UserDataSvc y MessagingService.
-:apps_listo
 :: Visualizador de fotos de Windows, el de Windows 7: sigue instalado, pero
 :: Windows 10 le saco las fotos comunes. Se le devuelven con su nombre y su
 :: icono de siempre, y se registra en "Abrir con" y en Aplicaciones predeterminadas.
@@ -641,31 +566,23 @@ reg add "%_app%\shell\open\DropTarget" /v Clsid /t REG_SZ /d "{FFE2A43C-56B9-4bf
 for %%e in (.jpg .jpeg .jpe .jfif .png .gif .bmp .dib .tif .tiff .webp .heic .heif .avif) do reg add "%_app%\SupportedTypes" /v %%e /t REG_SZ /d "" /f >nul 2>&1
 echo   [OK] Visualizador de fotos de Windows para JPG (JPEG, JFIF), PNG, GIF, BMP,
 echo        WebP, HEIC y AVIF. HEIC y AVIF necesitan extensiones de la Store.
-:: La app Fotos nueva, para todos los usuarios.
-powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-AppxPackage -AllUsers -Name Microsoft.Windows.Photos -ErrorAction SilentlyContinue | ForEach-Object { Remove-AppxPackage -Package $_.PackageFullName -AllUsers -ErrorAction SilentlyContinue }; Get-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -eq 'Microsoft.Windows.Photos' } | ForEach-Object { Remove-AppxProvisionedPackage -Online -PackageName $_.PackageName -ErrorAction SilentlyContinue | Out-Null }"
-echo   [OK] App Fotos quitada. Si algun dia hace falta, se reinstala desde la Store.
 :: Alt+Tab clasico: iconos en vez de miniaturas en vivo de cada ventana. Con
 :: 4 GB y video con driver queda el moderno: las miniaturas las dibuja la placa.
 if "%EFECTOS%"=="1" (call :borrar "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Explorer" AltTabSettings) else (call :dword "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Explorer" AltTabSettings 1)
 if "%EFECTOS%"=="1" (echo   [OK] Alt+Tab moderno, con miniaturas: el video tiene driver.) else (echo   [OK] Alt+Tab clasico activado.)
-:: Caracteristicas opcionales (Configuracion > Aplicaciones > Caracteristicas
-:: opcionales): no corren de fondo, pero ocupan disco. Quedan Paint, Bloc de
-:: notas, PowerShell ISE, los idiomas y, con impresora, Fax y Escaner y la
-:: Administracion de impresion. Windows Hello facial necesita camara infrarroja;
-:: el PIN y la huella no dependen de el.
-echo   Quitando caracteristicas opcionales, puede tardar varios minutos...
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$q=[ordered]@{'App.StepsRecorder'='Grabacion de acciones de usuario'; 'MathRecognizer'='Reconocedor matematico'; 'Microsoft.Windows.WordPad'='WordPad'; 'Media.WindowsMediaPlayer'='Reproductor de Windows Media'; 'Browser.InternetExplorer'='Internet Explorer 11'; 'App.Support.QuickAssist'='Asistencia rapida (la vieja)'; 'OpenSSH.Client'='Cliente OpenSSH'; 'Hello.Face.*'='Windows Hello: reconocimiento facial'; 'XPS.Viewer'='Visor de XPS'}; if ('%IMPRESORA%' -eq 'N') { $q['Print.Fax.Scan']='Fax y Escaner de Windows'; $q['Print.Management.Console']='Administracion de impresion' }; $todas=@(Get-WindowsCapability -Online -ErrorAction SilentlyContinue); if (-not $todas.Count) { Write-Output '    (Windows no devolvio la lista: se saltea)'; exit 0 }; $n=0; $vistas=@(); foreach ($c in @($todas | Where-Object { $_.State -eq 'Installed' })) { $base=$c.Name.Split('~')[0]; foreach ($k in $q.Keys) { if ($base -like $k) { if ($vistas -notcontains $k) { Write-Output ('    - ' + $q[$k]); $vistas+=$k }; Remove-WindowsCapability -Online -Name $c.Name -ErrorAction SilentlyContinue | Out-Null; $n++; break } } }; if ($n -eq 0) { Write-Output '    (ya no quedaba ninguna)' }"
-echo   [OK] Caracteristicas opcionales: quedan Paint, Bloc de notas, PowerShell ISE
-if "%IMPRESORA%"=="S" (echo        y las de impresion.) else (echo        y los idiomas.)
-:: Adobe Reader, si esta instalado: fuera todo lo que arranca solo con Windows,
-:: incluido su actualizador automatico (tarea y servicio). Los PDF quedan para
-:: Edge o Chrome. Reader sigue andando si alguien lo abre.
+:: Apps preinstaladas (si se eligio), app Fotos, caracteristicas opcionales y
+:: Adobe Reader, en la seccion QUITAR. Sale con 2 si Adobe Reader esta instalado.
 set "ADOBE=N"
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$n=0; $ks='%UPS%\Software\Microsoft\Windows\CurrentVersion\Run','%UPS%\Software\Microsoft\Windows\CurrentVersion\RunOnce','Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Run','Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\RunOnce','Registry::HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Run','Registry::HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\RunOnce'; foreach ($k in $ks) { $i=Get-Item -LiteralPath $k -ErrorAction SilentlyContinue; if ($i) { foreach ($v in $i.Property) { $d=[string]$i.GetValue($v); if (($v + ' ' + $d) -match 'AdobeARM|Adobe ARM|reader_sl|Speed Launcher|acrotray|Acrobat Assistant|AdobeCollabSync|\\Adobe\\(Acrobat|Reader)') { Remove-ItemProperty -LiteralPath $k -Name $v -ErrorAction SilentlyContinue; Write-Output ('  [OK] Adobe: fuera del inicio: ' + $v); $n++ } } } }; Get-ScheduledTask -TaskName 'Adobe Acrobat Update Task*' -ErrorAction SilentlyContinue | Where-Object { [string]$_.State -ne 'Disabled' } | ForEach-Object { $_ | Disable-ScheduledTask -ErrorAction SilentlyContinue | Out-Null; Write-Output ('  [OK] Adobe: tarea desactivada: ' + $_.TaskName); $n++ }; if (Get-Service -Name AdobeARMservice -ErrorAction SilentlyContinue) { Stop-Service -Name AdobeARMservice -Force -ErrorAction SilentlyContinue; Set-Service -Name AdobeARMservice -StartupType Disabled -ErrorAction SilentlyContinue; Write-Output '  [OK] Adobe: servicio de actualizacion automatica deshabilitado.'; $n++ }; $u='Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*','Registry::HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*'; $r=Get-ItemProperty -Path $u -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -match 'Acrobat|Adobe Reader' } | Select-Object -First 1; if ($r) { Write-Output ('  [OK] Adobe Reader instalado: ' + $r.DisplayName + '. Sigue andando si alguien lo abre.'); exit 2 }; if ($n) { exit 1 }; exit 0"
+call :ps QUITAR
 if errorlevel 2 set "ADOBE=S"
-if errorlevel 1 goto :adobe_listo
-echo   [OK] Adobe Reader no esta instalado: nada que limpiar.
-:adobe_listo
+if "%QUITARAPPS%"=="N" goto :apps_listo
+:: Sin Correo, Calendario ni Contactos, sus servicios de sincronizacion no tienen
+:: nada que hacer. Son servicios por usuario: se deshabilita la plantilla y rige
+:: desde el proximo inicio de sesion.
+for %%s in (OneSyncSvc PimIndexMaintenanceSvc UnistoreSvc UserDataSvc MessagingService) do call :servicio %%s disabled
+echo   [OK] Deshabilitados sus servicios de sincronizacion: OneSyncSvc,
+echo        PimIndexMaintenanceSvc, UnistoreSvc, UserDataSvc y MessagingService.
+:apps_listo
 
 :: =========================================================================
 call :titulo "11/11  Limpieza de temporales"
@@ -680,7 +597,7 @@ taskkill /im msedge.exe >nul 2>&1
 ping -n 4 127.0.0.1 >nul
 echo   Vaciando temporales. Lo que Windows tiene en uso se saltea solo.
 set "OPT_SELF=%~dp0"
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$t=[IO.File]::ReadAllText($env:OPT_RUTA); $i=$t.IndexOf('#LIMPIEZA-' + 'INICIO#'); $j=$t.IndexOf('#LIMPIEZA-' + 'FIN#'); if ($i -ge 0 -and $j -gt $i) { Invoke-Expression $t.Substring($i, $j - $i) }"
+call :ps LIMPIEZA
 echo   [OK] Limpieza terminada.
 :: Papelera: el Sensor de almacenamiento borra solo lo que tenga mas de 30 dias.
 :: Corre una vez por semana; tambien limpia temporales que las apps no usan.
@@ -698,13 +615,8 @@ echo   [OK] Papelera: se vacia sola lo que tenga mas de 30 dias (revision semana
 :: =========================================================================
 call :titulo "Ultimos pasos"
 :: =========================================================================
-:: Estado de Defender. Las firmas no se actualizan aca: lo hace Windows Update, y
-:: en un disco mecanico tarda varios minutos.
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$s=Get-MpComputerStatus -ErrorAction SilentlyContinue; if ($s) { $rt='INACTIVO, hay otro antivirus?'; if ($s.RealTimeProtectionEnabled) { $rt='ACTIVO' }; $tp='inactiva'; if ($s.IsTamperProtected) { $tp='ACTIVA' }; Write-Output ('  Defender en tiempo real: ' + $rt); Write-Output ('  Proteccion contra alteraciones: ' + $tp); Write-Output ('  Firmas de virus del: ' + $s.AntivirusSignatureLastUpdated) } else { Write-Output '  No se pudo leer el estado de Defender. Hay otro antivirus instalado?' }"
-echo.
-echo   Programas que arrancan con Windows. Desactiva los que no uses en
-echo   Administrador de tareas, pestana Inicio, desde la sesion del usuario:
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$ks='%UPS%\Software\Microsoft\Windows\CurrentVersion\Run','Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Run','Registry::HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Run'; foreach ($k in $ks) { $i=Get-Item -LiteralPath $k -ErrorAction SilentlyContinue; if ($i) { $i.Property | ForEach-Object { $m=''; if ($_ -match 'Theft|Deterrent|TDAgent') { $m='   <-- antirrobo de Conectar Igualdad: NO lo desactives' }; Write-Output ('    - ' + $_ + $m) } } }"
+:: Estado de Defender y programas que arrancan con Windows (seccion FINAL).
+call :ps FINAL
 echo.
 echo ==========================================================================
 echo   LISTO. Hay que REINICIAR la PC para aplicar todo.
@@ -740,7 +652,7 @@ goto :fin_con_reinicio
 :op_verificar
 title Optimizar PC Vieja v2 - Verificar estado
 cls
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$env:VE_RUTA=$env:OPT_RUTA; $t=[IO.File]::ReadAllText($env:OPT_RUTA); $i=$t.IndexOf('#VERIFICAR-' + 'INICIO#'); $j=$t.IndexOf('#VERIFICAR-' + 'FIN#'); if ($i -ge 0 -and $j -gt $i) { Invoke-Expression $t.Substring($i, $j - $i) }"
+call :ps VERIFICAR
 goto :menu
 
 :: =========================================================================
@@ -921,7 +833,7 @@ goto :menu
 :: =========================================================================
 :op_revertir
 title Optimizar PC Vieja v2 - Revertir
-call :detectar_usuario
+call :detectar
 cls
 echo ==========================================================================
 echo   REVERTIR LA OPTIMIZACION
@@ -967,8 +879,7 @@ call :borrar "%_pol%\Windows Error Reporting" Disabled
 call :borrar "%_pol%\DeliveryOptimization" DODownloadMode
 call :borrar "%_pol%\Device Metadata" PreventDeviceMetadataFromNetwork
 call :borrar "%UHIVE%\Software\Policies\Microsoft\Windows\Explorer" DisableSearchBoxSuggestions
-powershell -NoProfile -ExecutionPolicy Bypass -Command "Enable-MMAgent -ApplicationPreLaunch -ErrorAction SilentlyContinue" >nul 2>&1
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$b='%UPS%\Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications'; Get-ChildItem -LiteralPath $b -ErrorAction SilentlyContinue | ForEach-Object { Remove-ItemProperty -LiteralPath $_.PSPath -Name Disabled,DisabledByUser -ErrorAction SilentlyContinue }"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Enable-MMAgent -ApplicationPreLaunch -ErrorAction SilentlyContinue; $b='%UPS%\Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications'; Get-ChildItem -LiteralPath $b -ErrorAction SilentlyContinue | ForEach-Object { Remove-ItemProperty -LiteralPath $_.PSPath -Name Disabled,DisabledByUser -ErrorAction SilentlyContinue }" >nul 2>&1
 call :borrar "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications" GlobalUserDisabled
 call :borrar "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Search" BackgroundAppGlobalToggle
 call :borrar "HKLM\SOFTWARE\Policies\Microsoft\WindowsStore" AutoDownload
@@ -1003,10 +914,14 @@ echo   [OK] Efectos visuales, desenfoque al iniciar sesion, menus, animaciones, 
 echo        y Explorador como de fabrica.
 
 call :titulo "Cache de escritura del disco"
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$n=(Get-Partition -DriveLetter $env:SystemDrive.Substring(0,1) -ErrorAction SilentlyContinue).DiskNumber; $d=Get-PhysicalDisk -ErrorAction SilentlyContinue | Where-Object { $_.DeviceId -eq [string]$n } | Select-Object -First 1; $w=Get-CimInstance Win32_DiskDrive -ErrorAction SilentlyContinue | Where-Object { $_.Index -eq $n } | Select-Object -First 1; if (-not $w -or -not $w.PNPDeviceID) { Write-Output '  No se encontro el disco del sistema: nada que revertir.'; exit 0 }; $k='Registry::HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Enum\' + $w.PNPDeviceID + '\Device Parameters\Disk'; Remove-ItemProperty -LiteralPath $k -Name CacheIsPowerProtected -ErrorAction SilentlyContinue; Write-Output '  [OK] El vaciado del bufer de escritura vuelve a estar activo, como de fabrica.'"
+:: Sin PowerShell: el disco ya lo identifico EQUIPO. Fuera de un bloque con
+:: parentesis, por si el identificador del disco trajera alguno.
+if defined DISCO_PNP reg delete "HKLM\SYSTEM\CurrentControlSet\Enum\%DISCO_PNP%\Device Parameters\Disk" /v CacheIsPowerProtected /f >nul 2>&1
+if defined DISCO_PNP echo   [OK] El vaciado del bufer de escritura vuelve a estar activo, como de fabrica.
+if not defined DISCO_PNP echo   No se encontro el disco del sistema: nada que revertir.
 
 call :titulo "Archivo de paginacion"
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$cs=Get-CimInstance Win32_ComputerSystem; if ($cs.AutomaticManagedPagefile) { Write-Output '  [OK] El archivo de paginacion ya es automatico.'; exit 0 }; $ram=[math]::Round((Get-CimInstance Win32_PhysicalMemory -ErrorAction SilentlyContinue | Measure-Object -Property Capacity -Sum).Sum / 1MB); if ($ram -lt 256) { $ram=[math]::Ceiling($cs.TotalPhysicalMemory / 512MB) * 512 }; $mb=[int][math]::Min($ram * 2, 8192); $nombre=$env:SystemDrive + '\pagefile.sys'; $pf=Get-CimInstance Win32_PageFileSetting | Where-Object { $_.Name -eq $nombre } | Select-Object -First 1; if ($pf -and (@($mb, [int]($ram * 2)) -contains [int]$pf.InitialSize) -and $pf.MaximumSize -eq $pf.InitialSize) { Set-CimInstance -InputObject $cs -Property @{AutomaticManagedPagefile=$true}; Write-Output '  [OK] El archivo de paginacion vuelve a ser automatico, como de fabrica.' } else { Write-Output '  [OK] El archivo de paginacion lo configuro alguien a mano: se deja como esta.' }"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$cs=Get-CimInstance Win32_ComputerSystem; if ($cs.AutomaticManagedPagefile) { Write-Output '  [OK] El archivo de paginacion ya es automatico.'; exit 0 }; $ram=[int]$env:RAM_INST; $mb=[int][math]::Min($ram * 2, 8192); $nombre=$env:SystemDrive + '\pagefile.sys'; $pf=Get-CimInstance Win32_PageFileSetting | Where-Object { $_.Name -eq $nombre } | Select-Object -First 1; if ($pf -and (@($mb, [int]($ram * 2)) -contains [int]$pf.InitialSize) -and $pf.MaximumSize -eq $pf.InitialSize) { Set-CimInstance -InputObject $cs -Property @{AutomaticManagedPagefile=$true}; Write-Output '  [OK] El archivo de paginacion vuelve a ser automatico, como de fabrica.' } else { Write-Output '  [OK] El archivo de paginacion lo configuro alguien a mano: se deja como esta.' }"
 
 call :titulo "Energia"
 :: Herramienta oficial: vuelve los planes de Windows a fabrica, con sus botones,
@@ -1115,7 +1030,7 @@ call :dword "%_chr%" PrivacySandboxPromptEnabled 0
 call :dword "%_chr%" DefaultBrowserSettingEnabled 0
 echo   [OK] Chrome ya no pide iniciar sesion ni muestra pantallas de bienvenida.
 call :politica_ublock
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$t=[IO.File]::ReadAllText($env:OPT_RUTA); $i=$t.IndexOf('#AULA-' + 'INICIO#'); $j=$t.IndexOf('#AULA-' + 'FIN#'); if ($i -ge 0 -and $j -gt $i) { Invoke-Expression $t.Substring($i, $j - $i) }"
+call :ps AULA
 echo.
 echo   LISTO. Al abrir Chrome va directo al navegador; uBlock Origin Lite aparece
 echo   al minuto (hace falta internet).
@@ -1263,39 +1178,34 @@ goto :eof
 for /f "tokens=1,2 delims=:" %%a in ("%~1") do call :asegurar %%a %%b
 goto :eof
 
-:: Usuario de la sesion abierta (dueno del explorer.exe de esta sesion). Deja
-:: listos USID, UNAME, UHIVE, UCLS, UPS y UPROFILE. Se calcula una sola vez.
-:detectar_usuario
+:: Corre una seccion de PowerShell de este archivo (ver SECCIONES EN POWERSHELL,
+:: al final). El errorlevel queda con el exit de la seccion. Uso: call :ps NOMBRE
+:ps
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$t=[IO.File]::ReadAllText($env:OPT_RUTA); $i=$t.IndexOf('#%~1-INICIO#'); $j=$t.IndexOf('#%~1-FIN#'); if ($i -ge 0 -and $j -gt $i) { Invoke-Expression $t.Substring($i, $j - $i) }"
+goto :eof
+
+:: Usuario de la sesion abierta y datos del equipo, de la seccion EQUIPO. Si
+:: PowerShell no responde, quedan los valores de abajo: la cuenta que ejecuta el
+:: script y un equipo sin datos. Se calcula una sola vez.
+:detectar
 if defined UHIVE goto :eof
+echo   Revisando el equipo...
 set "USID="
-set "UNAME="
-for /f "usebackq tokens=1,2 delims=|" %%a in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "$s=(Get-Process -Id $PID).SessionId; $p=Get-CimInstance Win32_Process -Filter 'Name=''explorer.exe''' | Where-Object { $_.SessionId -eq $s } | Select-Object -First 1; if ($p) { $o=Invoke-CimMethod -InputObject $p -MethodName GetOwner; $i=Invoke-CimMethod -InputObject $p -MethodName GetOwnerSid; $i.Sid + '|' + $o.Domain + '\' + $o.User }"`) do (
-    set "USID=%%a"
-    set "UNAME=%%b"
-)
-if defined USID if not "%USID:~0,4%"=="S-1-" set "USID="
-if not defined USID goto :usid_validado
-reg query "HKU\%USID%" >nul 2>&1
-if errorlevel 1 set "USID="
-:usid_validado
-if defined USID goto :usuario_detectado
+set "UNAME=%USERDOMAIN%\%USERNAME%"
 set "UHIVE=HKCU"
 set "UCLS=HKCU\Software\Classes"
 set "UPS=Registry::HKEY_CURRENT_USER"
-set "UNAME=%USERDOMAIN%\%USERNAME%"
-set "UPROFILE=%USERPROFILE%"
-goto :usuario_listo
-:usuario_detectado
-set "UHIVE=HKU\%USID%"
-:: Las clases del usuario viven en su propia colmena; si no estuviera cargada,
-:: Software\Classes del usuario es un enlace de Windows a esa misma colmena.
-set "UCLS=HKU\%USID%_Classes"
-reg query "%UCLS%" >nul 2>&1
-if errorlevel 1 set "UCLS=HKU\%USID%\Software\Classes"
-set "UPS=Registry::HKEY_USERS\%USID%"
-set "UPROFILE="
-for /f "tokens=2,*" %%a in ('reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\%USID%" /v ProfileImagePath 2^>nul ^| findstr /i "ProfileImagePath"') do call set "UPROFILE=%%b"
-:usuario_listo
+set "BUILD=0"
+set "RAM_MB=9999"
+set "RAM_INST=0"
+set "GPU_BASICA=0"
+set "ANTIRROBO=0"
+set "DISCO_TIPO=desconocido"
+set "DISCO_PNP="
+set "CPU_NOMBRE=desconocido"
+:: Cada linea de EQUIPO es VARIABLE=valor. Esta lee la salida, asi que no puede
+:: usar :ps; los marcadores van partidos para que IndexOf no la encuentre a ella.
+for /f "usebackq delims=" %%l in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "$t=[IO.File]::ReadAllText($env:OPT_RUTA); $i=$t.IndexOf('#EQUIPO-' + 'INICIO#'); $j=$t.IndexOf('#EQUIPO-' + 'FIN#'); if ($i -ge 0 -and $j -gt $i) { Invoke-Expression $t.Substring($i, $j - $i) }"`) do set "%%l"
 goto :eof
 
 :: Busca winget y deja como llamarlo en WINGET. Prueba que responda, no solo que
@@ -1369,12 +1279,281 @@ goto :eof
 
 :: =========================================================================
 ::  SECCIONES EN POWERSHELL. cmd nunca llega hasta aca: todo termina antes
-::  con "exit /b", "goto :menu" o "goto :eof".
+::  con "exit /b", "goto :menu" o "goto :eof". Se corren con call :ps NOMBRE.
+::  Una seccion por paso y no un PowerShell por ajuste: en una PC de 2 GB con
+::  disco mecanico, cada PowerShell que arranca cuesta varios segundos.
+::   - EQUIPO: usuario de la sesion y hardware (opciones 1 y 6, via :detectar).
+::   - DISCO: paginacion, cache de escritura, CompactOS y Restaurar sistema
+::     (paso 8 de la opcion 1).
+::   - QUITAR: apps, app Fotos, caracteristicas opcionales y Adobe Reader
+::     (paso 10 de la opcion 1).
 ::   - LIMPIEZA: vaciado de temporales (paso 11 de la opcion 1).
+::   - FINAL: estado de Defender e inicio de Windows (final de la opcion 1).
 ::   - VERIFICAR: el reporte de la opcion 7.
 ::   - LUZ: luz nocturna del anochecer al amanecer (paso 7 de la opcion 1).
 ::   - AULA: borrado de perfiles de Chrome (opcion 5).
 :: =========================================================================
+#EQUIPO-INICIO#
+# Lo que cmd necesita saber del equipo, una linea VARIABLE=valor por dato:
+# :detectar hace set con cada una, asi que nada mas puede escribir en la salida.
+$ErrorActionPreference = 'SilentlyContinue'
+# Usuario de la sesion abierta: el dueno del explorer.exe de esta sesion, aunque
+# el script se haya elevado con otra cuenta de administrador.
+$s = (Get-Process -Id $PID).SessionId
+$ex = Get-CimInstance Win32_Process -Filter "Name='explorer.exe'" | Where-Object { $_.SessionId -eq $s } | Select-Object -First 1
+if ($ex) {
+    $sid = [string](Invoke-CimMethod -InputObject $ex -MethodName GetOwnerSid).Sid
+    $o = Invoke-CimMethod -InputObject $ex -MethodName GetOwner
+    if ($sid -like 'S-1-*' -and (Test-Path -LiteralPath ('Registry::HKEY_USERS\' + $sid))) {
+        'USID=' + $sid
+        'UNAME=' + $o.Domain + '\' + $o.User
+        'UHIVE=HKU\' + $sid
+        'UPS=Registry::HKEY_USERS\' + $sid
+        # Las clases del usuario viven en su propia colmena; si no estuviera cargada,
+        # Software\Classes del usuario es un enlace de Windows a esa misma colmena.
+        if (Test-Path -LiteralPath ('Registry::HKEY_USERS\' + $sid + '_Classes')) { 'UCLS=HKU\' + $sid + '_Classes' } else { 'UCLS=HKU\' + $sid + '\Software\Classes' }
+    }
+}
+# Solo si hay dato: cmd compara BUILD con GEQ, y vacio seria un error de sintaxis.
+$b = (Get-ItemProperty -LiteralPath 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion').CurrentBuildNumber
+if ($b) { 'BUILD=' + $b }
+$cs = Get-CimInstance Win32_ComputerSystem
+'RAM_MB=' + [math]::Round($cs.TotalPhysicalMemory / 1MB)
+# RAM instalada: la suma de los modulos, porque Windows de 32 bits ve unos 3,2 GB
+# de 4 y el video se queda con un pedazo. Si no se pueden leer, la visible
+# redondeada a 512 MB. La usan el perfil de 4 GB y el archivo de paginacion.
+$ri = [math]::Round((Get-CimInstance Win32_PhysicalMemory | Measure-Object -Property Capacity -Sum).Sum / 1MB)
+if ($ri -lt 256) { $ri = [math]::Ceiling($cs.TotalPhysicalMemory / 512MB) * 512 }
+'RAM_INST=' + $ri
+# El driver basico de Microsoft se instala como display.inf.
+$g = 0
+Get-CimInstance Win32_VideoController | ForEach-Object { if ($_.InfFilename -eq 'display.inf' -or $_.Name -match 'Basic Display') { $g = 1 } }
+'GPU_BASICA=' + $g
+# Antirrobo de Conectar Igualdad (Theft Deterrent): carpeta, servicio o inicio.
+$a = 0
+foreach ($d in $env:ProgramFiles, ${env:ProgramFiles(x86)}) { if ($d -and (Test-Path -LiteralPath (Join-Path $d 'Intel Learning Series\Theft Deterrent'))) { $a = 1 } }
+if (Get-Service | Where-Object { ($_.Name + ' ' + $_.DisplayName) -match 'Theft|Deterrent|TDAgent' }) { $a = 1 }
+foreach ($k in 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run', 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Run') {
+    $it = Get-Item -LiteralPath $k
+    if ($it -and ($it.Property -match 'Theft|Deterrent|TDAgent')) { $a = 1 }
+}
+'ANTIRROBO=' + $a
+# Disco del sistema: tipo (SSD o HDD) e identificador, para la cache de escritura.
+$n = (Get-Partition -DriveLetter $env:SystemDrive[0]).DiskNumber
+if ($null -ne $n) {
+    $d = Get-PhysicalDisk | Where-Object { $_.DeviceId -eq [string]$n } | Select-Object -First 1
+    if ([string]$d.MediaType -eq 'SSD' -or [string]$d.MediaType -eq 'HDD') { 'DISCO_TIPO=' + [string]$d.MediaType }
+    $w = Get-CimInstance Win32_DiskDrive | Where-Object { $_.Index -eq $n } | Select-Object -First 1
+    if ($w.PNPDeviceID) { 'DISCO_PNP=' + $w.PNPDeviceID }
+}
+'CPU_NOMBRE=' + ((Get-CimInstance Win32_Processor | Select-Object -First 1).Name -replace '\s+', ' ').Trim()
+#EQUIPO-FIN#
+#DISCO-INICIO#
+# Paso 8 de la opcion 1. Usa RAM_INST, DISCO_TIPO y DISCO_PNP de la seccion EQUIPO.
+$cs = Get-CimInstance Win32_ComputerSystem
+$nombre = $env:SystemDrive + '\pagefile.sys'
+# Sin archivo de paginacion, con 2 GB de RAM los programas se cuelgan: si alguien
+# lo quito, vuelve a administrarlo Windows.
+if (-not $cs.AutomaticManagedPagefile -and -not (Get-CimInstance Win32_PageFileSetting)) {
+    Set-CimInstance -InputObject $cs -Property @{AutomaticManagedPagefile=$true}
+    Write-Output '  [REPARADO] No habia archivo de paginacion: ahora lo administra Windows.'
+    $cs = Get-CimInstance Win32_ComputerSystem
+}
+# Archivo de paginacion fijo en el doble de la RAM instalada (con 2 GB, 4096 MB),
+# con tope de 8 GB: con 8 GB de RAM, el doble serian 16 GB de disco sin uso.
+# El automatico arranca chico y crece cuando hace falta: en un disco lento,
+# mientras crece, los programas pueden fallar por falta de memoria (Microsoft),
+# y crecer y achicarse lo fragmenta. Fijo, nunca cambia de tamano. Rige al reiniciar.
+$mb = [int][math]::Min([int]$env:RAM_INST * 2, 8192)
+$pf = Get-CimInstance Win32_PageFileSetting | Where-Object { $_.Name -eq $nombre } | Select-Object -First 1
+if ($mb -le 0) {
+    Write-Output '  [AVISO] No se pudo leer la RAM: el archivo de paginacion queda como esta.'
+} elseif (-not $cs.AutomaticManagedPagefile -and $pf -and $pf.InitialSize -eq $mb -and $pf.MaximumSize -eq $mb) {
+    Write-Output ('  [OK] Archivo de paginacion: ya estaba fijo en ' + $mb + ' MB.')
+} else {
+    $actual = 0
+    Get-CimInstance Win32_PageFileUsage | Where-Object { $_.Name -eq $nombre } | ForEach-Object { $actual = [int]$_.AllocatedBaseSize }
+    $libre = [math]::Floor((Get-PSDrive -Name $env:SystemDrive.Substring(0, 1)).Free / 1MB) + $actual
+    if ($libre -lt ($mb + 2048)) {
+        Write-Output '  [AVISO] Poco espacio libre: el archivo de paginacion queda como esta.'
+    } else {
+        try {
+            Set-CimInstance -InputObject $cs -Property @{AutomaticManagedPagefile=$false} -ErrorAction Stop
+            $pf = Get-CimInstance Win32_PageFileSetting | Where-Object { $_.Name -eq $nombre } | Select-Object -First 1
+            if ($pf) { Set-CimInstance -InputObject $pf -Property @{InitialSize=[uint32]$mb; MaximumSize=[uint32]$mb} -ErrorAction Stop }
+            else { New-CimInstance -ClassName Win32_PageFileSetting -Property @{Name=$nombre; InitialSize=[uint32]$mb; MaximumSize=[uint32]$mb} -ErrorAction Stop | Out-Null }
+            Write-Output ('  [OK] Archivo de paginacion fijo en ' + $mb + ' MB, el doble de la RAM con tope de 8 GB: no crece ni se fragmenta.')
+        } catch {
+            Set-CimInstance -InputObject $cs -Property @{AutomaticManagedPagefile=$true} -ErrorAction SilentlyContinue
+            Write-Output '  [AVISO] No se pudo configurar el archivo de paginacion: queda automatico.'
+        }
+    }
+}
+# Cache de escritura del disco: activada y SIN vaciado del bufer. Asi Windows no
+# espera a que el disco confirme cada escritura: se gana tiempo. El costo: ante
+# un corte de luz se pueden perder o corromper los ultimos cambios. Decision
+# tomada: aca importa el tiempo. En un SSD no se toca. Rige al reiniciar.
+if ($env:DISCO_TIPO -eq 'SSD') {
+    Write-Output '  [OK] Cache de escritura: el disco es un SSD, queda como esta.'
+} elseif (-not $env:DISCO_PNP) {
+    Write-Output '  [AVISO] No se encontro el disco del sistema: la cache de escritura queda como esta.'
+} else {
+    $k = 'Registry::HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Enum\' + $env:DISCO_PNP + '\Device Parameters\Disk'
+    try {
+        if (-not (Test-Path -LiteralPath $k)) { New-Item -Path $k -Force -ErrorAction Stop | Out-Null }
+        Set-ItemProperty -LiteralPath $k -Name UserWriteCacheSetting -Value 1 -Type DWord -ErrorAction Stop
+        Set-ItemProperty -LiteralPath $k -Name CacheIsPowerProtected -Value 1 -Type DWord -ErrorAction Stop
+        Write-Output '  [OK] Cache de escritura del disco activada y sin vaciado del bufer: rige al reiniciar.'
+    } catch {
+        Write-Output '  [AVISO] No se pudo configurar la cache de escritura del disco.'
+    }
+}
+# CompactOS: en HDD conviene el sistema sin comprimir. Solo se descomprime si
+# estaba comprimido y hay espacio; si no, se saltea: tarda varios minutos igual.
+$comprimido = $false
+foreach ($f in 'System32\shell32.dll', 'System32\mshtml.dll', 'explorer.exe') {
+    $p = Join-Path $env:windir $f
+    if ((Test-Path -LiteralPath $p) -and ((Get-Item -LiteralPath $p -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) { $comprimido = $true }
+}
+if (-not $comprimido) {
+    Write-Output '  [OK] El sistema no esta comprimido con CompactOS: nada que hacer.'
+} elseif ((Get-PSDrive -Name $env:SystemDrive.Substring(0, 1)).Free -lt 6GB) {
+    Write-Output '  [AVISO] El sistema esta comprimido pero quedan menos de 6 GB libres: se deja asi.'
+} else {
+    Write-Output '  El sistema esta comprimido con CompactOS: descomprimiendo, puede tardar...'
+    compact.exe /CompactOS:never 2>&1 | Out-Null
+    Write-Output '  [OK] Sistema descomprimido.'
+}
+# Restaurar sistema: desactivado. Cada punto cuesta escrituras de fondo y espacio
+# en el disco, y en la practica se reinstala. La herramienta oficial borra sus
+# puntos y libera el espacio. La vuelta atras es la opcion 6 del menu.
+try {
+    Disable-ComputerRestore -Drive ($env:SystemDrive + '\') -ErrorAction Stop
+    schtasks.exe /change /tn '\Microsoft\Windows\SystemRestore\SR' /disable 2>&1 | Out-Null
+    Write-Output '  [OK] Restaurar sistema desactivado: se borraron sus puntos y se libero su espacio.'
+} catch {
+    Write-Output '  [AVISO] No se pudo desactivar Restaurar sistema. Se puede a mano en Propiedades'
+    Write-Output '          del sistema, Proteccion del sistema, Configurar.'
+}
+#DISCO-FIN#
+#QUITAR-INICIO#
+# Paso 10 de la opcion 1: lo que se quita. Sale con 2 si Adobe Reader esta
+# instalado, para el aviso final sobre los PDF.
+if ($env:QUITARAPPS -eq 'S') {
+    Write-Output '  Quitando apps preinstaladas para todos los usuarios, puede tardar...'
+    $apps = 'Microsoft.549981C3F5F10','Microsoft.BingNews','Microsoft.BingSearch','Microsoft.Copilot','Microsoft.GetHelp','Microsoft.Getstarted','Microsoft.Messaging','Microsoft.Microsoft3DViewer','Microsoft.MicrosoftOfficeHub','Microsoft.MicrosoftSolitaireCollection','Microsoft.MicrosoftStickyNotes','Microsoft.MixedReality.Portal','Microsoft.MSPaint','Microsoft.Office.OneNote','Microsoft.OneConnect','Microsoft.OutlookForWindows','Microsoft.People','Microsoft.PowerAutomateDesktop','Microsoft.Print3D','Microsoft.SkypeApp','Microsoft.Todos','Microsoft.Wallet','Microsoft.WindowsAlarms','Microsoft.WindowsFeedbackHub','Microsoft.WindowsMaps','microsoft.windowscommunicationsapps','Microsoft.YourPhone','Microsoft.ZuneMusic','Microsoft.ZuneVideo','Microsoft.GamingApp','Microsoft.XboxApp','Microsoft.Xbox.TCUI','Microsoft.XboxGameOverlay','Microsoft.XboxGamingOverlay','Microsoft.XboxIdentityProvider','Microsoft.XboxSpeechToTextOverlay','Clipchamp.Clipchamp','MicrosoftTeams','king.com.*'
+    $prov = Get-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue
+    foreach ($a in $apps) {
+        Get-AppxPackage -AllUsers -Name $a -ErrorAction SilentlyContinue | Sort-Object PackageFullName -Unique | ForEach-Object {
+            Write-Output ('    - ' + $_.Name)
+            Remove-AppxPackage -Package $_.PackageFullName -AllUsers -ErrorAction SilentlyContinue
+        }
+        $prov | Where-Object { $_.DisplayName -like $a } | ForEach-Object { Remove-AppxProvisionedPackage -Online -PackageName $_.PackageName -ErrorAction SilentlyContinue | Out-Null }
+    }
+    Write-Output '  [OK] Apps preinstaladas quitadas.'
+}
+# La app Fotos nueva, para todos los usuarios: el Visualizador de fotos clasico
+# ya quedo registrado en el paso anterior.
+Get-AppxPackage -AllUsers -Name Microsoft.Windows.Photos -ErrorAction SilentlyContinue | ForEach-Object { Remove-AppxPackage -Package $_.PackageFullName -AllUsers -ErrorAction SilentlyContinue }
+Get-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -eq 'Microsoft.Windows.Photos' } | ForEach-Object { Remove-AppxProvisionedPackage -Online -PackageName $_.PackageName -ErrorAction SilentlyContinue | Out-Null }
+Write-Output '  [OK] App Fotos quitada. Si algun dia hace falta, se reinstala desde la Store.'
+# Caracteristicas opcionales (Configuracion > Aplicaciones > Caracteristicas
+# opcionales): no corren de fondo, pero ocupan disco. Quedan Paint, Bloc de
+# notas, PowerShell ISE, los idiomas y, con impresora, Fax y Escaner y la
+# Administracion de impresion. Windows Hello facial necesita camara infrarroja;
+# el PIN y la huella no dependen de el.
+Write-Output '  Quitando caracteristicas opcionales, puede tardar varios minutos...'
+$q = [ordered]@{'App.StepsRecorder'='Grabacion de acciones de usuario'; 'MathRecognizer'='Reconocedor matematico'; 'Microsoft.Windows.WordPad'='WordPad'; 'Media.WindowsMediaPlayer'='Reproductor de Windows Media'; 'Browser.InternetExplorer'='Internet Explorer 11'; 'App.Support.QuickAssist'='Asistencia rapida (la vieja)'; 'OpenSSH.Client'='Cliente OpenSSH'; 'Hello.Face.*'='Windows Hello: reconocimiento facial'; 'XPS.Viewer'='Visor de XPS'}
+if ($env:IMPRESORA -eq 'N') { $q['Print.Fax.Scan'] = 'Fax y Escaner de Windows'; $q['Print.Management.Console'] = 'Administracion de impresion' }
+$todas = @(Get-WindowsCapability -Online -ErrorAction SilentlyContinue)
+if (-not $todas.Count) {
+    Write-Output '    (Windows no devolvio la lista: se saltea)'
+} else {
+    $n = 0; $vistas = @()
+    foreach ($c in @($todas | Where-Object { $_.State -eq 'Installed' })) {
+        $base = $c.Name.Split('~')[0]
+        foreach ($k in $q.Keys) {
+            if ($base -like $k) {
+                if ($vistas -notcontains $k) { Write-Output ('    - ' + $q[$k]); $vistas += $k }
+                Remove-WindowsCapability -Online -Name $c.Name -ErrorAction SilentlyContinue | Out-Null
+                $n++
+                break
+            }
+        }
+    }
+    if ($n -eq 0) { Write-Output '    (ya no quedaba ninguna)' }
+}
+Write-Output '  [OK] Caracteristicas opcionales: quedan Paint, Bloc de notas, PowerShell ISE'
+if ($env:IMPRESORA -eq 'S') { Write-Output '       y las de impresion.' } else { Write-Output '       y los idiomas.' }
+# Adobe Reader, si esta instalado: fuera todo lo que arranca solo con Windows,
+# incluido su actualizador automatico (tarea y servicio). Los PDF quedan para
+# Edge o Chrome. Reader sigue andando si alguien lo abre.
+$n = 0
+$ks = ($env:UPS + '\Software\Microsoft\Windows\CurrentVersion\Run'), ($env:UPS + '\Software\Microsoft\Windows\CurrentVersion\RunOnce'),
+    'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Run', 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\RunOnce',
+    'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Run', 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\RunOnce'
+foreach ($k in $ks) {
+    $it = Get-Item -LiteralPath $k -ErrorAction SilentlyContinue
+    if ($it) {
+        foreach ($v in $it.Property) {
+            $d = [string]$it.GetValue($v)
+            if (($v + ' ' + $d) -match 'AdobeARM|Adobe ARM|reader_sl|Speed Launcher|acrotray|Acrobat Assistant|AdobeCollabSync|\\Adobe\\(Acrobat|Reader)') {
+                Remove-ItemProperty -LiteralPath $k -Name $v -ErrorAction SilentlyContinue
+                Write-Output ('  [OK] Adobe: fuera del inicio: ' + $v)
+                $n++
+            }
+        }
+    }
+}
+Get-ScheduledTask -TaskName 'Adobe Acrobat Update Task*' -ErrorAction SilentlyContinue | Where-Object { [string]$_.State -ne 'Disabled' } | ForEach-Object {
+    $_ | Disable-ScheduledTask -ErrorAction SilentlyContinue | Out-Null
+    Write-Output ('  [OK] Adobe: tarea desactivada: ' + $_.TaskName)
+    $n++
+}
+if (Get-Service -Name AdobeARMservice -ErrorAction SilentlyContinue) {
+    Stop-Service -Name AdobeARMservice -Force -ErrorAction SilentlyContinue
+    Set-Service -Name AdobeARMservice -StartupType Disabled -ErrorAction SilentlyContinue
+    Write-Output '  [OK] Adobe: servicio de actualizacion automatica deshabilitado.'
+    $n++
+}
+$u = 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*', 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*'
+$r = Get-ItemProperty -Path $u -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -match 'Acrobat|Adobe Reader' } | Select-Object -First 1
+if ($r) {
+    Write-Output ('  [OK] Adobe Reader instalado: ' + $r.DisplayName + '. Sigue andando si alguien lo abre.')
+    exit 2
+}
+if ($n -eq 0) { Write-Output '  [OK] Adobe Reader no esta instalado: nada que limpiar.' }
+#QUITAR-FIN#
+#FINAL-INICIO#
+# Ultimos pasos de la opcion 1. Las firmas de Defender no se actualizan aca: lo
+# hace Windows Update, y en un disco mecanico tarda varios minutos.
+$s = Get-MpComputerStatus -ErrorAction SilentlyContinue
+if ($s) {
+    $rt = 'INACTIVO, hay otro antivirus?'
+    if ($s.RealTimeProtectionEnabled) { $rt = 'ACTIVO' }
+    $tp = 'inactiva'
+    if ($s.IsTamperProtected) { $tp = 'ACTIVA' }
+    Write-Output ('  Defender en tiempo real: ' + $rt)
+    Write-Output ('  Proteccion contra alteraciones: ' + $tp)
+    Write-Output ('  Firmas de virus del: ' + $s.AntivirusSignatureLastUpdated)
+} else {
+    Write-Output '  No se pudo leer el estado de Defender. Hay otro antivirus instalado?'
+}
+Write-Output ''
+Write-Output '  Programas que arrancan con Windows. Desactiva los que no uses en'
+Write-Output '  Administrador de tareas, pestana Inicio, desde la sesion del usuario:'
+$ks = ($env:UPS + '\Software\Microsoft\Windows\CurrentVersion\Run'), 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Run', 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Run'
+foreach ($k in $ks) {
+    $it = Get-Item -LiteralPath $k -ErrorAction SilentlyContinue
+    if ($it) {
+        $it.Property | ForEach-Object {
+            $m = ''
+            if ($_ -match 'Theft|Deterrent|TDAgent') { $m = '   <-- antirrobo de Conectar Igualdad: NO lo desactives' }
+            Write-Output ('    - ' + $_ + $m)
+        }
+    }
+}
+#FINAL-FIN#
 #LIMPIEZA-INICIO#
 $ErrorActionPreference = 'SilentlyContinue'
 $self = $env:OPT_SELF
@@ -1890,7 +2069,7 @@ foreach ($k in @(($U + '\Software\Microsoft\Windows\CurrentVersion\Run'), 'HKEY_
 
 # --- Guardar --------------------------------------------------------------------
 $nombre = 'estado-' + $env:COMPUTERNAME + '-' + (Get-Date -Format 'yyyyMMdd-HHmm') + '.txt'
-$destino = Join-Path (Split-Path -Parent $env:VE_RUTA) $nombre
+$destino = Join-Path (Split-Path -Parent $env:OPT_RUTA) $nombre
 try { [IO.File]::WriteAllLines($destino, $lineas) } catch { $destino = Join-Path $env:TEMP $nombre; [IO.File]::WriteAllLines($destino, $lineas) }
 Write-Host ''
 Write-Host ('Reporte guardado en: ' + $destino) -ForegroundColor Green

@@ -15,3 +15,5 @@ jobs:
       - uses: actions/checkout@v4
       - name: Comprobar el menu
         run: python3 pruebas/menu.py
+      - name: Comprobar las secciones de PowerShell
+        run: python3 pruebas/secciones.py

@@ -78,7 +78,7 @@ mínimo aunque haya RAM. La opción 7 muestra el perfil detectado.
 | Elemento | Acción |
 |---|---|
 | Servicios esenciales | Si están deshabilitados, vuelven a su valor de fábrica: Defender, Centro de seguridad, Firewall, Windows Update (`BITS`, `UsoSvc`, `WaaSMedicSvc`, `DoSvc`), Store y licencias, `Appinfo` (UAC), `VSS`, `swprv`, `W32Time`, red, audio, temas. |
-| Defender | Borra políticas que lo desactivan. Activa el bloqueo de PUA. |
+| Defender | Borra políticas que lo desactivan. El bloqueo de PUA se activa en el [paso 5](#5-defender). |
 | Firewall | Encendido en los 3 perfiles; borra políticas que lo apagan. |
 | SmartScreen | Borra políticas que lo apagan (Windows y Edge). |
 | UAC | Si está apagado o en "no notificar nunca", vuelve al valor de fábrica. |
@@ -87,7 +87,6 @@ mínimo aunque haya RAM. La opción 7 muestra el perfil detectado.
 | Windows Update | Borra políticas que lo bloquean. |
 | Reproducción automática | Desactivada en todas las unidades. |
 | Tareas | Asegura activas: `ScheduledDefrag`, `StartComponentCleanup`, `DiskDiagnosticResolver`, análisis de Defender. |
-| Paginación | Verifica que exista. |
 
 ### 2. Revisión del script v1
 
@@ -193,8 +192,8 @@ Sin exclusiones.
 ### 8. Memoria, disco y energía
 
 - Compresión de memoria activada.
-- Archivo de paginación fijo en 2 × RAM con tope de 8 GB (2 GB: 4096 MB; 8 GB: 8192 MB). Sin espacio suficiente, queda
-  como estaba.
+- Archivo de paginación: si alguien lo quitó, vuelve a administrarlo Windows. Después, fijo en 2 × RAM con tope de
+  8 GB (2 GB: 4096 MB; 8 GB: 8192 MB). Sin espacio suficiente, queda como estaba.
 - Caché de escritura activada y vaciado del búfer desactivado (`UserWriteCacheSetting=1`,
   `CacheIsPowerProtected=1`), salvo en SSD. Riesgo asumido: pérdida de datos ante un corte de luz.
 - NTFS: `DisableLastAccess`, `Disable8dot3`.
@@ -528,8 +527,16 @@ fija; revisar *Load/Unload Cycle Count* con [CrystalDiskInfo](https://crystalmar
   valores originales. Perfiles: la opción 1 corrió como PC de 2 GB con HDD y sin driver, y como PC de 8 GB con SSD y
   driver; en cada caso se verificaron los servicios, los efectos visuales, las miniaturas, el menú de apagado y los
   valores de `powercfg` (suspensión, tapa y botones).
-- **PowerShell:** los 39 bloques pasan el parser oficial. La quita de características opcionales se ejecutó contra una
-  lista simulada de 22H2, con y sin impresora.
+- **VM con Windows 11 (UTM, ARM):** la versión anterior del script y la actual corrieron, cada una desde el mismo
+  disco, las opciones 6, 1, 7, 5 y 6 con respuestas fijas. Después de cada paso se guardó el estado de Windows:
+  registro que toca el script, servicios, tareas, planes de energía, Defender, compresión de memoria, paginación, apps
+  y características. Después de la opción 1 el estado es idéntico, y la opción 1 abre PowerShell 8 veces en lugar de
+  18 (contado con `Win32_ProcessStartTrace`). Con la versión anterior, la opción 6 dejaba apagada la precarga de
+  apps (`ApplicationPreLaunch`); con la actual vuelve a fábrica. La VM ya venía optimizada: no quedaban apps ni
+  características que quitar, y con SSD la caché de escritura se saltea.
+- **PowerShell:** las secciones de las opciones 1, 5, 6 y 7 corren en la VM; los bloques de las opciones 2, 3 y 4
+  pasan el parser oficial. La quita de características opcionales se ejecutó contra una lista simulada de 22H2, con y
+  sin impresora.
 - **Luz nocturna:** los blobs generados se decodificaron con un parser Bond independiente, partiendo de la referencia
   de win-nightlight-cli (envoltorio Bond), de un blob de Windows 10 (envoltorio viejo) y de ninguno. Con el blob
   viejo, el resultado coincide byte a byte con el *AutoOn* de Windows 10, salvo el FILETIME.
@@ -544,9 +551,12 @@ fija; revisar *Load/Unload Cycle Count* con [CrystalDiskInfo](https://crystalmar
 - **Formato:** ASCII y CRLF.
 - **Menú:** [`pruebas/menu.py`](pruebas/menu.py) compara el menú en pantalla, la cabecera del script, el despacho
   de `choice` y la tabla de este README. Corre en la Action antes de publicar: si no coinciden, la release no se toca.
+- **Secciones:** [`pruebas/secciones.py`](pruebas/secciones.py) comprueba que cada `call :ps` tenga su sección de
+  PowerShell y que cada marcador aparezca una sola vez: un nombre mal escrito saltearía el paso sin avisar. También
+  corre antes de publicar.
 
-Sin probar (Wine no los implementa): servicios, Defender, energía, caché de escritura, apps, características
-opcionales, Store, ubicación, luz nocturna y Restaurar sistema.
+Sin probar en Windows real: la caché de escritura en un disco mecánico, la quita de apps y características
+opcionales cuando todavía están, y las opciones 2, 3 y 4.
 
 ## Prueba en VM (UTM)
 

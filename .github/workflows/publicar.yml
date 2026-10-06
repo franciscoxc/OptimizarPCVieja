@@ -8,6 +8,7 @@ on:
     paths:
       - OptimizarPC.bat
       - pruebas/menu.py
+      - pruebas/secciones.py
       - .github/workflows/publicar.yml
   workflow_dispatch:
 
@@ -28,6 +29,9 @@ jobs:
       # mismo, la release no se toca y queda la anterior.
       - name: Comprobar el menu
         run: python3 pruebas/menu.py
+
+      - name: Comprobar las secciones de PowerShell
+        run: python3 pruebas/secciones.py
 
       - name: Publicar como ultima version
         env:
