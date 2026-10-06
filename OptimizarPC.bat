@@ -1677,21 +1677,19 @@ if ([IO.File]::Exists($dmp)) {
           Write-Output ('    ' + 'Volcado de memoria completo'.PadRight(44) + ([string][Math]::Round($largo / 1MB, 1)).PadLeft(8) + ' MB') }
     catch { $totalSalteados++ }
 }
-# Prefetch: solo las entradas (*.pf) de programas que no se abren hace mas de 30
-# dias. Windows reescribe el .pf de un programa cada vez que arranca, asi que su
-# fecha es la ultima vez que se uso: se van las de programas abandonados y quedan
-# las de todos los dias, que aceleran su proximo arranque. Si el script corrio hace
-# poco, no hay nada que borrar. Quedan siempre el rastro de arranque (NTOSBOOT), el
-# mapa del desfragmentador (Layout.ini), ReadyBoot y las bases de SysMain (Ag*.db).
-$limite = (Get-Date).AddDays(-30)
-$b = 0; $s = 0
-foreach ($f in [IO.Directory]::GetFiles((Join-Path $env:SystemRoot 'Prefetch'), '*.pf')) {
-    $i = New-Object IO.FileInfo($f)
-    if ($i.Name -like 'NTOSBOOT-*' -or $i.LastWriteTime -ge $limite) { continue }
-    try { $l = $i.Length; [IO.File]::Delete($f); $b += $l } catch { $s++ }
+# Prefetch: las entradas de programas (*.pf) se vacian solo si el script no lo
+# hizo hace poco: con el .pf mas viejo de menos de una semana, la carpeta ya se
+# vacio en esa semana, y vaciarla de nuevo solo haria mas lento abrir cada
+# programa mientras Windows la rearma. Quedan siempre el rastro de arranque
+# (NTOSBOOT), el mapa del desfragmentador (Layout.ini), ReadyBoot y las bases de
+# SysMain (Ag*.db).
+$prefetch = Join-Path $env:SystemRoot 'Prefetch'
+$masViejo = [IO.Directory]::GetFiles($prefetch, '*.pf') | Where-Object { [IO.Path]::GetFileName($_) -notlike 'NTOSBOOT-*' } | ForEach-Object { [IO.File]::GetLastWriteTime($_) } | Sort-Object | Select-Object -First 1
+if ($masViejo -and $masViejo -lt (Get-Date).AddDays(-7)) {
+    Vaciar 'Prefetch: entradas de programas' $prefetch '*.pf' 'NTOSBOOT-*'
+} else {
+    Write-Output ('    ' + 'Prefetch: vaciado hace menos de una semana'.PadRight(44) + '   se deja')
 }
-$totalBytes += $b; $totalSalteados += $s
-Linea 'Prefetch: programas sin abrir hace 30 dias' $b $s 0
 if (Get-Command Delete-DeliveryOptimizationCache -ErrorAction SilentlyContinue) {
     Delete-DeliveryOptimizationCache -Force -ErrorAction SilentlyContinue | Out-Null
     Write-Output ('    ' + 'Cache de Delivery Optimization'.PadRight(44) + '   vaciada')
