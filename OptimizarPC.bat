@@ -161,7 +161,6 @@ echo   - No crea punto de restauracion: Restaurar sistema se desactiva. Si algo
 echo     sale mal, la vuelta atras es la opcion 6 del menu.
 echo   - En un disco mecanico puede tardar entre 10 y 20 minutos. La primera vez,
 echo     bastante mas: quitar las caracteristicas opcionales es lento.
-echo   - Chrome y Edge se cierran solos durante la limpieza: guarda lo que haya abierto.
 echo   - Al terminar hay que REINICIAR la PC.
 echo.
 choice /c SN /n /m "  Continuar? [S/N]: "
@@ -590,11 +589,9 @@ call :titulo "11/11  Limpieza de temporales"
 :: Vaciado de todas las carpetas temporales de Windows. El codigo esta en la
 :: seccion LIMPIEZA al final de este archivo. Lo que esta en uso se saltea, y la
 :: carpeta desde la que corre el script tambien, por si se abrio desde un ZIP.
-:: Chrome y Edge se cierran como con la X, para que su cache no este en uso.
-echo   Cerrando Chrome y Edge para vaciar su cache...
-taskkill /im chrome.exe >nul 2>&1
-taskkill /im msedge.exe >nul 2>&1
-ping -n 4 127.0.0.1 >nul
+:: Los navegadores no se cierran: perder lo que la persona tenia abierto cuesta mas
+:: que la cache que queda sin vaciar. Con Chrome o Edge abiertos, lo que tienen en
+:: uso se saltea como cualquier otro archivo y el resto se borra.
 echo   Vaciando temporales. Lo que Windows tiene en uso se saltea solo.
 set "OPT_SELF=%~dp0"
 call :ps LIMPIEZA

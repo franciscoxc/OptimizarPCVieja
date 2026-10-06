@@ -281,7 +281,7 @@ Reinstalar: *Características opcionales > Agregar una característica*.
 | Caché de Delivery Optimization | Actualizaciones ya instaladas. |
 | `C:\Windows\Prefetch\*.pf` | Solo entradas de programas, y si no se vaciaron en la última semana (ver abajo). |
 | Caché y descargas de Adobe Reader | Si está instalado. |
-| Caché de Chrome y Edge, todos los usuarios y perfiles | `Cache`, `Code Cache`, `GPUCache`, `Media Cache`, `Dawn*Cache`; en la raíz, `ShaderCache`, `GrShaderCache`, `GraphiteDawnCache`. No se tocan cookies, contraseñas, autocompletar, historial, favoritos ni datos de sitios (Local Storage, IndexedDB, Service Workers): las sesiones siguen abiertas. Antes se cierran ambos navegadores como con la X. |
+| Caché de Chrome y Edge, todos los usuarios y perfiles | `Cache`, `Code Cache`, `GPUCache`, `Media Cache`, `Dawn*Cache`; en la raíz, `ShaderCache`, `GrShaderCache`, `GraphiteDawnCache`. No se tocan cookies, contraseñas, autocompletar, historial, favoritos ni datos de sitios (Local Storage, IndexedDB, Service Workers): las sesiones siguen abiertas. Los navegadores no se cierran: si están abiertos, se saltea lo que tengan en uso. |
 
 Lo bloqueado se saltea y se cuenta, separando "en uso" de "sin permiso". Al final muestra lo liberado por carpeta. Salvaguardas: no sigue junctions ni
 symlinks, no vacía raíces protegidas (`C:\Windows`, perfiles) y saltea la carpeta del script.
