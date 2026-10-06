@@ -279,7 +279,7 @@ Reinstalar: *Características opcionales > Agregar una característica*.
 | `MEMORY.DMP`, `Minidump`, `LiveKernelReports` | Volcados; el primero puede pesar como la RAM. |
 | `C:\Windows\Logs\CBS\CbsPersist_*` | Registros viejos de CBS (el actual no se toca). |
 | Caché de Delivery Optimization | Actualizaciones ya instaladas. |
-| `C:\Windows\Prefetch\*.pf` | Solo entradas de programas (ver abajo). |
+| `C:\Windows\Prefetch\*.pf` | Solo las de programas que no se abren hace más de 30 días (ver abajo). |
 | Caché y descargas de Adobe Reader | Si está instalado. |
 | Caché de Chrome y Edge, todos los usuarios y perfiles | `Cache`, `Code Cache`, `GPUCache`, `Media Cache`, `Dawn*Cache`; en la raíz, `ShaderCache`, `GrShaderCache`, `GraphiteDawnCache`. No se tocan cookies, contraseñas, autocompletar, historial, favoritos ni datos de sitios (Local Storage, IndexedDB, Service Workers): las sesiones siguen abiertas. Antes se cierran ambos navegadores como con la X. |
 
@@ -288,8 +288,11 @@ symlinks, no vacía raíces protegidas (`C:\Windows`, perfiles) y saltea la carp
 
 Prefetch: vaciarlo entero agrega 4-15 s al arranque siguiente
 ([Microsoft](https://learn.microsoft.com/en-us/archive/blogs/ryanmy/misinformation-and-the-the-prefetch-flag),
-[Ed Bott](https://edbott.com/2005/06/01/one-more-time-do-not-clean-out-your-prefetch-folder/)). Se conservan
-`NTOSBOOT-B00DFAAD.pf`, `Layout.ini`, `ReadyBoot` y `Ag*.db`.
+[Ed Bott](https://edbott.com/2005/06/01/one-more-time-do-not-clean-out-your-prefetch-folder/)). Por eso se borran
+solo las entradas de programas que no se abren hace más de 30 días: Windows reescribe el `.pf` de un programa cada
+vez que arranca, así que su fecha es la última vez que se usó. Se van las de programas abandonados; las de lo que se
+usa a diario se quedan y siguen acelerando su arranque. Se conservan siempre `NTOSBOOT-B00DFAAD.pf`, `Layout.ini`,
+`ReadyBoot` y `Ag*.db`.
 
 Papelera: no se vacía, pero se activa el *Sensor de almacenamiento* para borrar lo que tenga más de 30 días
 (`StoragePolicy`: `01=1`, `08=1`, `256=30`, revisión semanal `2048=7`). También borra temporales que las apps no usan

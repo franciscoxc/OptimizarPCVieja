@@ -1677,11 +1677,21 @@ if ([IO.File]::Exists($dmp)) {
           Write-Output ('    ' + 'Volcado de memoria completo'.PadRight(44) + ([string][Math]::Round($largo / 1MB, 1)).PadLeft(8) + ' MB') }
     catch { $totalSalteados++ }
 }
-# Prefetch: solo las entradas de programas (*.pf), donde se acumula lo de programas
-# que ya no se usan. Quedan el rastro de arranque de Windows (NTOSBOOT), el mapa
-# del desfragmentador (Layout.ini), ReadyBoot y las bases de SysMain (Ag*.db):
-# asi el arranque no se resiente. Cada programa rehace su entrada al abrirlo.
-Vaciar 'Prefetch: entradas de programas' (Join-Path $env:SystemRoot 'Prefetch') '*.pf' 'NTOSBOOT-*'
+# Prefetch: solo las entradas (*.pf) de programas que no se abren hace mas de 30
+# dias. Windows reescribe el .pf de un programa cada vez que arranca, asi que su
+# fecha es la ultima vez que se uso: se van las de programas abandonados y quedan
+# las de todos los dias, que aceleran su proximo arranque. Si el script corrio hace
+# poco, no hay nada que borrar. Quedan siempre el rastro de arranque (NTOSBOOT), el
+# mapa del desfragmentador (Layout.ini), ReadyBoot y las bases de SysMain (Ag*.db).
+$limite = (Get-Date).AddDays(-30)
+$b = 0; $s = 0
+foreach ($f in [IO.Directory]::GetFiles((Join-Path $env:SystemRoot 'Prefetch'), '*.pf')) {
+    $i = New-Object IO.FileInfo($f)
+    if ($i.Name -like 'NTOSBOOT-*' -or $i.LastWriteTime -ge $limite) { continue }
+    try { $l = $i.Length; [IO.File]::Delete($f); $b += $l } catch { $s++ }
+}
+$totalBytes += $b; $totalSalteados += $s
+Linea 'Prefetch: programas sin abrir hace 30 dias' $b $s 0
 if (Get-Command Delete-DeliveryOptimizationCache -ErrorAction SilentlyContinue) {
     Delete-DeliveryOptimizationCache -Force -ErrorAction SilentlyContinue | Out-Null
     Write-Output ('    ' + 'Cache de Delivery Optimization'.PadRight(44) + '   vaciada')
