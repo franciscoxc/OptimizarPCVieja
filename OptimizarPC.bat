@@ -483,6 +483,8 @@ call :ps DISCO
 :: Energia: la prioridad es la velocidad, no el ahorro. Se aplica a los tres
 :: planes de Windows, por si alguien cambia de plan despues:
 ::  - el disco nunca se apaga solo: despertarlo congela la PC varios segundos;
+::  - la pantalla se apaga a los 15 minutos sin uso, en cualquier equipo, con
+::    cargador y con bateria;
 ::  - suspende sola a las 4 horas sin uso: le da tiempo de sobra al mantenimiento
 ::    automatico de Windows, que corre con la PC prendida y sin uso. Con 4 GB o
 ::    mas, a la hora: esas PCs lo terminan antes. Nunca hiberna;
@@ -508,6 +510,7 @@ echo   [OK] Plan de energia: Alto rendimiento, tambien en notebooks.
 call :energia_plan SCHEME_CURRENT
 powercfg /setactive SCHEME_CURRENT >nul 2>&1
 echo   [OK] El disco nunca se apaga solo y la PC nunca hiberna.
+echo   [OK] La pantalla se apaga a los 15 minutos sin uso.
 if "%PERFIL_4GB%"=="1" (echo   [OK] Suspension a la hora sin uso.) else (echo   [OK] Suspension a las 4 horas sin uso: da tiempo al mantenimiento de Windows.)
 if "%PERFIL_4GB%"=="1" (echo   [OK] Tapa: suspende. Boton de encendido: apagado completo. Boton de suspension: nada.) else (echo   [OK] Boton de encendido y tapa: apagado completo. Boton de suspension: nada.)
 echo   [OK] Bateria critica: apagado completo.
@@ -1158,6 +1161,8 @@ goto :visor_extension
 :energia_plan
 powercfg /setacvalueindex %1 SUB_DISK DISKIDLE 0 >nul 2>&1
 powercfg /setdcvalueindex %1 SUB_DISK DISKIDLE 0 >nul 2>&1
+powercfg /setacvalueindex %1 SUB_VIDEO VIDEOIDLE 900 >nul 2>&1
+powercfg /setdcvalueindex %1 SUB_VIDEO VIDEOIDLE 900 >nul 2>&1
 if not defined _susp set "_susp=14400"
 if not defined _tapa set "_tapa=3"
 powercfg /setacvalueindex %1 SUB_SLEEP STANDBYIDLE %_susp% >nul 2>&1
@@ -1968,6 +1973,7 @@ L ('Bateria critica:                ' + (Energia SUB_BATTERY BATACTIONCRIT))
 L ('Suspender tras (seg, 14400 = 4 h, 3600 = 1 h): ' + (Energia SUB_SLEEP STANDBYIDLE))
 L ('Hibernar tras (seg, 0 nunca):   ' + (Energia SUB_SLEEP HIBERNATEIDLE))
 L ('Apagar disco tras (seg, 0 nunca): ' + (Energia SUB_DISK DISKIDLE))
+L ('Apagar pantalla tras (seg, 900 = 15 min): ' + (Energia SUB_VIDEO VIDEOIDLE))
 $fm = 'HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\FlyoutMenuSettings'
 L ('Menu de apagado: Suspender / Hibernar visibles: ' + (Leer $fm 'ShowSleepOption') + ' / ' + (Leer $fm 'ShowHibernateOption') + '   (0 = ocultos)')
 

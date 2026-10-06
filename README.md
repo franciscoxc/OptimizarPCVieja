@@ -205,6 +205,7 @@ Energía, aplicada a Equilibrado, Alto rendimiento, Economizador y al plan activ
 |---|---|---|
 | Plan | Alto rendimiento, también en notebooks | Sin limitación de CPU. Menos autonomía. |
 | Apagar disco | Nunca | Despertar un HDD tarda segundos. |
+| Apagar pantalla | A los 15 min, con cargador y con batería | El mismo valor en todos los equipos. |
 | Suspender | A las 4 h (1 h con 4 GB o más), con cargador y con batería | Margen para el mantenimiento automático. |
 | Hibernar | Nunca | Hibernación desactivada. |
 | Botón de encendido | Apagar | |
