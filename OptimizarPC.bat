@@ -170,14 +170,10 @@ if errorlevel 2 goto :menu
 echo.
 echo   Unas preguntas antes de empezar. Despues no molesta mas.
 echo.
-choice /c SN /n /m "  1. Usas impresora en esta PC? [S/N]: "
-if errorlevel 2 (set "IMPRESORA=N") else (set "IMPRESORA=S")
-choice /c SN /n /m "  2. Compartis carpetas o impresora con otras PCs de tu red? [S/N]: "
-if errorlevel 2 (set "COMPARTIR=N") else (set "COMPARTIR=S")
-choice /c SN /n /m "  3. Usas OneDrive? [S/N]: "
+choice /c SN /n /m "  1. Usas OneDrive? [S/N]: "
 if errorlevel 2 (set "ONEDRIVE=N") else (set "ONEDRIVE=S")
 echo.
-echo   4. Quitar apps preinstaladas: Xbox, Solitario, Candy Crush, Noticias, Skype,
+echo   2. Quitar apps preinstaladas: Xbox, Solitario, Candy Crush, Noticias, Skype,
 echo      Enlace Movil, Obtener ayuda, Sugerencias, Contactos, Mapas, Correo y
 echo      Calendario, Outlook nuevo, OneNote, Notas rapidas, Alarmas, Groove,
 echo      Peliculas y TV, Paint 3D, Cortana, Copilot y similares. Quedan: Store,
@@ -312,10 +308,11 @@ echo        lfsvc, WbioSrvc y RetailDemo.
 :: Automatico retrasado: tienen que correr solos, pero pueden esperar al arranque.
 for %%s in (BITS WpnService) do call :servicio %%s delayed-auto
 echo   [OK] Automatico retrasado: BITS y WpnService.
-if "%IMPRESORA%"=="S" (call :servicio Spooler delayed-auto) else (call :servicio Spooler demand)
-if "%IMPRESORA%"=="S" (echo   [OK] Impresion: Automatico retrasado.) else (echo   [OK] Impresion: Manual.)
-if "%COMPARTIR%"=="S" (call :servicio LanmanServer auto) else (call :servicio LanmanServer demand)
-if "%COMPARTIR%"=="S" (echo   [OK] Compartir en red: Automatico.) else (echo   [OK] Compartir en red: Manual.)
+:: Impresion y compartir en red, siempre activos: una impresora o una carpeta
+:: compartida que dejan de andar sin aviso cuestan mas que los pocos MB que ahorran.
+call :servicio Spooler delayed-auto
+call :servicio LanmanServer auto
+echo   [OK] Impresion: Automatico retrasado. Compartir en red: Automatico.
 
 :: =========================================================================
 call :titulo "4/11  Tareas programadas de telemetria"
@@ -1464,12 +1461,11 @@ Get-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue | Where-Object 
 Write-Output '  [OK] App Fotos quitada. Si algun dia hace falta, se reinstala desde la Store.'
 # Caracteristicas opcionales (Configuracion > Aplicaciones > Caracteristicas
 # opcionales): no corren de fondo, pero ocupan disco. Quedan Paint, Bloc de
-# notas, PowerShell ISE, los idiomas y, con impresora, Fax y Escaner y la
-# Administracion de impresion. Windows Hello facial necesita camara infrarroja;
+# notas, PowerShell ISE, los idiomas, Fax y Escaner y la Administracion de
+# impresion. Windows Hello facial necesita camara infrarroja;
 # el PIN y la huella no dependen de el.
 Write-Output '  Quitando caracteristicas opcionales, puede tardar varios minutos...'
 $q = [ordered]@{'App.StepsRecorder'='Grabacion de acciones de usuario'; 'MathRecognizer'='Reconocedor matematico'; 'Microsoft.Windows.WordPad'='WordPad'; 'Media.WindowsMediaPlayer'='Reproductor de Windows Media'; 'Browser.InternetExplorer'='Internet Explorer 11'; 'App.Support.QuickAssist'='Asistencia rapida (la vieja)'; 'OpenSSH.Client'='Cliente OpenSSH'; 'Hello.Face.*'='Windows Hello: reconocimiento facial'; 'XPS.Viewer'='Visor de XPS'}
-if ($env:IMPRESORA -eq 'N') { $q['Print.Fax.Scan'] = 'Fax y Escaner de Windows'; $q['Print.Management.Console'] = 'Administracion de impresion' }
 $todas = @(Get-WindowsCapability -Online -ErrorAction SilentlyContinue)
 if (-not $todas.Count) {
     Write-Output '    (Windows no devolvio la lista: se saltea)'
@@ -1488,8 +1484,8 @@ if (-not $todas.Count) {
     }
     if ($n -eq 0) { Write-Output '    (ya no quedaba ninguna)' }
 }
-Write-Output '  [OK] Caracteristicas opcionales: quedan Paint, Bloc de notas, PowerShell ISE'
-if ($env:IMPRESORA -eq 'S') { Write-Output '       y las de impresion.' } else { Write-Output '       y los idiomas.' }
+Write-Output '  [OK] Caracteristicas opcionales: quedan Paint, Bloc de notas, PowerShell ISE,'
+Write-Output '       los idiomas y las de impresion.'
 # Adobe Reader, si esta instalado: fuera todo lo que arranca solo con Windows,
 # incluido su actualizador automatico (tarea y servicio). Los PDF quedan para
 # Edge o Chrome. Reader sigue andando si alguien lo abre.
@@ -1832,7 +1828,7 @@ $espera = [ordered]@{
     'PcaSvc' = 'Manual'; 'TrkWks' = 'Manual'; 'iphlpsvc' = 'Manual'; 'DPS' = 'Manual'; 'CDPSvc' = 'Manual'; 'MapsBroker' = 'Manual'; 'edgeupdate' = 'Manual'
     'lfsvc' = 'Manual'; 'WbioSrvc' = 'Manual'; 'RetailDemo' = 'Manual'
     'BITS' = 'Auto retrasado'; 'WpnService' = 'Auto retrasado'
-    'Spooler' = 'segun respuesta'; 'LanmanServer' = 'segun respuesta'
+    'Spooler' = 'Auto retrasado'; 'LanmanServer' = 'Automatico'
     'WinDefend' = 'Automatico'; 'WdNisSvc' = 'Manual'; 'SecurityHealthService' = 'Manual'; 'wscsvc' = 'Auto retrasado'; 'mpssvc' = 'Automatico'; 'BFE' = 'Automatico'
     'wuauserv' = 'Manual'; 'UsoSvc' = 'Auto retrasado'; 'WaaSMedicSvc' = 'Manual'; 'CryptSvc' = 'Automatico'; 'TrustedInstaller' = 'Manual'
     'AppXSvc' = 'Manual'; 'ClipSVC' = 'Manual'; 'InstallService' = 'Manual'; 'Appinfo' = 'Manual'; 'VSS' = 'Manual'; 'swprv' = 'Manual'; 'W32Time' = 'Manual'

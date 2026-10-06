@@ -11,7 +11,7 @@ UAC, SmartScreen, Windows Update).
 1. Ejecutar `OptimizarPC.bat`. Se autoeleva (UAC) y se relanza en 64 bits si hace falta. Requiere solo `cmd` y
    PowerShell 5.1.
 2. Opción `1`. El menú responde a una tecla, sin Enter.
-3. Cuatro preguntas: impresora, compartir en red, OneDrive, apps preinstaladas. El resto es desatendido:
+3. Dos preguntas: OneDrive y apps preinstaladas. El resto es desatendido:
    10-20 min en HDD, más la primera vez (características opcionales).
 4. Reiniciar.
 
@@ -121,8 +121,8 @@ La compresión de memoria se activa siempre (paso 8).
 | Manual | `PcaSvc`, `TrkWks`, `iphlpsvc`, `DPS`, `CDPSvc`, `MapsBroker`, `edgeupdate` | No necesitan arrancar con Windows. Edge se actualiza por tareas programadas. Con `DPS` en Manual, los solucionadores de problemas no andan hasta que el servicio se inicia. |
 | Manual | `lfsvc`, `WbioSrvc`, `RetailDemo`, `TabletInputService` | Fábrica. `lfsvc` es la ubicación: la usa la luz nocturna. |
 | Automático (retrasado) | `BITS`, `WpnService` | Necesarios, pero no en el arranque. |
-| Según respuesta | `Spooler` | Con impresora: Automático (retrasado). Sin: Manual. |
-| Según respuesta | `LanmanServer` | Compartiendo en red: Automático. Si no: Manual. |
+| Automático (retrasado) | `Spooler` | Siempre: una impresora que deja de andar sin aviso cuesta más que lo que ahorra. |
+| Automático | `LanmanServer` | Siempre, para compartir carpetas e impresoras en la red. |
 | Según respuesta | `OneSyncSvc`, `PimIndexMaintenanceSvc`, `UnistoreSvc`, `UserDataSvc`, `MessagingService` | Sincronizan Correo, Calendario, Contactos y Mensajes. Deshabilitados si se quitan las apps. Son servicios por usuario: rigen desde el próximo inicio de sesión. |
 | Automático | `SysMain` | Compresión de memoria desde el arranque. |
 
@@ -230,8 +230,6 @@ Sin él, *Apagar* es un apagado completo.
 
 | Pregunta | Sí | No |
 |---|---|---|
-| Impresora | `Spooler` Automático (retrasado); se conservan Fax y Escáner y Administración de impresión | `Spooler` Manual; se quitan esas dos características |
-| Compartir en red | `LanmanServer` Automático | `LanmanServer` Manual |
 | OneDrive | Sin cambios | Fuera del inicio (no se desinstala) |
 | Quitar apps | Ver abajo; además se deshabilitan sus servicios de sincronización | Sin cambios |
 
@@ -259,9 +257,7 @@ desactivado.
 | Cliente OpenSSH | `OpenSSH.Client` | Quitar |
 | Windows Hello: reconocimiento facial | `Hello.Face.*` | Quitar: requiere cámara IR. PIN y huella no dependen de esto. |
 | Visor de XPS | `XPS.Viewer` | Quitar, si está |
-| Fax y Escáner de Windows | `Print.Fax.Scan` | Quitar sin impresora |
-| Administración de impresión | `Print.Management.Console` | Quitar sin impresora |
-| Paint, Bloc de notas, PowerShell ISE | | Se conservan |
+| Paint, Bloc de notas, PowerShell ISE, Fax y Escáner, Administración de impresión | | Se conservan |
 | Idiomas (`Language.*`) y demás | | No se tocan |
 
 No consumen RAM ni CPU en reposo: la ganancia es espacio en disco. La primera ejecución tarda varios minutos (DISM).
@@ -536,8 +532,7 @@ fija; revisar *Load/Unload Cycle Count* con [CrystalDiskInfo](https://crystalmar
   apps (`ApplicationPreLaunch`); con la actual vuelve a fábrica. La VM ya venía optimizada: no quedaban apps ni
   características que quitar, y con SSD la caché de escritura se saltea.
 - **PowerShell:** las secciones de las opciones 1, 5, 6 y 7 corren en la VM; los bloques de las opciones 2, 3 y 4
-  pasan el parser oficial. La quita de características opcionales se ejecutó contra una lista simulada de 22H2, con y
-  sin impresora.
+  pasan el parser oficial. La quita de características opcionales se ejecutó contra una lista simulada de 22H2.
 - **Luz nocturna:** los blobs generados se decodificaron con un parser Bond independiente, partiendo de la referencia
   de win-nightlight-cli (envoltorio Bond), de un blob de Windows 10 (envoltorio viejo) y de ninguno. Con el blob
   viejo, el resultado coincide byte a byte con el *AutoOn* de Windows 10, salvo el FILETIME.
