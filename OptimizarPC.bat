@@ -276,8 +276,23 @@ if /i "%_r%"=="0x1" (
     set "_reparado=1"
     echo   [REPARADO] DisablePagingExecutive estaba en 1: vuelve a 0.
 )
-if "%_reparado%"=="0" echo   [OK] Nada perjudicial del v1: SysMain, teclado tactil, biometria, ubicacion
-if "%_reparado%"=="0" echo        y DisablePagingExecutive estan bien.
+:: Precarga del arranque y de los programas: en disco mecanico junta muchas
+:: lecturas sueltas en una sola en bloque. 3 es el valor de fabrica; otros
+:: optimizadores la apagan con 0 y cada programa tarda mas en abrir.
+call :leer "%_mm%\PrefetchParameters" EnablePrefetcher
+if not "%_r%"=="0x3" (
+    call :dword "%_mm%\PrefetchParameters" EnablePrefetcher 3
+    set "_reparado=1"
+    echo   [REPARADO] EnablePrefetcher no estaba en 3: la precarga vuelve a la de fabrica.
+)
+call :leer "%_mm%\PrefetchParameters" EnableSuperfetch
+if not "%_r%"=="0x3" (
+    call :dword "%_mm%\PrefetchParameters" EnableSuperfetch 3
+    set "_reparado=1"
+    echo   [REPARADO] EnableSuperfetch no estaba en 3: la precarga vuelve a la de fabrica.
+)
+if "%_reparado%"=="0" echo   [OK] Nada perjudicial del v1: SysMain, teclado tactil, biometria, ubicacion,
+if "%_reparado%"=="0" echo        DisablePagingExecutive y la precarga estan bien.
 :: Compresion de memoria activa y sin precarga de apps UWP en RAM.
 sc start SysMain >nul 2>&1
 powershell -NoProfile -ExecutionPolicy Bypass -Command "Enable-MMAgent -MemoryCompression -ErrorAction SilentlyContinue; Disable-MMAgent -ApplicationPreLaunch -ErrorAction SilentlyContinue" >nul 2>&1
@@ -1819,6 +1834,7 @@ $mma = Get-MMAgent
 if ($mma) { L ('Compresion de memoria / precarga de apps / combinacion de paginas: ' + $mma.MemoryCompression + ' / ' + $mma.ApplicationPreLaunch + ' / ' + $mma.PageCombining) }
 L ('Proceso de compresion activo:   ' + [bool](Get-Process -Name 'Memory Compression'))
 foreach ($v in 'DisablePagingExecutive', 'IOPageLockLimit', 'DontVerifyRandomDrivers', 'LargeSystemCache') { L ($v + ': ' + (Leer $mm $v)) }
+L ('Precarga EnablePrefetcher / EnableSuperfetch: ' + (Leer ($mm + '\PrefetchParameters') 'EnablePrefetcher') + ' / ' + (Leer ($mm + '\PrefetchParameters') 'EnableSuperfetch') + '   (3 = arranque y programas, el de fabrica)')
 L ('Paginacion administrada por Windows: ' + $cs.AutomaticManagedPagefile)
 Get-CimInstance Win32_PageFileSetting | ForEach-Object { L ('Paginacion configurada:         ' + $_.Name + ' - inicial ' + $_.InitialSize + ' MB, maximo ' + $_.MaximumSize + ' MB   (la v2: fijo en el doble de la RAM)') }
 Get-CimInstance Win32_PageFileUsage | ForEach-Object { L ('Archivo de paginacion:          ' + $_.Name + ' - ' + $_.AllocatedBaseSize + ' MB (en uso ' + $_.CurrentUsage + ' MB, pico ' + $_.PeakUsage + ' MB)') }

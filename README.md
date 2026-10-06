@@ -100,6 +100,7 @@ pantalla); si no hay nada, lo informa. Lo correcto o inocuo no se toca.
 | `WbioSrvc` deshabilitado | Perjudicial: rompe la huella. | Manual (fábrica). |
 | `lfsvc` deshabilitado | Perjudicial: rompe la luz nocturna del anochecer al amanecer. | Manual (fábrica). |
 | `DisablePagingExecutive=1` | Perjudicial con poca RAM: fija el kernel en memoria. | `0`. |
+| `EnablePrefetcher` o `EnableSuperfetch` distintos de `3` | Perjudicial en disco mecánico: sin precarga, el arranque y cada programa leen el disco de a pedazos. | `3` (fábrica). |
 | `DoSvc` con `Start=4` | Perjudicial: puede romper Windows Update. | Fábrica (paso 1) + `DODownloadMode=0` (sin P2P). |
 | `IOPageLockLimit`, `DontVerifyRandomDrivers` | Placebos: Windows los ignora. | Sin cambios. |
 | `compact /CompactOS:never` | Correcto en HDD. | Se mantiene; descomprime solo si estaba comprimido y hay 6 GB libres. |
