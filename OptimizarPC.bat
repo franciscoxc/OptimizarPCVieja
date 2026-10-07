@@ -173,11 +173,11 @@ choice /c SN /n /m "  1. Usas OneDrive? [S/N]: "
 if errorlevel 2 (set "ONEDRIVE=N") else (set "ONEDRIVE=S")
 echo.
 echo   2. Quitar apps preinstaladas: Xbox, Solitario, Candy Crush, Noticias, Skype,
-echo      Enlace Movil, Obtener ayuda, Sugerencias, Contactos, Mapas, Correo y
-echo      Calendario, Outlook nuevo, OneNote, Notas rapidas, Alarmas, Groove,
-echo      Peliculas y TV, Paint 3D, Cortana y similares. Quedan: Store,
-echo      Calculadora, Camara, Grabadora de sonidos, Clima y Recortes y anotacion.
-echo      Todo se reinstala de la Store.
+echo      Teams, Enlace Movil, Obtener ayuda, Sugerencias, Contactos, Mapas, Correo
+echo      y Calendario, Outlook nuevo, OneNote, Notas rapidas, Alarmas, Groove,
+echo      Peliculas y TV, Paint 3D, Cortana, Familia, Asistencia rapida, Dev Home
+echo      y similares. Quedan: Store, Calculadora, Camara, Grabadora de sonidos,
+echo      Clima y Recortes y anotacion. Todo se reinstala de la Store.
 choice /c SN /n /m "     Quitarlas? [S/N]: "
 if errorlevel 2 (set "QUITARAPPS=N") else (set "QUITARAPPS=S")
 
@@ -376,9 +376,12 @@ call :dword "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager" DisableWpbtE
 call :dword "HKLM\SYSTEM\Maps" AutoUpdateEnabled 0
 :: Copilot y la IA de Windows, apagados por politica en Windows 10 y 11. Recall y
 :: Click to Do solo existen en algunas PCs con Windows 11; en el resto no hacen nada.
-:: La app de Copilot se quita en el paso 10, siempre.
+:: La app y el programa de Copilot se quitan en el paso 10, siempre.
 call :dword "%_pol%\WindowsCopilot" TurnOffWindowsCopilot 1
 call :dword "%UHIVE%\Software\Policies\Microsoft\Windows\WindowsCopilot" TurnOffWindowsCopilot 1
+:: El programa de Copilot lo maneja el actualizador de Edge, y esta es su politica para
+:: no instalar una app. Sin comprobar: no se encontro como pedirle que lo reinstale.
+call :dword "HKLM\SOFTWARE\Policies\Microsoft\EdgeUpdate" Install{C50565E9-CCCF-44B4-BA15-5AC5C6569197} 0
 call :dword "%_pol%\WindowsAI" DisableAIDataAnalysis 1
 call :dword "%_pol%\WindowsAI" AllowRecallEnablement 0
 call :dword "%_pol%\WindowsAI" DisableClickToDo 1
@@ -567,6 +570,9 @@ call :dword "%_edge%\Recommended" SleepingTabsEnabled 1
 call :dword "%_edge%\Recommended" SleepingTabsTimeout 300
 call :dword "HKLM\SOFTWARE\Policies\Microsoft\EdgeUpdate" CreateDesktopShortcutDefault 0
 call :dword "HKLM\SOFTWARE\Policies\Google\Chrome" BackgroundModeEnabled 0
+:: Con StartupBoostEnabled en 0, Edge se saca solo del inicio, pero recien la proxima
+:: vez que arranca: el script terminaba mostrandolo todavia en el inicio.
+for /f %%v in ('reg query "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Run" 2^>nul ^| findstr /i /c:"MicrosoftEdgeAutoLaunch_"') do reg delete "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Run" /v %%v /f >nul 2>&1
 echo   [OK] Edge: sin precarga, sin quedar de fondo, sin barra lateral; pestanas
 echo        en suspension a los 5 minutos. Chrome: sin quedar de fondo.
 echo        Van a decir "Administrado por tu organizacion": es normal.
@@ -577,7 +583,9 @@ call :titulo "10/11  Opcionales, clasicos de Windows 7 y Adobe Reader"
 if "%ONEDRIVE%"=="S" goto :onedrive_listo
 reg delete "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Run" /v OneDrive /f >nul 2>&1
 taskkill /f /im OneDrive.exe >nul 2>&1
-echo   [OK] OneDrive ya no arranca con Windows. No se desinstalo.
+:: Aunque no se use, sus tareas lo actualizan y mandan reportes todos los dias.
+for %%t in ("OneDrive Reporting Task" "OneDrive Standalone Update Task") do schtasks /change /tn "%%~t-%USID%" /disable >nul 2>&1
+echo   [OK] OneDrive ya no arranca con Windows ni se actualiza solo. No se desinstalo.
 :onedrive_listo
 :: Visualizador de fotos de Windows, el de Windows 7: sigue instalado, pero
 :: Windows 10 le saco las fotos comunes. Se le devuelven con su nombre y su
@@ -907,6 +915,7 @@ call :borrar "%_pol%\Windows Feeds" EnableFeeds
 call :borrar "HKLM\SOFTWARE\Policies\Microsoft\Dsh" AllowNewsAndInterests
 call :borrar "%_pol%\WindowsCopilot" TurnOffWindowsCopilot
 call :borrar "%UHIVE%\Software\Policies\Microsoft\Windows\WindowsCopilot" TurnOffWindowsCopilot
+call :borrar "HKLM\SOFTWARE\Policies\Microsoft\EdgeUpdate" Install{C50565E9-CCCF-44B4-BA15-5AC5C6569197}
 for %%v in (DisableAIDataAnalysis AllowRecallEnablement DisableClickToDo) do call :borrar "%_pol%\WindowsAI" %%v
 call :borrar "%_pol%\Windows Search" AllowCortana
 call :borrar "%_pol%\Windows Search" EnableDynamicContentInWSB
@@ -992,12 +1001,17 @@ echo   [OK] Politicas de Edge y Chrome quitadas, incluidas las de Chrome de aula
 call :titulo "Adobe Reader"
 powershell -NoProfile -ExecutionPolicy Bypass -Command "if (-not (Get-Service -Name AdobeARMservice -ErrorAction SilentlyContinue)) { Write-Output '  Adobe Reader no esta instalado: nada que revertir.'; exit 0 }; Set-Service -Name AdobeARMservice -StartupType Automatic -ErrorAction SilentlyContinue; Start-Service -Name AdobeARMservice -ErrorAction SilentlyContinue; Get-ScheduledTask -TaskName 'Adobe Acrobat Update Task*' -ErrorAction SilentlyContinue | Enable-ScheduledTask -ErrorAction SilentlyContinue | Out-Null; Write-Output '  [OK] Adobe Reader: actualizacion automatica activada otra vez.'; Write-Output '       Las entradas de inicio viejas no vuelven: Reader no las necesita.'"
 
+:: OneDrive vuelve al inicio recien cuando se lo abre; sus tareas, ya.
+for %%t in ("OneDrive Reporting Task" "OneDrive Standalone Update Task") do schtasks /change /tn "%%~t-%USID%" /enable >nul 2>&1
+
 echo.
 echo   Para recuperar lo que no se revierte solo:
 echo    - OneDrive: abrilo una vez y vuelve a arrancar con Windows.
 echo    - Apps quitadas: se reinstalan gratis desde la Microsoft Store.
 echo    - Caracteristicas opcionales: Configuracion, Aplicaciones, Caracteristicas
 echo      opcionales, Agregar una caracteristica.
+echo    - Conexion a Escritorio remoto: Panel de control, Programas, Activar o
+echo      desactivar las caracteristicas de Windows.
 echo    - App Fotos: buscala en la Store como "Microsoft Fotos". El Visualizador de
 echo      fotos clasico queda disponible: no molesta y no ocupa nada.
 echo.
@@ -1484,23 +1498,45 @@ try {
 # a DISM tarda varios segundos.
 $prov = Get-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue
 # Quita una app para todos los usuarios y para los que se creen despues. Devuelve
-# el nombre de cada paquete que encontro.
+# el nombre de cada paquete que quito.
 function QuitarApp([string]$Nombre) {
-    Get-AppxPackage -AllUsers -Name $Nombre -ErrorAction SilentlyContinue | Sort-Object PackageFullName -Unique | ForEach-Object {
-        Remove-AppxPackage -Package $_.PackageFullName -AllUsers -ErrorAction SilentlyContinue
-        $_.Name
+    # ponytail-keep: primero fuera de los provisionados. Con la app todavia provisionada,
+    # Remove-AppxPackage -AllUsers falla con 0x80070002 y la app queda instalada: asi
+    # quedaron 28 apps en una netbook con Windows 10 recien instalado.
+    $prov | Where-Object { $_.DisplayName -like $Nombre } | ForEach-Object {
+        try { Remove-AppxProvisionedPackage -Online -PackageName $_.PackageName -ErrorAction Stop | Out-Null } catch {}
     }
-    $prov | Where-Object { $_.DisplayName -like $Nombre } | ForEach-Object { Remove-AppxProvisionedPackage -Online -PackageName $_.PackageName -ErrorAction SilentlyContinue | Out-Null }
+    Get-AppxPackage -AllUsers -Name $Nombre -ErrorAction SilentlyContinue | Sort-Object PackageFullName -Unique | ForEach-Object {
+        $p = $_; $ok = $true
+        # Los errores de Appx cortan aunque se pida SilentlyContinue: sin try salen en
+        # rojo. Si para todos los usuarios no se puede, al menos para esta cuenta.
+        try { Remove-AppxPackage -Package $p.PackageFullName -AllUsers -ErrorAction Stop }
+        catch { try { Remove-AppxPackage -Package $p.PackageFullName -ErrorAction Stop } catch { $ok = $false } }
+        if ($ok) { $p.Name }
+    }
 }
 if ($env:QUITARAPPS -eq 'S') {
     Write-Output '  Quitando apps preinstaladas para todos los usuarios, puede tardar...'
-    $apps = 'Microsoft.549981C3F5F10','Microsoft.BingNews','Microsoft.BingSearch','Microsoft.GetHelp','Microsoft.Getstarted','Microsoft.Messaging','Microsoft.Microsoft3DViewer','Microsoft.MicrosoftOfficeHub','Microsoft.MicrosoftSolitaireCollection','Microsoft.MicrosoftStickyNotes','Microsoft.MixedReality.Portal','Microsoft.MSPaint','Microsoft.Office.OneNote','Microsoft.OneConnect','Microsoft.OutlookForWindows','Microsoft.People','Microsoft.PowerAutomateDesktop','Microsoft.Print3D','Microsoft.SkypeApp','Microsoft.Todos','Microsoft.Wallet','Microsoft.WindowsAlarms','Microsoft.WindowsFeedbackHub','Microsoft.WindowsMaps','microsoft.windowscommunicationsapps','Microsoft.YourPhone','Microsoft.ZuneMusic','Microsoft.ZuneVideo','Microsoft.GamingApp','Microsoft.XboxApp','Microsoft.Xbox.TCUI','Microsoft.XboxGameOverlay','Microsoft.XboxGamingOverlay','Microsoft.XboxIdentityProvider','Microsoft.XboxSpeechToTextOverlay','Clipchamp.Clipchamp','MicrosoftTeams','king.com.*'
+    $apps = 'Microsoft.549981C3F5F10','Microsoft.BingNews','Microsoft.BingSearch','Microsoft.GetHelp','Microsoft.Getstarted','Microsoft.Messaging','Microsoft.Microsoft3DViewer','Microsoft.MicrosoftOfficeHub','Microsoft.MicrosoftSolitaireCollection','Microsoft.MicrosoftStickyNotes','Microsoft.MixedReality.Portal','Microsoft.MSPaint','Microsoft.Office.OneNote','Microsoft.OneConnect','Microsoft.OutlookForWindows','Microsoft.People','Microsoft.PowerAutomateDesktop','Microsoft.Print3D','Microsoft.SkypeApp','Microsoft.Todos','Microsoft.Wallet','Microsoft.WindowsAlarms','Microsoft.WindowsFeedbackHub','Microsoft.WindowsMaps','microsoft.windowscommunicationsapps','Microsoft.YourPhone','Microsoft.ZuneMusic','Microsoft.ZuneVideo','Microsoft.GamingApp','Microsoft.XboxApp','Microsoft.Xbox.TCUI','Microsoft.XboxGameOverlay','Microsoft.XboxGamingOverlay','Microsoft.XboxIdentityProvider','Microsoft.XboxSpeechToTextOverlay','Clipchamp.Clipchamp','MicrosoftTeams','MSTeams','king.com.*','Microsoft.Windows.DevHome','MicrosoftCorporationII.MicrosoftFamily','MicrosoftCorporationII.QuickAssist','Microsoft.Edge.GameAssist','*StartExperiencesApp'
     foreach ($a in $apps) { QuitarApp $a | ForEach-Object { Write-Output ('    - ' + $_) } }
+    # El complemento de Teams para Office y el instalador de Teams para todas las
+    # cuentas son MSI. Sin Teams no sirven, y el complemento se carga con cada Outlook.
+    $u = 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*', 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*', ($env:UPS + '\Software\Microsoft\Windows\CurrentVersion\Uninstall\*')
+    Get-ItemProperty -Path $u -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -like 'Microsoft Teams Meeting Add-in*' -or $_.DisplayName -eq 'Teams Machine-Wide Installer' } | ForEach-Object {
+        if ($_.UninstallString -match '\{[0-9A-Fa-f-]{36}\}') {
+            Start-Process msiexec.exe -ArgumentList ('/x ' + $Matches[0] + ' /qn /norestart') -Wait
+            Write-Output ('    - ' + $_.DisplayName)
+        }
+    }
     Write-Output '  [OK] Apps preinstaladas quitadas.'
 }
 # Copilot, siempre: no depende de la pregunta de las apps. Lo que no es una app
 # (el boton, Recall, Click to Do) lo apagan las politicas del paso 6.
 [void](QuitarApp 'Microsoft.Copilot')
+# Copilot tambien llega como programa, con el instalador de Edge: --force-uninstall
+# lo quita sin preguntar, en unos 10 s. Para que no vuelva esta la politica del paso 6.
+$c = Get-ItemProperty -LiteralPath 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Microsoft Copilot', 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\Microsoft Copilot' -ErrorAction SilentlyContinue | Select-Object -First 1
+if ($c.UninstallString -match '^"([^"]+)"\s*(.*)$') { Start-Process -FilePath $Matches[1] -ArgumentList ($Matches[2] + ' --force-uninstall') -Wait -WindowStyle Hidden }
 Write-Output '  [OK] Copilot quitado; el resto de la IA de Windows queda apagado por politica.'
 # La app Fotos nueva, para todos los usuarios: el Visualizador de fotos clasico
 # ya quedo registrado en el paso anterior.
@@ -1533,6 +1569,14 @@ if (-not $todas.Count) {
 }
 Write-Output '  [OK] Caracteristicas opcionales: quedan Paint, Bloc de notas, PowerShell ISE,'
 Write-Output '       los idiomas y las de impresion.'
+# Conexion a Escritorio remoto no es una opcional sino una caracteristica de Windows.
+# Sale en unos 25 s, sin reiniciar.
+if ((Get-WindowsOptionalFeature -Online -FeatureName Microsoft-RemoteDesktopConnection -ErrorAction SilentlyContinue).State -eq 'Enabled') {
+    try {
+        Disable-WindowsOptionalFeature -Online -FeatureName Microsoft-RemoteDesktopConnection -NoRestart -ErrorAction Stop | Out-Null
+        Write-Output '  [OK] Conexion a Escritorio remoto quitada.'
+    } catch {}
+}
 # Adobe Reader, si esta instalado: fuera todo lo que arranca solo con Windows,
 # incluido su actualizador automatico (tarea y servicio). Los PDF quedan para
 # Edge o Chrome. Reader sigue andando si alguien lo abre.
@@ -2112,14 +2156,17 @@ L ('Chrome de aula (BrowserSignin): ' + (Leer 'HKEY_LOCAL_MACHINE\SOFTWARE\Polic
 
 # --- Apps preinstaladas -------------------------------------------------------
 Titulo 'Apps preinstaladas que la v2 puede quitar (presentes)'
-$apps = 'Microsoft.549981C3F5F10', 'Microsoft.BingNews', 'Microsoft.Copilot', 'Microsoft.GetHelp', 'Microsoft.Getstarted', 'Microsoft.MicrosoftOfficeHub', 'Microsoft.MicrosoftSolitaireCollection', 'Microsoft.MicrosoftStickyNotes', 'Microsoft.Office.OneNote', 'Microsoft.OutlookForWindows', 'Microsoft.People', 'Microsoft.SkypeApp', 'Microsoft.WindowsAlarms', 'Microsoft.WindowsMaps', 'microsoft.windowscommunicationsapps', 'Microsoft.YourPhone', 'Microsoft.ZuneMusic', 'Microsoft.ZuneVideo', 'Microsoft.XboxApp', 'Microsoft.XboxGamingOverlay', 'king.com.*'
+$apps = 'Microsoft.549981C3F5F10', 'Microsoft.BingNews', 'Microsoft.Copilot', 'Microsoft.GetHelp', 'Microsoft.Getstarted', 'Microsoft.MicrosoftOfficeHub', 'Microsoft.MicrosoftSolitaireCollection', 'Microsoft.MicrosoftStickyNotes', 'Microsoft.Office.OneNote', 'Microsoft.OutlookForWindows', 'Microsoft.People', 'Microsoft.SkypeApp', 'Microsoft.WindowsAlarms', 'Microsoft.WindowsMaps', 'microsoft.windowscommunicationsapps', 'Microsoft.YourPhone', 'Microsoft.ZuneMusic', 'Microsoft.ZuneVideo', 'Microsoft.XboxApp', 'Microsoft.XboxGamingOverlay', 'king.com.*', 'MSTeams', 'Microsoft.Windows.DevHome', 'MicrosoftCorporationII.MicrosoftFamily', 'MicrosoftCorporationII.QuickAssist', 'Microsoft.Edge.GameAssist'
 $hay = foreach ($a in $apps) { Get-AppxPackage -AllUsers -Name $a | Select-Object -ExpandProperty Name -Unique }
 if ($hay) { L (($hay | Sort-Object -Unique) -join ', ') } else { L '(ninguna)' }
+$cp = (Test-Path -LiteralPath 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Microsoft Copilot') -or (Test-Path -LiteralPath 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\Microsoft Copilot')
+L ('Copilot (programa) instalado:   ' + $cp)
 
 # --- Caracteristicas opcionales -----------------------------------------------
 Titulo 'Caracteristicas opcionales instaladas'
 $caps = @(Get-WindowsCapability -Online -ErrorAction SilentlyContinue | Where-Object { $_.State -eq 'Installed' } | ForEach-Object { $_.Name.Split('~')[0] })
 if ($caps.Count) { L (($caps | Sort-Object -Unique) -join ', ') } else { L '(no se pudo leer)' }
+L ('Conexion a Escritorio remoto:   ' + (Get-WindowsOptionalFeature -Online -FeatureName Microsoft-RemoteDesktopConnection -ErrorAction SilentlyContinue).State)
 
 # --- Inicio de Windows --------------------------------------------------------
 Titulo 'Programas que arrancan con Windows'

@@ -161,7 +161,7 @@ Sin exclusiones.
 | Contenido sugerido, instalaciones silenciosas, consejos, "terminá de configurar tu PC" | Apagado. |
 | Noticias e intereses (`EnableFeeds`) y los Widgets de Windows 11 (`AllowNewsAndInterests=0`) | Apagado. |
 | Cortana, Bing y destacados en la búsqueda | Apagado. |
-| Copilot y la IA de Windows | Apagados por política: `TurnOffWindowsCopilot` (equipo y usuario) y, en las PCs con Windows 11 que los tienen, Recall (`DisableAIDataAnalysis=1`, `AllowRecallEnablement=0`) y Click to Do (`DisableClickToDo=1`). La app de Copilot se quita siempre (paso 10). |
+| Copilot y la IA de Windows | Apagados por política: `TurnOffWindowsCopilot` (equipo y usuario) y, en las PCs con Windows 11 que los tienen, Recall (`DisableAIDataAnalysis=1`, `AllowRecallEnablement=0`) y Click to Do (`DisableClickToDo=1`). La app de Copilot y el programa, que instala el actualizador de Edge, se quitan siempre (paso 10). La política de EdgeUpdate `Install{C50565E9-CCCF-44B4-BA15-5AC5C6569197}=0` debería impedirle reinstalarlo; sin comprobar, porque no se encontró cómo pedirle que lo reinstale. |
 | Barra de juegos y Game DVR | Apagado. |
 | Historial de actividad | No se publica ni se sube. |
 | Informe de errores (WER) | Apagado. |
@@ -227,7 +227,8 @@ Sin él, *Apagar* es un apagado completo.
 ### 9. Navegadores
 
 - Edge: sin arranque acelerado, sin modo de fondo, sin barra lateral ni Edge bar, sin recomendaciones ni compras;
-  pestañas en suspensión a los 5 min (fábrica: 2 h).
+  pestañas en suspensión a los 5 min (fábrica: 2 h). Su entrada de inicio (`MicrosoftEdgeAutoLaunch_*`) se borra en el
+  momento: con la sola política, Edge la saca recién la próxima vez que arranca.
 - Chrome: sin modo de fondo.
 - Ambos muestran "Administrado por tu organización" (políticas).
 
@@ -235,15 +236,21 @@ Sin él, *Apagar* es un apagado completo.
 
 | Pregunta | Sí | No |
 |---|---|---|
-| OneDrive | Sin cambios | Fuera del inicio (no se desinstala) |
+| OneDrive | Sin cambios | Fuera del inicio y sin sus tareas diarias de actualización y reportes (no se desinstala) |
 | Quitar apps | Ver abajo; además se deshabilitan sus servicios de sincronización | Sin cambios |
 
 Apps quitadas (todos los usuarios): Xbox, Solitario, Candy Crush, Noticias, Skype, Enlace Móvil (`Microsoft.YourPhone`),
 Obtener ayuda (`Microsoft.GetHelp`), Sugerencias (`Microsoft.Getstarted`), Contactos, Mapas, Correo y Calendario,
 Outlook nuevo, OneNote para Win10, Notas rápidas, Alarmas, Groove, Películas y TV, Paint 3D, Visor 3D, Portal de
-realidad mixta, Centro de comentarios, To Do, Cortana. Quedan: Store, Calculadora, Cámara, Grabadora de
-sonidos, Clima, Recortes y anotación. Se reinstalan desde la Store. Copilot se quita siempre, aunque se conteste
-que no.
+realidad mixta, Centro de comentarios, To Do, Cortana, Dev Home, Clipchamp, Power Automate y, en Windows 11, Teams,
+Microsoft Family, Asistencia rápida, Edge para Game Bar y Experiencias de Inicio. Con Teams se van el complemento de
+Teams para Office y el instalador de Teams para todas las cuentas (MSI, `msiexec /x /qn`). Quedan: Store,
+Calculadora, Cámara, Grabadora de sonidos, Clima, Recortes y anotación. Se reinstalan desde la Store. Copilot, la
+app y el programa, se quita siempre, aunque se conteste que no.
+
+Cada app sale primero de los paquetes provisionados y después de las cuentas. Al revés, en un Windows 10 recién
+instalado `Remove-AppxPackage -AllUsers` falla con `0x80070002` y la app queda instalada: pasó con 28 apps en la
+netbook de prueba. Si para todas las cuentas no se puede, se quita al menos de la que corre el script.
 
 Sin preguntar: [clásicos de Windows 7](#clásicos-de-windows-7), características opcionales y Restaurar sistema
 desactivado.
@@ -259,7 +266,7 @@ desactivado.
 | WordPad | `Microsoft.Windows.WordPad` | Quitar |
 | Reproductor de Windows Media | `Media.WindowsMediaPlayer` | Quitar (VLC, opción 4) |
 | Internet Explorer 11 | `Browser.InternetExplorer` | Quitar (el modo IE de Edge puede dejar de funcionar) |
-| Asistencia rápida integrada | `App.Support.QuickAssist` | Quitar (reemplazada por la versión de la Store) |
+| Asistencia rápida integrada | `App.Support.QuickAssist` | Quitar (la de la Store sale con las apps, paso 10) |
 | Cliente OpenSSH | `OpenSSH.Client` | Quitar |
 | Windows Hello: reconocimiento facial | `Hello.Face.*` | Quitar: requiere cámara IR. PIN y huella no dependen de esto. |
 | Visor de XPS | `XPS.Viewer` | Quitar, si está |
@@ -268,6 +275,10 @@ desactivado.
 
 No consumen RAM ni CPU en reposo: la ganancia es espacio en disco. La primera ejecución tarda varios minutos (DISM).
 Reinstalar: *Características opcionales > Agregar una característica*.
+
+Conexión a Escritorio remoto (`mstsc`) no es una opcional sino una característica de Windows
+(`Microsoft-RemoteDesktopConnection`): sale con `Disable-WindowsOptionalFeature`, en unos 25 s y sin reiniciar. Vuelve
+desde *Panel de control > Programas > Activar o desactivar las características de Windows*.
 
 ### 12. Limpieza de temporales
 
@@ -510,6 +521,9 @@ fija; revisar *Load/Unload Cycle Count* con [CrystalDiskInfo](https://crystalmar
 | *Set Services to Manual* masivo | Rompió Windows Update, la hora y el Bluetooth en WinUtil. |
 | Desactivar mitigaciones Spectre/Meltdown | Expone el equipo. |
 | Desinstalar OneDrive o Edge | Rompe más de lo que arregla; Edge y WebView2 los usan otras apps. |
+| Desinstalar Microsoft Update Health Tools | Su servicio (`uhssvc`) ya viene deshabilitado y Windows Update lo reinstala (KB5001716). |
+| Quitar Windows App Runtime | Son bibliotecas de otras apps: Windows no las deja quitar mientras alguna las use, y las reinstala. No corren por sí solas. |
+| Apps de Chrome (Documentos, Drive, Gmail, Hojas de cálculo, Presentaciones, YouTube) | Accesos a páginas web: no corren ni ocupan RAM. Son de cada perfil de Chrome y se quitan en `chrome://apps`. |
 | Idiomas de *Características opcionales* | Pueden romper la configuración regional y Windows los reinstala. |
 
 ## Límites de software
