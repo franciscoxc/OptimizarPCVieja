@@ -182,8 +182,10 @@ Sin exclusiones.
 - `MenuShowDelay`: 400 a 100 ms.
 - El Explorador abre en *Este equipo* (Acceso rápido calcula recientes en disco).
 - Barra de tareas: sin caja ni lupa de búsqueda (`SearchboxTaskbarMode=0`; se busca abriendo el Inicio y
-  escribiendo), sin los botones de Cortana y Copilot, y con el nombre de cada ventana: los botones se agrupan recién
-  cuando la barra se llena (`TaskbarGlomLevel=1`).
+  escribiendo), sin los botones de Cortana, Copilot y Vista de tareas (`ShowTaskViewButton=0`), y con el nombre de
+  cada ventana: los botones se agrupan recién cuando la barra se llena (`TaskbarGlomLevel=1`). En Windows 11, sin
+  Widgets (la política del paso 6) ni el botón de *Reanudar* (`IsEnabled=0` en `Explorer\Advanced`, según
+  [elevenforum](https://www.elevenforum.com/t/turn-on-or-off-resume-app-button-on-taskbar-in-windows-11.40288/)).
 - Sin detección automática del tipo de carpeta (WinUtil). Efecto secundario: se reinician las vistas guardadas.
 - **Luz nocturna programada del anochecer al amanecer.** Se escribe el blob `windows.data.bluelightreduction.settings`
   de CloudStore (Bond CompactBinary v1, sin documentar; formato según
@@ -348,7 +350,9 @@ winget install --id <ID> -e --source winget --silent --accept-package-agreements
 - Si ya está instalado y winget no conoce la versión: `winget upgrade --include-unknown` (opción exclusiva de
   `upgrade`).
 - Sin winget: lo registra para la cuenta; si no está, abre la Store en *Instalador de aplicación*.
-- WinRAR queda en inglés (único idioma del paquete).
+- WinRAR sale en el idioma de Windows: winget elige el instalador por idioma.
+- En Windows de 32 bits, WinRAR queda en la 7.01: RARLab publica solo 64 bits desde la 7.10. La 7.01 tiene la falla
+  [CVE-2025-8088](https://www.cve.org/CVERecord?id=CVE-2025-8088), corregida en la 7.13.
 
 uBlock Origin Lite (`ddkjiahejlhfcafbddmgiahcphecmpfh`) se fuerza con la política
 [`ExtensionInstallForcelist`](https://chromeenterprise.google/policies/extension-install-forcelist/) antes de instalar
@@ -566,6 +570,21 @@ fija; revisar *Load/Unload Cycle Count* con [CrystalDiskInfo](https://crystalmar
   también se probaron "sin Chrome" y "archivos en uso". En Wine, las cinco políticas quedan escritas.
 - **Netbook simulada:** G4 (N2600, 1 GB, sin driver, con antirrobo): tres avisos. Visualizador de fotos verificado
   contra el `.reg` de referencia.
+- **Netbook real con Windows 10 de 32 bits recién instalado y actualizado** (Classmate PC, Atom N455, 2 GB, disco de
+  5400 rpm, Defender apagado a mano): la opción 1 tardó unos 10 minutos la primera vez y 6 la segunda. Antes, a los
+  50 minutos de encendida y con Windows Update todavía trabajando; después, a los 12 minutos de reiniciar:
+
+  | | Antes | Después |
+  |---|---|---|
+  | RAM disponible | 599 MB | 1137 MB |
+  | Procesos (memoria privada) | 83 (833 MB) | 59 (393 MB) |
+  | Servicios corriendo | 86 | 74 |
+  | Tareas de Microsoft activas | 178 | 163 |
+
+  Dejaron de arrancar Edge de fondo (5 procesos, 71 MB), OneDrive y Noticias e intereses (6 procesos de WebView2,
+  122 MB). La primera pasada destapó el error de `Remove-AppxPackage -AllUsers` con las apps todavía provisionadas;
+  con el orden nuevo, la segunda quitó todas sin mensajes de error. La opción 4 instaló VLC y Chrome con winget; WinRAR
+  falló una vez por la red, con el aviso previsto, y se instaló al repetirla.
 - **Formato:** ASCII y CRLF.
 - **Menú:** [`pruebas/menu.py`](pruebas/menu.py) compara el menú en pantalla, la cabecera del script, el despacho
   de `choice` y la tabla de este README. Corre en la Action antes de publicar: si no coinciden, la release no se toca.
@@ -573,8 +592,7 @@ fija; revisar *Load/Unload Cycle Count* con [CrystalDiskInfo](https://crystalmar
   PowerShell y que cada marcador aparezca una sola vez: un nombre mal escrito saltearía el paso sin avisar. También
   corre antes de publicar.
 
-Sin probar en Windows real: la caché de escritura en un disco mecánico, la quita de apps y características
-opcionales cuando todavía están, y las opciones 2, 3 y 4.
+Sin probar en Windows real: las opciones 2 y 3.
 
 ## Prueba en VM (UTM)
 

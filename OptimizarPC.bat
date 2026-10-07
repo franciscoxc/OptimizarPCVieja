@@ -478,14 +478,20 @@ call :dword "%_adv%" IconsOnly 0
 call :dword "%_adv%" LaunchTo 1
 call :dword "%_adv%" Start_TrackProgs 0
 :: Barra de tareas: sin caja ni lupa de busqueda (abriendo el Inicio y escribiendo
-:: se busca igual), sin los botones de Cortana y Copilot, y con el nombre de cada
-:: ventana: los botones se agrupan recien cuando la barra se llena.
+:: se busca igual), sin los botones de Cortana, Copilot y Vista de tareas, y con el
+:: nombre de cada ventana: los botones se agrupan recien cuando la barra se llena.
+:: Los Widgets de Windows 11 ya los apaga la politica del paso 6.
 call :dword "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Search" SearchboxTaskbarMode 0
 call :dword "%_adv%" ShowCortanaButton 0
 call :dword "%_adv%" ShowCopilotButton 0
+call :dword "%_adv%" ShowTaskViewButton 0
 call :dword "%_adv%" TaskbarGlomLevel 1
-echo   [OK] Barra de tareas: sin busqueda, Cortana ni Copilot; muestra el nombre de cada
-echo        ventana hasta que se llena.
+:: Windows 11: sin el boton de "Reanudar" (seguir en la PC lo que se usaba en el
+:: celular). El nombre del valor es generico, pero es este: lo documenta Shawn Brink
+:: en elevenforum.
+call :dword "%_adv%" IsEnabled 0
+echo   [OK] Barra de tareas: sin busqueda, Cortana, Copilot, Vista de tareas ni Reanudar;
+echo        muestra el nombre de cada ventana hasta que se llena.
 :: Sin deteccion automatica del tipo de carpeta (tweak de WinUtil).
 reg delete "%UCLS%\Local Settings\Software\Microsoft\Windows\Shell\BagMRU" /f >nul 2>&1
 reg delete "%UCLS%\Local Settings\Software\Microsoft\Windows\Shell\Bags" /f >nul 2>&1
@@ -951,7 +957,7 @@ call :dword "%_adv%" Start_TrackProgs 1
 call :borrar "%_adv%" LaunchTo
 :: Sin estos valores, Windows vuelve a su barra de fabrica.
 call :borrar "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Search" SearchboxTaskbarMode
-for %%v in (ShowCortanaButton ShowCopilotButton TaskbarGlomLevel) do call :borrar "%_adv%" %%v
+for %%v in (ShowCortanaButton ShowCopilotButton ShowTaskViewButton TaskbarGlomLevel IsEnabled) do call :borrar "%_adv%" %%v
 call :dword "%UHIVE%\Software\Microsoft\Windows\DWM" EnableAeroPeek 1
 call :dword "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" EnableTransparency 1
 call :borrar "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Explorer" AltTabSettings
@@ -1046,8 +1052,7 @@ call :instalar Google.Chrome "Google Chrome"
 echo.
 echo   LISTO. uBlock Origin Lite aparece en Chrome al minuto de abrirlo por primera
 echo   vez. Queda fija: desde Chrome no se puede quitar, por eso Chrome muestra
-echo   que lo administra tu organizacion. WinRAR queda en ingles: winget no ofrece
-echo   otro idioma.
+echo   que lo administra tu organizacion.
 goto :menu
 
 :: =========================================================================
@@ -2013,6 +2018,7 @@ $lista = @(
     @(($U + '\Software\Microsoft\Windows\CurrentVersion\Search'), 'SearchboxTaskbarMode'),
     @(($U + '\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'), 'TaskbarGlomLevel'),
     @(($U + '\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'), 'ShowCopilotButton'),
+    @(($U + '\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'), 'ShowTaskViewButton'),
     @(($U + '\System\GameConfigStore'), 'GameDVR_Enabled')
 )
 foreach ($par in $lista) { L ($par[1].PadRight(32) + (Leer $par[0] $par[1])) }
