@@ -159,8 +159,9 @@ Sin exclusiones.
 |---|---|
 | Telemetría | Mínimo permitido; sin encuestas ni ID de publicidad. |
 | Contenido sugerido, instalaciones silenciosas, consejos, "terminá de configurar tu PC" | Apagado. |
-| Noticias e intereses (`EnableFeeds`) | Apagado. |
+| Noticias e intereses (`EnableFeeds`) y los Widgets de Windows 11 (`AllowNewsAndInterests=0`) | Apagado. |
 | Cortana, Bing y destacados en la búsqueda | Apagado. |
+| Copilot y la IA de Windows | Apagados por política: `TurnOffWindowsCopilot` (equipo y usuario) y, en las PCs con Windows 11 que los tienen, Recall (`DisableAIDataAnalysis=1`, `AllowRecallEnablement=0`) y Click to Do (`DisableClickToDo=1`). La app de Copilot se quita siempre (paso 10). |
 | Barra de juegos y Game DVR | Apagado. |
 | Historial de actividad | No se publica ni se sube. |
 | Informe de errores (WER) | Apagado. |
@@ -180,6 +181,9 @@ Sin exclusiones.
   (`DisableAcrylicBackgroundOnLogon`), salvo en "mejor apariencia".
 - `MenuShowDelay`: 400 a 100 ms.
 - El Explorador abre en *Este equipo* (Acceso rápido calcula recientes en disco).
+- Barra de tareas: sin caja ni lupa de búsqueda (`SearchboxTaskbarMode=0`; se busca abriendo el Inicio y
+  escribiendo), sin los botones de Cortana y Copilot, y con el nombre de cada ventana: los botones se agrupan recién
+  cuando la barra se llena (`TaskbarGlomLevel=1`).
 - Sin detección automática del tipo de carpeta (WinUtil). Efecto secundario: se reinician las vistas guardadas.
 - **Luz nocturna programada del anochecer al amanecer.** Se escribe el blob `windows.data.bluelightreduction.settings`
   de CloudStore (Bond CompactBinary v1, sin documentar; formato según
@@ -237,8 +241,9 @@ Sin él, *Apagar* es un apagado completo.
 Apps quitadas (todos los usuarios): Xbox, Solitario, Candy Crush, Noticias, Skype, Enlace Móvil (`Microsoft.YourPhone`),
 Obtener ayuda (`Microsoft.GetHelp`), Sugerencias (`Microsoft.Getstarted`), Contactos, Mapas, Correo y Calendario,
 Outlook nuevo, OneNote para Win10, Notas rápidas, Alarmas, Groove, Películas y TV, Paint 3D, Visor 3D, Portal de
-realidad mixta, Centro de comentarios, To Do, Cortana, Copilot. Quedan: Store, Calculadora, Cámara, Grabadora de
-sonidos, Clima, Recortes y anotación. Se reinstalan desde la Store.
+realidad mixta, Centro de comentarios, To Do, Cortana. Quedan: Store, Calculadora, Cámara, Grabadora de
+sonidos, Clima, Recortes y anotación. Se reinstalan desde la Store. Copilot se quita siempre, aunque se conteste
+que no.
 
 Sin preguntar: [clásicos de Windows 7](#clásicos-de-windows-7), características opcionales y Restaurar sistema
 desactivado.

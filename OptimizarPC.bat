@@ -175,7 +175,7 @@ echo.
 echo   2. Quitar apps preinstaladas: Xbox, Solitario, Candy Crush, Noticias, Skype,
 echo      Enlace Movil, Obtener ayuda, Sugerencias, Contactos, Mapas, Correo y
 echo      Calendario, Outlook nuevo, OneNote, Notas rapidas, Alarmas, Groove,
-echo      Peliculas y TV, Paint 3D, Cortana, Copilot y similares. Quedan: Store,
+echo      Peliculas y TV, Paint 3D, Cortana y similares. Quedan: Store,
 echo      Calculadora, Camara, Grabadora de sonidos, Clima y Recortes y anotacion.
 echo      Todo se reinstala de la Store.
 choice /c SN /n /m "     Quitarlas? [S/N]: "
@@ -374,8 +374,19 @@ call :dword "%_pol%\Windows Error Reporting" Disabled 1
 call :dword "%_pol%\Device Metadata" PreventDeviceMetadataFromNetwork 1
 call :dword "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager" DisableWpbtExecution 1
 call :dword "HKLM\SYSTEM\Maps" AutoUpdateEnabled 0
+:: Copilot y la IA de Windows, apagados por politica en Windows 10 y 11. Recall y
+:: Click to Do solo existen en algunas PCs con Windows 11; en el resto no hacen nada.
+:: La app de Copilot se quita en el paso 10, siempre.
+call :dword "%_pol%\WindowsCopilot" TurnOffWindowsCopilot 1
+call :dword "%UHIVE%\Software\Policies\Microsoft\Windows\WindowsCopilot" TurnOffWindowsCopilot 1
+call :dword "%_pol%\WindowsAI" DisableAIDataAnalysis 1
+call :dword "%_pol%\WindowsAI" AllowRecallEnablement 0
+call :dword "%_pol%\WindowsAI" DisableClickToDo 1
+:: Widgets de Windows 11, el equivalente de Noticias e intereses (EnableFeeds).
+call :dword "HKLM\SOFTWARE\Policies\Microsoft\Dsh" AllowNewsAndInterests 0
 echo   [OK] Telemetria al minimo, sin Noticias e intereses, sin Cortana ni destacados,
 echo        sin barra de juegos, sin P2P de actualizaciones ni informe de errores.
+echo   [OK] Copilot y la IA de Windows apagados por politica (Recall y Click to Do incluidos).
 
 :: Ajustes del usuario de la sesion
 set "_cdm=%UHIVE%\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager"
@@ -463,6 +474,15 @@ call :dword "%_adv%" IconsOnly 0
 :: El Explorador abre en "Este equipo" y no rastrea los programas abiertos.
 call :dword "%_adv%" LaunchTo 1
 call :dword "%_adv%" Start_TrackProgs 0
+:: Barra de tareas: sin caja ni lupa de busqueda (abriendo el Inicio y escribiendo
+:: se busca igual), sin los botones de Cortana y Copilot, y con el nombre de cada
+:: ventana: los botones se agrupan recien cuando la barra se llena.
+call :dword "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Search" SearchboxTaskbarMode 0
+call :dword "%_adv%" ShowCortanaButton 0
+call :dword "%_adv%" ShowCopilotButton 0
+call :dword "%_adv%" TaskbarGlomLevel 1
+echo   [OK] Barra de tareas: sin busqueda, Cortana ni Copilot; muestra el nombre de cada
+echo        ventana hasta que se llena.
 :: Sin deteccion automatica del tipo de carpeta (tweak de WinUtil).
 reg delete "%UCLS%\Local Settings\Software\Microsoft\Windows\Shell\BagMRU" /f >nul 2>&1
 reg delete "%UCLS%\Local Settings\Software\Microsoft\Windows\Shell\Bags" /f >nul 2>&1
@@ -884,6 +904,10 @@ echo   [OK] Analisis, notificaciones, icono y MRT como de fabrica. El bloqueo de
 call :titulo "Procesos en segundo plano y busqueda"
 set "_pol=HKLM\SOFTWARE\Policies\Microsoft\Windows"
 call :borrar "%_pol%\Windows Feeds" EnableFeeds
+call :borrar "HKLM\SOFTWARE\Policies\Microsoft\Dsh" AllowNewsAndInterests
+call :borrar "%_pol%\WindowsCopilot" TurnOffWindowsCopilot
+call :borrar "%UHIVE%\Software\Policies\Microsoft\Windows\WindowsCopilot" TurnOffWindowsCopilot
+for %%v in (DisableAIDataAnalysis AllowRecallEnablement DisableClickToDo) do call :borrar "%_pol%\WindowsAI" %%v
 call :borrar "%_pol%\Windows Search" AllowCortana
 call :borrar "%_pol%\Windows Search" EnableDynamicContentInWSB
 call :borrar "%_pol%\GameDVR" AllowGameDVR
@@ -916,6 +940,9 @@ call :dword "%_adv%" TaskbarAnimations 1
 call :dword "%_adv%" IconsOnly 0
 call :dword "%_adv%" Start_TrackProgs 1
 call :borrar "%_adv%" LaunchTo
+:: Sin estos valores, Windows vuelve a su barra de fabrica.
+call :borrar "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Search" SearchboxTaskbarMode
+for %%v in (ShowCortanaButton ShowCopilotButton TaskbarGlomLevel) do call :borrar "%_adv%" %%v
 call :dword "%UHIVE%\Software\Microsoft\Windows\DWM" EnableAeroPeek 1
 call :dword "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" EnableTransparency 1
 call :borrar "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Explorer" AltTabSettings
@@ -1453,23 +1480,31 @@ try {
 #QUITAR-INICIO#
 # Paso 10 de la opcion 1: lo que se quita. Sale con 2 si Adobe Reader esta
 # instalado, para el aviso final sobre los PDF.
+# Los paquetes provisionados se leen una sola vez: en una PC vieja, cada consulta
+# a DISM tarda varios segundos.
+$prov = Get-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue
+# Quita una app para todos los usuarios y para los que se creen despues. Devuelve
+# el nombre de cada paquete que encontro.
+function QuitarApp([string]$Nombre) {
+    Get-AppxPackage -AllUsers -Name $Nombre -ErrorAction SilentlyContinue | Sort-Object PackageFullName -Unique | ForEach-Object {
+        Remove-AppxPackage -Package $_.PackageFullName -AllUsers -ErrorAction SilentlyContinue
+        $_.Name
+    }
+    $prov | Where-Object { $_.DisplayName -like $Nombre } | ForEach-Object { Remove-AppxProvisionedPackage -Online -PackageName $_.PackageName -ErrorAction SilentlyContinue | Out-Null }
+}
 if ($env:QUITARAPPS -eq 'S') {
     Write-Output '  Quitando apps preinstaladas para todos los usuarios, puede tardar...'
-    $apps = 'Microsoft.549981C3F5F10','Microsoft.BingNews','Microsoft.BingSearch','Microsoft.Copilot','Microsoft.GetHelp','Microsoft.Getstarted','Microsoft.Messaging','Microsoft.Microsoft3DViewer','Microsoft.MicrosoftOfficeHub','Microsoft.MicrosoftSolitaireCollection','Microsoft.MicrosoftStickyNotes','Microsoft.MixedReality.Portal','Microsoft.MSPaint','Microsoft.Office.OneNote','Microsoft.OneConnect','Microsoft.OutlookForWindows','Microsoft.People','Microsoft.PowerAutomateDesktop','Microsoft.Print3D','Microsoft.SkypeApp','Microsoft.Todos','Microsoft.Wallet','Microsoft.WindowsAlarms','Microsoft.WindowsFeedbackHub','Microsoft.WindowsMaps','microsoft.windowscommunicationsapps','Microsoft.YourPhone','Microsoft.ZuneMusic','Microsoft.ZuneVideo','Microsoft.GamingApp','Microsoft.XboxApp','Microsoft.Xbox.TCUI','Microsoft.XboxGameOverlay','Microsoft.XboxGamingOverlay','Microsoft.XboxIdentityProvider','Microsoft.XboxSpeechToTextOverlay','Clipchamp.Clipchamp','MicrosoftTeams','king.com.*'
-    $prov = Get-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue
-    foreach ($a in $apps) {
-        Get-AppxPackage -AllUsers -Name $a -ErrorAction SilentlyContinue | Sort-Object PackageFullName -Unique | ForEach-Object {
-            Write-Output ('    - ' + $_.Name)
-            Remove-AppxPackage -Package $_.PackageFullName -AllUsers -ErrorAction SilentlyContinue
-        }
-        $prov | Where-Object { $_.DisplayName -like $a } | ForEach-Object { Remove-AppxProvisionedPackage -Online -PackageName $_.PackageName -ErrorAction SilentlyContinue | Out-Null }
-    }
+    $apps = 'Microsoft.549981C3F5F10','Microsoft.BingNews','Microsoft.BingSearch','Microsoft.GetHelp','Microsoft.Getstarted','Microsoft.Messaging','Microsoft.Microsoft3DViewer','Microsoft.MicrosoftOfficeHub','Microsoft.MicrosoftSolitaireCollection','Microsoft.MicrosoftStickyNotes','Microsoft.MixedReality.Portal','Microsoft.MSPaint','Microsoft.Office.OneNote','Microsoft.OneConnect','Microsoft.OutlookForWindows','Microsoft.People','Microsoft.PowerAutomateDesktop','Microsoft.Print3D','Microsoft.SkypeApp','Microsoft.Todos','Microsoft.Wallet','Microsoft.WindowsAlarms','Microsoft.WindowsFeedbackHub','Microsoft.WindowsMaps','microsoft.windowscommunicationsapps','Microsoft.YourPhone','Microsoft.ZuneMusic','Microsoft.ZuneVideo','Microsoft.GamingApp','Microsoft.XboxApp','Microsoft.Xbox.TCUI','Microsoft.XboxGameOverlay','Microsoft.XboxGamingOverlay','Microsoft.XboxIdentityProvider','Microsoft.XboxSpeechToTextOverlay','Clipchamp.Clipchamp','MicrosoftTeams','king.com.*'
+    foreach ($a in $apps) { QuitarApp $a | ForEach-Object { Write-Output ('    - ' + $_) } }
     Write-Output '  [OK] Apps preinstaladas quitadas.'
 }
+# Copilot, siempre: no depende de la pregunta de las apps. Lo que no es una app
+# (el boton, Recall, Click to Do) lo apagan las politicas del paso 6.
+[void](QuitarApp 'Microsoft.Copilot')
+Write-Output '  [OK] Copilot quitado; el resto de la IA de Windows queda apagado por politica.'
 # La app Fotos nueva, para todos los usuarios: el Visualizador de fotos clasico
 # ya quedo registrado en el paso anterior.
-Get-AppxPackage -AllUsers -Name Microsoft.Windows.Photos -ErrorAction SilentlyContinue | ForEach-Object { Remove-AppxPackage -Package $_.PackageFullName -AllUsers -ErrorAction SilentlyContinue }
-Get-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -eq 'Microsoft.Windows.Photos' } | ForEach-Object { Remove-AppxProvisionedPackage -Online -PackageName $_.PackageName -ErrorAction SilentlyContinue | Out-Null }
+[void](QuitarApp 'Microsoft.Windows.Photos')
 Write-Output '  [OK] App Fotos quitada. Si algun dia hace falta, se reinstala desde la Store.'
 # Caracteristicas opcionales (Configuracion > Aplicaciones > Caracteristicas
 # opcionales): no corren de fondo, pero ocupan disco. Quedan Paint, Bloc de
@@ -1931,6 +1966,9 @@ $lista = @(
     @(($U + '\Software\Microsoft\Windows\CurrentVersion\Search'), 'BackgroundAppGlobalToggle'),
     @('HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsStore\WindowsUpdate', 'AutoDownload'),
     @(($U + '\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'), 'LaunchTo'),
+    @(($U + '\Software\Microsoft\Windows\CurrentVersion\Search'), 'SearchboxTaskbarMode'),
+    @(($U + '\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'), 'TaskbarGlomLevel'),
+    @(($U + '\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'), 'ShowCopilotButton'),
     @(($U + '\System\GameConfigStore'), 'GameDVR_Enabled')
 )
 foreach ($par in $lista) { L ($par[1].PadRight(32) + (Leer $par[0] $par[1])) }
@@ -2074,7 +2112,7 @@ L ('Chrome de aula (BrowserSignin): ' + (Leer 'HKEY_LOCAL_MACHINE\SOFTWARE\Polic
 
 # --- Apps preinstaladas -------------------------------------------------------
 Titulo 'Apps preinstaladas que la v2 puede quitar (presentes)'
-$apps = 'Microsoft.549981C3F5F10', 'Microsoft.BingNews', 'Microsoft.GetHelp', 'Microsoft.Getstarted', 'Microsoft.MicrosoftOfficeHub', 'Microsoft.MicrosoftSolitaireCollection', 'Microsoft.MicrosoftStickyNotes', 'Microsoft.Office.OneNote', 'Microsoft.OutlookForWindows', 'Microsoft.People', 'Microsoft.SkypeApp', 'Microsoft.WindowsAlarms', 'Microsoft.WindowsMaps', 'microsoft.windowscommunicationsapps', 'Microsoft.YourPhone', 'Microsoft.ZuneMusic', 'Microsoft.ZuneVideo', 'Microsoft.XboxApp', 'Microsoft.XboxGamingOverlay', 'king.com.*'
+$apps = 'Microsoft.549981C3F5F10', 'Microsoft.BingNews', 'Microsoft.Copilot', 'Microsoft.GetHelp', 'Microsoft.Getstarted', 'Microsoft.MicrosoftOfficeHub', 'Microsoft.MicrosoftSolitaireCollection', 'Microsoft.MicrosoftStickyNotes', 'Microsoft.Office.OneNote', 'Microsoft.OutlookForWindows', 'Microsoft.People', 'Microsoft.SkypeApp', 'Microsoft.WindowsAlarms', 'Microsoft.WindowsMaps', 'microsoft.windowscommunicationsapps', 'Microsoft.YourPhone', 'Microsoft.ZuneMusic', 'Microsoft.ZuneVideo', 'Microsoft.XboxApp', 'Microsoft.XboxGamingOverlay', 'king.com.*'
 $hay = foreach ($a in $apps) { Get-AppxPackage -AllUsers -Name $a | Select-Object -ExpandProperty Name -Unique }
 if ($hay) { L (($hay | Sort-Object -Unique) -join ', ') } else { L '(ninguna)' }
 
