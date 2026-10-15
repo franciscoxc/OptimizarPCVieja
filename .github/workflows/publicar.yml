@@ -9,6 +9,7 @@ on:
       - OptimizarPC.bat
       - pruebas/menu.py
       - pruebas/secciones.py
+      - pruebas/limpieza.ps1
       - .github/workflows/publicar.yml
   workflow_dispatch:
 
@@ -33,12 +34,16 @@ jobs:
       - name: Comprobar las secciones de PowerShell
         run: python3 pruebas/secciones.py
 
+      - name: Probar la limpieza
+        run: pwsh -NoProfile pruebas/limpieza.ps1
+
       - name: Publicar como ultima version
         env:
           GH_TOKEN: ${{ github.token }}
+        # Se reemplaza el archivo sin borrar la release: borrar primero dejaba la
+        # descarga en 404 si la creacion fallaba. Crear queda para la primera vez.
         run: |
-          gh release delete ultima --cleanup-tag --yes || true
-          gh release create ultima OptimizarPC.bat \
+          gh release upload ultima OptimizarPC.bat --clobber || gh release create ultima OptimizarPC.bat \
             --target "$GITHUB_SHA" \
             --title "OptimizarPC (ultima version)" \
             --notes "Descarga OptimizarPC.bat y ejecutalo con doble clic." \

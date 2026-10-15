@@ -27,7 +27,7 @@ suspende (ver [Perfiles](#perfiles-según-el-hardware)).
 | `1` | Optimizar. Incluye la revisión del script v1. | Sí |
 | `2` | Limpiar WinSxS con DISM `/ResetBase`. Avanzado, irreversible. Pide confirmación. Hasta 1 h. | Sí |
 | `3` | Desfragmentación completa. Horas. | Sí |
-| `4` | Instalar WinRAR, VLC y Chrome con winget. | Sí |
+| `4` | Instalar WinRAR, Everything, VLC y Chrome con winget. | Sí |
 | `5` | Chrome de aula: cierra Chrome y borra todos sus perfiles; arranca sin pedir iniciar sesión. Pide confirmación. | Sí |
 | `6` | Revertir la opción 1 a valores de fábrica. | Sí |
 | `7` | Verificar: hardware, antirrobo CI, estado de cada ajuste. Reporte `.txt` junto al script. | No |
@@ -113,7 +113,7 @@ La compresión de memoria se activa siempre (paso 8).
 | Inicio | Servicios | Motivo |
 |---|---|---|
 | Deshabilitado | `DiagTrack`, `dmwappushservice` | Telemetría. |
-| Deshabilitado (HDD) | `WSearch` | Indexa leyendo el disco; con SSD queda de fábrica. El Inicio sigue encontrando apps (20H2+); se pierde la búsqueda instantánea de archivos. Alternativa: [Everything](https://www.voidtools.com/) (lee la MFT). |
+| Deshabilitado (HDD) | `WSearch` | Indexa leyendo el disco; con SSD queda de fábrica. El Inicio sigue encontrando apps (20H2+); se pierde la búsqueda instantánea de archivos. Lo reemplaza [Everything](https://www.voidtools.com/) (lee la MFT), que instala la opción 4. |
 | Deshabilitado | `XblAuthManager`, `XblGameSave`, `XboxNetApiSvc`, `XboxGipSvc`, `xbgm` | Xbox. |
 | Deshabilitado (< 4 GB) | `bthserv`, `BTAGService`, `BthAvctpSvc` | Bluetooth. Con 4 GB o más, Manual (fábrica): sin adaptador no consume nada. |
 | Deshabilitado | `RemoteRegistry` | Fábrica; se asegura. |
@@ -338,15 +338,16 @@ Reader deja de recibir parches: asignar `.pdf` a Edge o Chrome, o desinstalarlo.
 
 Al final: estado de Defender, programas de inicio y reinicio.
 
-## Opción 4: Chrome, WinRAR y VLC
+## Opción 4: Chrome, WinRAR, VLC y Everything
 
-Orden: WinRAR, VLC, Chrome.
+Orden: WinRAR, Everything, VLC, Chrome. winget elige la versión de 32 o de 64 bits según Windows. Everything
+reemplaza la búsqueda de archivos de Windows, que la opción 1 apaga en discos mecánicos.
 
 ```
 winget install --id <ID> -e --source winget --silent --accept-package-agreements --accept-source-agreements
 ```
 
-- IDs exactos (`RARLab.WinRAR`, `VideoLAN.VLC`, `Google.Chrome`) con `-e`: un nombre suelto puede ser ambiguo.
+- IDs exactos (`RARLab.WinRAR`, `voidtools.Everything`, `VideoLAN.VLC`, `Google.Chrome`) con `-e`: un nombre suelto puede ser ambiguo.
 - `--source winget`: evita la fuente `msstore` y su aceptación aparte.
 - Si ya está instalado y winget no conoce la versión: `winget upgrade --include-unknown` (opción exclusiva de
   `upgrade`).
@@ -589,6 +590,9 @@ fija; revisar *Load/Unload Cycle Count* con [CrystalDiskInfo](https://crystalmar
 - **Formato:** ASCII y CRLF.
 - **Menú:** [`pruebas/menu.py`](pruebas/menu.py) compara el menú en pantalla, la cabecera del script, el despacho
   de `choice` y la tabla de este README. Corre en la Action antes de publicar: si no coinciden, la release no se toca.
+- **Limpieza, automática:** [`pruebas/limpieza.ps1`](pruebas/limpieza.ps1) corre la función que borra (`Vaciar`)
+  con PowerShell 7 contra un árbol de prueba: borra lo común, no sigue enlaces, respeta la carpeta del script y las
+  prohibidas, y limpia aunque el script esté en la raíz del disco. Corre antes de publicar.
 - **Secciones:** [`pruebas/secciones.py`](pruebas/secciones.py) comprueba que cada `call :ps` tenga su sección de
   PowerShell y que cada marcador aparezca una sola vez: un nombre mal escrito saltearía el paso sin avisar. También
   corre antes de publicar.
@@ -628,7 +632,7 @@ Sin probar en Windows real: las opciones 2 y 3.
    - [ ] *Características opcionales*: quedan Paint, Bloc de notas, PowerShell ISE e idiomas.
    - [ ] *Pantalla > Configuración de luz nocturna*: programada, *Del atardecer al amanecer*. Opción 7: "del anochecer
      al amanecer" y ubicación `Allow / Allow`.
-   - [ ] Opción 4: WinRAR, VLC y Chrome sin preguntas; uBlock Origin Lite en Chrome.
+   - [ ] Opción 4: WinRAR, Everything, VLC y Chrome sin preguntas; uBlock Origin Lite en Chrome.
    - [ ] Tras la opción 1, Chrome y Edge siguen con las sesiones abiertas y las contraseñas guardadas.
    - [ ] *Configuración > Sistema > Almacenamiento*: Sensor activado, Papelera a 30 días, Descargas en "Nunca".
    - [ ] Opción 5: Chrome abre sin perfiles, sin pedir iniciar sesión, con uBlock Origin Lite.

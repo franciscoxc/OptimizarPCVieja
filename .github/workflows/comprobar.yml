@@ -17,3 +17,5 @@ jobs:
         run: python3 pruebas/menu.py
       - name: Comprobar las secciones de PowerShell
         run: python3 pruebas/secciones.py
+      - name: Probar la limpieza
+        run: pwsh -NoProfile pruebas/limpieza.ps1

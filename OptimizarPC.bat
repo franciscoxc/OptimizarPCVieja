@@ -12,7 +12,7 @@ title Optimizar PC Vieja v2
 ::    1. Optimizar la PC.
 ::    2. Limpiar restos de Windows Update (DISM /ResetBase, irreversible).
 ::    3. Desfragmentar a fondo.
-::    4. Instalar Chrome, WinRAR y VLC (con winget).
+::    4. Instalar Chrome, WinRAR, VLC y Everything (con winget).
 ::    5. Chrome de aula: cerrar sesiones y borrar perfiles.
 ::    6. Revertir la optimizacion (deshace la opcion 1).
 ::    7. Verificar el estado: solo mira, no cambia nada.
@@ -50,6 +50,9 @@ exit /b 1
 ::  MENU
 :: =========================================================================
 set "REINICIO_PENDIENTE=0"
+:: Tareas de telemetria: el paso 4 las desactiva y la opcion 6 las reactiva. Una
+:: sola lista, asi deshacer no se queda atras cuando se agrega una.
+set "_tareas="\Microsoft\Windows\Application Experience\Microsoft Compatibility Appraiser" "\Microsoft\Windows\Application Experience\ProgramDataUpdater" "\Microsoft\Windows\Autochk\Proxy" "\Microsoft\Windows\Customer Experience Improvement Program\Consolidator" "\Microsoft\Windows\Customer Experience Improvement Program\UsbCeip" "\Microsoft\Windows\DiskDiagnostic\Microsoft-Windows-DiskDiagnosticDataCollector" "\Microsoft\Windows\Feedback\Siuf\DmClient" "\Microsoft\Windows\Feedback\Siuf\DmClientOnScenarioDownload" "\Microsoft\Windows\Maps\MapsUpdateTask" "\Microsoft\Windows\Maps\MapsToastTask" "\Microsoft\Windows\Windows Error Reporting\QueueReporting" "\Microsoft\Windows\Maintenance\WinSAT" "\Microsoft\XblGameSave\XblGameSaveTask""
 cls
 :menu
 title Optimizar PC Vieja v2
@@ -62,7 +65,7 @@ echo.
 echo     1. Optimizar la PC
 echo     2. Limpiar restos de Windows Update (avanzado, irreversible, hasta 1 h)
 echo     3. Desfragmentar a fondo (de vez en cuando, puede tardar horas)
-echo     4. Instalar Chrome, WinRAR y VLC
+echo     4. Instalar Chrome, WinRAR, VLC y Everything
 echo     5. Chrome de aula: cerrar sesiones y borrar perfiles
 echo     6. Revertir la optimizacion (deshace la opcion 1)
 echo     7. Verificar el estado (solo mira, no cambia nada)
@@ -105,18 +108,12 @@ exit /b 0
 title Optimizar PC Vieja v2 - Optimizar
 :: Usuario de la sesion, version de Windows y hardware (seccion EQUIPO).
 call :detectar
-:: Perfiles segun el hardware:
+:: Perfiles segun el hardware (los fija :detectar, y la opcion 7 los muestra):
 ::  - RAM instalada de 4 GB o mas (se suman los modulos: Windows de 32 bits ve
 ::    unos 3,2 GB y el video se queda con un pedazo): suspension a la hora,
 ::    tapa que suspende, Suspender en el menu y Bluetooth en Manual;
 ::  - eso y placa de video con driver: efectos visuales en "mejor apariencia";
 ::  - disco del sistema SSD: indexador de busqueda de fabrica.
-set "PERFIL_4GB=0"
-if %RAM_INST% GEQ 3584 set "PERFIL_4GB=1"
-set "EFECTOS=0"
-if "%PERFIL_4GB%"=="1" if not "%GPU_BASICA%"=="1" set "EFECTOS=1"
-set "SSD=0"
-if /i "%DISCO_TIPO%"=="SSD" set "SSD=1"
 
 :: -------------------------------------------------------------------------
 :: Presentacion
@@ -257,29 +254,15 @@ call :asegurar TabletInputService demand
 call :asegurar WbioSrvc demand
 call :asegurar lfsvc demand
 :: Con poca RAM, fijar el kernel en memoria le saca RAM a los programas.
-call :leer "%_mm%" DisablePagingExecutive
-if /i "%_r%"=="0x1" (
-    call :dword "%_mm%" DisablePagingExecutive 0
-    set "_reparado=1"
-    echo   [REPARADO] DisablePagingExecutive estaba en 1: vuelve a 0.
-)
 :: Precarga del arranque y de los programas: en disco mecanico junta muchas
 :: lecturas sueltas en una sola en bloque. 3 es el valor de fabrica; otros
 :: optimizadores la apagan con 0 y cada programa tarda mas en abrir.
-call :leer "%_mm%\PrefetchParameters" EnablePrefetcher
-if not "%_r%"=="0x3" (
-    call :dword "%_mm%\PrefetchParameters" EnablePrefetcher 3
-    set "_reparado=1"
-    echo   [REPARADO] EnablePrefetcher no estaba en 3: la precarga vuelve a la de fabrica.
-)
-call :leer "%_mm%\PrefetchParameters" EnableSuperfetch
-if not "%_r%"=="0x3" (
-    call :dword "%_mm%\PrefetchParameters" EnableSuperfetch 3
-    set "_reparado=1"
-    echo   [REPARADO] EnableSuperfetch no estaba en 3: la precarga vuelve a la de fabrica.
-)
-if "%_reparado%"=="0" echo   [OK] Nada perjudicial del v1: SysMain, teclado tactil, biometria, ubicacion,
-if "%_reparado%"=="0" echo        DisablePagingExecutive y la precarga estan bien.
+:: Se escriben sin leerlos antes: el resultado es el mismo y es un reg menos.
+call :dword "%_mm%" DisablePagingExecutive 0
+call :dword "%_mm%\PrefetchParameters" EnablePrefetcher 3
+call :dword "%_mm%\PrefetchParameters" EnableSuperfetch 3
+if "%_reparado%"=="0" echo   [OK] Nada perjudicial del v1: SysMain, teclado tactil, biometria y ubicacion.
+echo   [OK] DisablePagingExecutive y la precarga en sus valores de fabrica.
 :: Compresion de memoria activa y sin precarga de apps UWP en RAM.
 sc start SysMain >nul 2>&1
 powershell -NoProfile -ExecutionPolicy Bypass -Command "Enable-MMAgent -MemoryCompression -ErrorAction SilentlyContinue; Disable-MMAgent -ApplicationPreLaunch -ErrorAction SilentlyContinue" >nul 2>&1
@@ -318,7 +301,7 @@ echo   [OK] Impresion: Automatico retrasado. Compartir en red: Automatico.
 :: =========================================================================
 call :titulo "4/11  Tareas programadas de telemetria"
 :: =========================================================================
-for %%t in ("\Microsoft\Windows\Application Experience\Microsoft Compatibility Appraiser" "\Microsoft\Windows\Application Experience\ProgramDataUpdater" "\Microsoft\Windows\Autochk\Proxy" "\Microsoft\Windows\Customer Experience Improvement Program\Consolidator" "\Microsoft\Windows\Customer Experience Improvement Program\UsbCeip" "\Microsoft\Windows\DiskDiagnostic\Microsoft-Windows-DiskDiagnosticDataCollector" "\Microsoft\Windows\Feedback\Siuf\DmClient" "\Microsoft\Windows\Feedback\Siuf\DmClientOnScenarioDownload" "\Microsoft\Windows\Maps\MapsUpdateTask" "\Microsoft\Windows\Maps\MapsToastTask" "\Microsoft\Windows\Windows Error Reporting\QueueReporting" "\Microsoft\Windows\Maintenance\WinSAT" "\Microsoft\XblGameSave\XblGameSaveTask") do schtasks /change /tn %%t /disable >nul 2>&1
+for %%t in (%_tareas%) do schtasks /change /tn %%t /disable >nul 2>&1
 echo   [OK] Desactivadas: Compatibility Appraiser, CEIP, comentarios, mapas,
 echo        informe de errores, WinSAT y Xbox.
 
@@ -654,7 +637,7 @@ echo   LISTO. Hay que REINICIAR la PC para aplicar todo.
 echo.
 if "%SSD%"=="1" goto :fin_busqueda_listo
 echo   Para buscar archivos: Windows Search queda apagado porque castiga el disco.
-echo   Everything, de voidtools.com, encuentra cualquier archivo al instante.
+echo   La opcion 4 instala Everything, que encuentra cualquier archivo al instante.
 echo.
 :fin_busqueda_listo
 if "%PERFIL_4GB%"=="1" (echo   Energia: el boton de encendido ahora APAGA la PC; cerrar la tapa la suspende.) else (echo   Energia: cerrar la tapa o apretar el boton de encendido ahora APAGA la PC,)
@@ -677,17 +660,18 @@ echo ==========================================================================
 goto :fin_con_reinicio
 
 :: =========================================================================
-::  2. VERIFICAR ESTADO (solo lectura). El reporte esta en PowerShell, en la
+::  7. VERIFICAR ESTADO (solo lectura). El reporte esta en PowerShell, en la
 ::  seccion VERIFICAR al final de este archivo, y se guarda en un .txt al lado.
 :: =========================================================================
 :op_verificar
 title Optimizar PC Vieja v2 - Verificar estado
+call :detectar
 cls
 call :ps VERIFICAR
 goto :menu
 
 :: =========================================================================
-::  3. LIMPIAR RESTOS DE WINDOWS UPDATE
+::  2. LIMPIAR RESTOS DE WINDOWS UPDATE
 ::  Cada actualizacion guarda la version anterior de lo que reemplaza, en
 ::  C:\Windows\WinSxS. Windows las borra solo recien a los 30 dias y con una
 ::  tarea que se corta a la hora. Aca se hace completo con DISM:
@@ -773,7 +757,7 @@ echo       El detalle queda en C:\Windows\Logs\DISM\dism.log.
 goto :menu
 
 :: =========================================================================
-::  4. DESFRAGMENTAR A FONDO (para discos mecanicos)
+::  3. DESFRAGMENTAR A FONDO (para discos mecanicos)
 ::  El desfragmentador automatico trabaja "por encima" a proposito: ignora los
 ::  fragmentos de mas de 64 MB y no junta el espacio libre. Aca se le pide el
 ::  trabajo completo: analisis, desfragmentacion completa (/W, o /D si Windows
@@ -856,7 +840,7 @@ defrag %DISCO% /L /U /V
 goto :menu
 
 :: =========================================================================
-::  5. REVERTIR LA OPTIMIZACION
+::  6. REVERTIR LA OPTIMIZACION
 ::  Vuelve a los valores de fabrica de Windows 10 lo que la opcion 1 cambia y
 ::  que podria molestar. A proposito NO revierte la seguridad reparada, las
 ::  correcciones del v1, la telemetria apagada ni las apps quitadas (se
@@ -890,7 +874,7 @@ for %%s in (PimIndexMaintenanceSvc UnistoreSvc UserDataSvc MessagingService) do 
 echo   [OK] Servicios en sus valores de fabrica.
 
 call :titulo "Tareas programadas"
-for %%t in ("\Microsoft\Windows\Application Experience\Microsoft Compatibility Appraiser" "\Microsoft\Windows\Application Experience\ProgramDataUpdater" "\Microsoft\Windows\Autochk\Proxy" "\Microsoft\Windows\Customer Experience Improvement Program\Consolidator" "\Microsoft\Windows\Customer Experience Improvement Program\UsbCeip" "\Microsoft\Windows\DiskDiagnostic\Microsoft-Windows-DiskDiagnosticDataCollector" "\Microsoft\Windows\Feedback\Siuf\DmClient" "\Microsoft\Windows\Feedback\Siuf\DmClientOnScenarioDownload" "\Microsoft\Windows\Maps\MapsUpdateTask" "\Microsoft\Windows\Maps\MapsToastTask" "\Microsoft\Windows\Windows Error Reporting\QueueReporting" "\Microsoft\Windows\Maintenance\WinSAT" "\Microsoft\XblGameSave\XblGameSaveTask") do schtasks /change /tn %%t /enable >nul 2>&1
+for %%t in (%_tareas%) do schtasks /change /tn %%t /enable >nul 2>&1
 echo   [OK] Tareas reactivadas.
 
 call :titulo "Defender"
@@ -1012,17 +996,18 @@ echo ==========================================================================
 goto :fin_con_reinicio
 
 :: =========================================================================
-::  6. INSTALAR CHROME, WINRAR Y VLC
+::  4. INSTALAR CHROME, WINRAR, VLC Y EVERYTHING
 ::  Con winget, el instalador de programas que trae Windows 10, en silencio y
-::  sin preguntas. Del mas chico al mas grande: WinRAR, VLC y Chrome. A Chrome
+::  sin preguntas. Del mas chico al mas grande: WinRAR, Everything, VLC y Chrome.
+::  winget elige solo la version de 32 o de 64 bits segun Windows. A Chrome
 ::  se le agrega uBlock Origin Lite con la politica oficial de instalacion
 ::  forzada (ExtensionInstallForcelist): Chrome la baja sola de la Web Store.
 :: =========================================================================
 :op_instalar
-title Optimizar PC Vieja v2 - Instalar Chrome, WinRAR y VLC
+title Optimizar PC Vieja v2 - Instalar Chrome, WinRAR, VLC y Everything
 cls
 echo ==========================================================================
-echo   INSTALAR WINRAR, VLC Y CHROME
+echo   INSTALAR WINRAR, EVERYTHING, VLC Y CHROME
 echo ==========================================================================
 echo.
 echo   Se instalan con winget, en silencio y uno por uno. Hace falta internet.
@@ -1030,6 +1015,8 @@ echo   Si alguno ya esta instalado, se saltea.
 call :buscar_winget
 if errorlevel 1 goto :menu
 call :instalar RARLab.WinRAR "WinRAR"
+:: Everything reemplaza la busqueda de archivos de Windows, que la opcion 1 apaga.
+call :instalar voidtools.Everything "Everything"
 call :instalar VideoLAN.VLC "VLC"
 :: La politica va antes que Chrome: asi la primera vez que se abre ya la encuentra.
 call :politica_ublock
@@ -1041,7 +1028,7 @@ echo   que lo administra tu organizacion.
 goto :menu
 
 :: =========================================================================
-::  7. CHROME DE AULA
+::  5. CHROME DE AULA
 ::  Para PCs compartidas, como las de un colegio: cierra Chrome en todas las
 ::  sesiones y borra todos sus perfiles en todos los usuarios de Windows
 ::  (cuentas, sesiones abiertas, contrasenas, historial y favoritos). Chrome
@@ -1252,6 +1239,13 @@ set "ONEDRIVE=S"
 :: Cada linea de EQUIPO es VARIABLE=valor. Esta lee la salida, asi que no puede
 :: usar :ps; los marcadores van partidos para que IndexOf no la encuentre a ella.
 for /f "usebackq delims=" %%l in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "$t=[IO.File]::ReadAllText($env:OPT_RUTA); $i=$t.IndexOf('#EQUIPO-' + 'INICIO#'); $j=$t.IndexOf('#EQUIPO-' + 'FIN#'); if ($i -ge 0 -and $j -gt $i) { Invoke-Expression $t.Substring($i, $j - $i) }"`) do set "%%l"
+:: Perfiles: ver la opcion 1.
+set "PERFIL_4GB=0"
+if %RAM_INST% GEQ 3584 set "PERFIL_4GB=1"
+set "EFECTOS=0"
+if "%PERFIL_4GB%"=="1" if not "%GPU_BASICA%"=="1" set "EFECTOS=1"
+set "SSD=0"
+if /i "%DISCO_TIPO%"=="SSD" set "SSD=1"
 goto :eof
 
 :: Busca winget y deja como llamarlo en WINGET. Prueba que responda, no solo que
@@ -1287,7 +1281,7 @@ if "%_rc%"=="0" goto :instalar_ok
 if "%_rc%"=="-1978335189" goto :instalar_actualizar
 if "%_rc%"=="-1978335135" goto :instalar_actualizar
 call :a_hex %_rc%
-echo   [AVISO] %~2 no se pudo instalar (error %_hex%). Revisa la conexion a internet.
+echo   [AVISO] %~2 no se pudo instalar (error %_hex%). Lo mas comun es la conexion: proba de nuevo.
 goto :eof
 :instalar_ok
 echo   [OK] %~2 instalado.
@@ -1529,8 +1523,10 @@ foreach ($a in $apps) { QuitarApp $a | ForEach-Object { Write-Output ('    - ' +
 $u = 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*', 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*', ($env:UPS + '\Software\Microsoft\Windows\CurrentVersion\Uninstall\*')
 Get-ItemProperty -Path $u -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -like 'Microsoft Teams Meeting Add-in*' -or $_.DisplayName -eq 'Teams Machine-Wide Installer' } | ForEach-Object {
     if ($_.UninstallString -match '\{[0-9A-Fa-f-]{36}\}') {
-        Start-Process msiexec.exe -ArgumentList ('/x ' + $Matches[0] + ' /qn /norestart') -Wait
-        Write-Output ('    - ' + $_.DisplayName)
+        # ponytail-keep: sin leer Handle antes de esperar, PowerShell 5.1 deja ExitCode vacio.
+        $m = Start-Process msiexec.exe -ArgumentList ('/x ' + $Matches[0] + ' /qn /norestart') -PassThru
+        [void]$m.Handle; $m.WaitForExit()
+        if ($m.ExitCode -in 0, 3010) { Write-Output ('    - ' + $_.DisplayName) }
     }
 }
 Write-Output '  [OK] Apps preinstaladas quitadas.'
@@ -1682,7 +1678,9 @@ function Vaciar([string]$Nombre, [string]$Carpeta, [string]$Patron = '*', [strin
         if ($dir -eq $Carpeta) { $filtro = $Patron }
         try { $entradas = [IO.Directory]::GetFileSystemEntries($dir, $filtro) } catch [UnauthorizedAccessException] { $sinPermiso++; continue } catch { $salteados++; continue }
         foreach ($e in $entradas) {
-            if ($self -and $e.StartsWith($self.TrimEnd('\'), [StringComparison]::OrdinalIgnoreCase)) { continue }
+            # Con el script en la raiz de un disco ("C:\") todo empezaria igual y no se
+            # borraria nada; y ahi nunca esta dentro de un Temp, asi que no hace falta.
+            if ($self -and $self.Length -gt 3 -and $e.StartsWith($self.TrimEnd('\'), [StringComparison]::OrdinalIgnoreCase)) { continue }
             if ($Excepto -and $dir -eq $Carpeta -and ([IO.Path]::GetFileName($e) -like $Excepto)) { continue }
             try { $attr = [IO.File]::GetAttributes($e) } catch { continue }
             if ($attr -band [IO.FileAttributes]::ReparsePoint) { continue }
@@ -1782,7 +1780,7 @@ $prefetch = Join-Path $env:SystemRoot 'Prefetch'
 $masViejo = [IO.Directory]::GetFiles($prefetch, '*.pf') | Where-Object { [IO.Path]::GetFileName($_) -notlike 'NTOSBOOT-*' } | ForEach-Object { [IO.File]::GetLastWriteTime($_) } | Sort-Object | Select-Object -First 1
 if ($masViejo -and $masViejo -lt (Get-Date).AddDays(-7)) {
     Vaciar 'Prefetch: entradas de programas' $prefetch '*.pf' 'NTOSBOOT-*'
-} else {
+} elseif ($masViejo) {
     Write-Output ('    ' + 'Prefetch: vaciado hace menos de una semana'.PadRight(44) + '   se deja')
 }
 if (Get-Command Delete-DeliveryOptimizationCache -ErrorAction SilentlyContinue) {
@@ -1832,13 +1830,9 @@ $ver = Leer 'HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion' 'D
 L ('Fecha:            ' + (Get-Date -Format 'yyyy-MM-dd HH:mm'))
 L ('Equipo:           ' + $env:COMPUTERNAME)
 L ('Windows:          ' + $os.Caption + ' ' + $ver + ' (compilacion ' + $os.BuildNumber + ', ' + $os.OSArchitecture + ')')
-$ramInst = [Math]::Round((Get-CimInstance Win32_PhysicalMemory | Measure-Object -Property Capacity -Sum).Sum / 1MB)
-L ('RAM:              ' + [Math]::Round($cs.TotalPhysicalMemory / 1GB, 1) + ' GB visibles, ' + $ramInst + ' MB instalados')
-$nd0 = (Get-Partition -DriveLetter $env:SystemDrive.Substring(0, 1)).DiskNumber
-$md0 = [string](Get-PhysicalDisk | Where-Object { $_.DeviceId -eq [string]$nd0 } | Select-Object -First 1).MediaType
-$basica = [bool](Get-CimInstance Win32_VideoController | Where-Object { $_.InfFilename -eq 'display.inf' -or $_.Name -match 'Basic Display' })
-$p4 = $ramInst -ge 3584
-L ('Perfil opcion 1:  4 GB o mas: ' + $p4 + ' | mejor apariencia: ' + ($p4 -and -not $basica) + ' | disco del sistema: ' + $md0)
+# El perfil sale de :detectar, el mismo calculo que usa la opcion 1.
+L ('RAM:              ' + [Math]::Round($cs.TotalPhysicalMemory / 1GB, 1) + ' GB visibles, ' + $env:RAM_INST + ' MB instalados')
+L ('Perfil opcion 1:  4 GB o mas: ' + ($env:PERFIL_4GB -eq '1') + ' | mejor apariencia: ' + ($env:EFECTOS -eq '1') + ' | disco del sistema: ' + $env:DISCO_TIPO + ' | OneDrive en uso: ' + ($env:ONEDRIVE -eq 'S'))
 Get-PhysicalDisk | ForEach-Object { L ('Disco:            ' + $_.FriendlyName + ' - ' + $_.MediaType + ' - ' + [Math]::Round($_.Size / 1GB) + ' GB') }
 $c = Get-PSDrive -Name $env:SystemDrive.Substring(0, 1)
 L ('Libre en ' + $env:SystemDrive + '       ' + [Math]::Round($c.Free / 1GB, 1) + ' GB')
@@ -1852,18 +1846,9 @@ Get-CimInstance Win32_VideoController | ForEach-Object {
 
 # --- Usuario de la sesion -----------------------------------------------------
 Titulo 'Usuario de la sesion'
-$s = (Get-Process -Id $PID).SessionId
-$ex = Get-CimInstance Win32_Process -Filter "Name='explorer.exe'" | Where-Object { $_.SessionId -eq $s } | Select-Object -First 1
-$sid = $null
-if ($ex) {
-    $o = Invoke-CimMethod -InputObject $ex -MethodName GetOwner
-    $sid = (Invoke-CimMethod -InputObject $ex -MethodName GetOwnerSid).Sid
-    L ('Sesion abierta:   ' + $o.Domain + '\' + $o.User + '  (' + $sid + ')')
-} else {
-    L 'Sesion abierta:   no detectada; se lee la cuenta actual'
-}
+if ($env:USID) { L ('Sesion abierta:   ' + $env:UNAME + '  (' + $env:USID + ')'); $U = 'HKEY_USERS\' + $env:USID }
+else { L 'Sesion abierta:   no detectada; se lee la cuenta actual'; $U = 'HKEY_CURRENT_USER' }
 L ('Ejecutado por:    ' + [Security.Principal.WindowsIdentity]::GetCurrent().Name)
-if ($sid -and (Test-Path -LiteralPath ('Registry::HKEY_USERS\' + $sid))) { $U = 'HKEY_USERS\' + $sid } else { $U = 'HKEY_CURRENT_USER' }
 
 # --- Antirrobo de Conectar Igualdad -------------------------------------------
 Titulo 'Antirrobo de Conectar Igualdad (Theft Deterrent)'
