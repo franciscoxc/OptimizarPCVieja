@@ -11,8 +11,7 @@ UAC, SmartScreen, Windows Update).
 1. Ejecutar `OptimizarPC.bat`. Se autoeleva (UAC) y se relanza en 64 bits si hace falta. Requiere solo `cmd` y
    PowerShell 5.1.
 2. Opción `1`. El menú responde a una tecla, sin Enter.
-3. Dos preguntas: OneDrive y apps preinstaladas. El resto es desatendido:
-   10-20 min en HDD, más la primera vez (características opcionales).
+3. No hace preguntas: 10-20 min en HDD, más la primera vez (características opcionales).
 4. Reiniciar.
 
 Descarga: el navegador puede pedir confirmación para un `.bat`, y SmartScreen avisa al ejecutarlo (*Más información >
@@ -124,7 +123,7 @@ La compresión de memoria se activa siempre (paso 8).
 | Automático (retrasado) | `BITS`, `WpnService` | Necesarios, pero no en el arranque. |
 | Automático (retrasado) | `Spooler` | Siempre: una impresora que deja de andar sin aviso cuesta más que lo que ahorra. |
 | Automático | `LanmanServer` | Siempre, para compartir carpetas e impresoras en la red. |
-| Según respuesta | `OneSyncSvc`, `PimIndexMaintenanceSvc`, `UnistoreSvc`, `UserDataSvc`, `MessagingService` | Sincronizan Correo, Calendario, Contactos y Mensajes. Deshabilitados si se quitan las apps. Son servicios por usuario: rigen desde el próximo inicio de sesión. |
+| Deshabilitado | `OneSyncSvc`, `PimIndexMaintenanceSvc`, `UnistoreSvc`, `UserDataSvc`, `MessagingService` | Sincronizan Correo, Calendario, Contactos y Mensajes. Sin las apps no tienen nada que hacer. Son servicios por usuario: rigen desde el próximo inicio de sesión. |
 | Automático | `SysMain` | Compresión de memoria desde el arranque. |
 
 Sin "todo a Manual": el *Set Services to Manual* de WinUtil (~190 servicios) rompió Windows Update
@@ -234,12 +233,14 @@ Sin él, *Apagar* es un apagado completo.
 - Chrome: sin modo de fondo.
 - Ambos muestran "Administrado por tu organización" (políticas).
 
-### 10. Preguntas
+### 10. OneDrive y apps preinstaladas
 
-| Pregunta | Sí | No |
-|---|---|---|
-| OneDrive | Sin cambios | Fuera del inicio y sin sus tareas diarias de actualización y reportes (no se desinstala) |
-| Quitar apps | Ver abajo; además se deshabilitan sus servicios de sincronización | Sin cambios |
+Sin preguntas. OneDrive se da por usado si tiene una cuenta iniciada con más de 3 archivos en su carpeta (sin
+contar `desktop.ini`), y entonces no se toca. Si no, sale del inicio y se desactivan sus tareas diarias de
+actualización y reportes; no se desinstala. Windows obliga a entrar con cuenta Microsoft y deja OneDrive configurado
+aunque nadie lo use: los 3 archivos de margen son los de bienvenida. Si no se puede averiguar, se da por usado.
+
+Las apps preinstaladas se quitan siempre, y se deshabilitan sus servicios de sincronización.
 
 Apps quitadas (todos los usuarios): Xbox, Solitario, Candy Crush, Noticias, Skype, Enlace Móvil (`Microsoft.YourPhone`),
 Obtener ayuda (`Microsoft.GetHelp`), Sugerencias (`Microsoft.Getstarted`), Contactos, Mapas, Correo y Calendario,
@@ -248,13 +249,13 @@ realidad mixta, Centro de comentarios, To Do, Cortana, Dev Home, Clipchamp, Powe
 Microsoft Family, Asistencia rápida, Edge para Game Bar y Experiencias de Inicio. Con Teams se van el complemento de
 Teams para Office y el instalador de Teams para todas las cuentas (MSI, `msiexec /x /qn`). Quedan: Store,
 Calculadora, Cámara, Grabadora de sonidos, Clima, Recortes y anotación. Se reinstalan desde la Store. Copilot, la
-app y el programa, se quita siempre, aunque se conteste que no.
+app y el programa, también se va.
 
 Cada app sale primero de los paquetes provisionados y después de las cuentas. Al revés, en un Windows 10 recién
 instalado `Remove-AppxPackage -AllUsers` falla con `0x80070002` y la app queda instalada: pasó con 28 apps en la
 netbook de prueba. Si para todas las cuentas no se puede, se quita al menos de la que corre el script.
 
-Sin preguntar: [clásicos de Windows 7](#clásicos-de-windows-7), características opcionales y Restaurar sistema
+También: [clásicos de Windows 7](#clásicos-de-windows-7), características opcionales y Restaurar sistema
 desactivado.
 
 ### 11. Características opcionales

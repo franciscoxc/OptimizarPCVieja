@@ -119,7 +119,7 @@ set "SSD=0"
 if /i "%DISCO_TIPO%"=="SSD" set "SSD=1"
 
 :: -------------------------------------------------------------------------
-:: Presentacion y preguntas
+:: Presentacion
 :: -------------------------------------------------------------------------
 cls
 echo ==========================================================================
@@ -136,6 +136,7 @@ if not "%RAM_MB%"=="9999" echo   RAM: %RAM_MB% MB visibles, %RAM_INST% MB instal
 if "%PERFIL_4GB%"=="1" echo   Perfil 4 GB o mas: suspende a la hora y con la tapa, Bluetooth en Manual.
 if "%EFECTOS%"=="1" echo   Video con driver: efectos visuales en "mejor apariencia".
 if "%SSD%"=="1" echo   Disco SSD: indexador de busqueda como de fabrica.
+if "%ONEDRIVE%"=="S" (echo   OneDrive: en uso, queda como esta.) else (echo   OneDrive: sin cuenta o casi vacio, deja de arrancar con Windows.)
 if %RAM_MB% GEQ 1500 goto :ram_ok
 echo   AVISO: tiene menos de 2 GB de RAM. Windows 10 de 64 bits pide 2 GB como minimo.
 echo          Estos Atom aceptan hasta 2 GB: ampliarla es la mejora mas barata que hay.
@@ -166,20 +167,6 @@ echo.
 choice /c SN /n /m "  Continuar? [S/N]: "
 if errorlevel 2 goto :menu
 
-echo.
-echo   Unas preguntas antes de empezar. Despues no molesta mas.
-echo.
-choice /c SN /n /m "  1. Usas OneDrive? [S/N]: "
-if errorlevel 2 (set "ONEDRIVE=N") else (set "ONEDRIVE=S")
-echo.
-echo   2. Quitar apps preinstaladas: Xbox, Solitario, Candy Crush, Noticias, Skype,
-echo      Teams, Enlace Movil, Obtener ayuda, Sugerencias, Contactos, Mapas, Correo
-echo      y Calendario, Outlook nuevo, OneNote, Notas rapidas, Alarmas, Groove,
-echo      Peliculas y TV, Paint 3D, Cortana, Familia, Asistencia rapida, Dev Home
-echo      y similares. Quedan: Store, Calculadora, Camara, Grabadora de sonidos,
-echo      Clima y Recortes y anotacion. Todo se reinstala de la Store.
-choice /c SN /n /m "     Quitarlas? [S/N]: "
-if errorlevel 2 (set "QUITARAPPS=N") else (set "QUITARAPPS=S")
 
 :: =========================================================================
 call :titulo "1/11  Seguridad: reparando lo que otra herramienta pudo apagar"
@@ -618,19 +605,17 @@ echo        WebP, HEIC y AVIF. HEIC y AVIF necesitan extensiones de la Store.
 :: 4 GB y video con driver queda el moderno: las miniaturas las dibuja la placa.
 if "%EFECTOS%"=="1" (call :borrar "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Explorer" AltTabSettings) else (call :dword "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Explorer" AltTabSettings 1)
 if "%EFECTOS%"=="1" (echo   [OK] Alt+Tab moderno, con miniaturas: el video tiene driver.) else (echo   [OK] Alt+Tab clasico activado.)
-:: Apps preinstaladas (si se eligio), app Fotos, caracteristicas opcionales y
+:: Apps preinstaladas, app Fotos, caracteristicas opcionales y
 :: Adobe Reader, en la seccion QUITAR. Sale con 2 si Adobe Reader esta instalado.
 set "ADOBE=N"
 call :ps QUITAR
 if errorlevel 2 set "ADOBE=S"
-if "%QUITARAPPS%"=="N" goto :apps_listo
 :: Sin Correo, Calendario ni Contactos, sus servicios de sincronizacion no tienen
 :: nada que hacer. Son servicios por usuario: se deshabilita la plantilla y rige
 :: desde el proximo inicio de sesion.
 for %%s in (OneSyncSvc PimIndexMaintenanceSvc UnistoreSvc UserDataSvc MessagingService) do call :servicio %%s disabled
 echo   [OK] Deshabilitados sus servicios de sincronizacion: OneSyncSvc,
 echo        PimIndexMaintenanceSvc, UnistoreSvc, UserDataSvc y MessagingService.
-:apps_listo
 
 :: =========================================================================
 call :titulo "11/11  Limpieza de temporales"
@@ -1263,6 +1248,7 @@ set "ANTIRROBO=0"
 set "DISCO_TIPO=desconocido"
 set "DISCO_PNP="
 set "CPU_NOMBRE=desconocido"
+set "ONEDRIVE=S"
 :: Cada linea de EQUIPO es VARIABLE=valor. Esta lee la salida, asi que no puede
 :: usar :ps; los marcadores van partidos para que IndexOf no la encuentre a ella.
 for /f "usebackq delims=" %%l in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "$t=[IO.File]::ReadAllText($env:OPT_RUTA); $i=$t.IndexOf('#EQUIPO-' + 'INICIO#'); $j=$t.IndexOf('#EQUIPO-' + 'FIN#'); if ($i -ge 0 -and $j -gt $i) { Invoke-Expression $t.Substring($i, $j - $i) }"`) do set "%%l"
@@ -1374,6 +1360,21 @@ if ($ex) {
         if (Test-Path -LiteralPath ('Registry::HKEY_USERS\' + $sid + '_Classes')) { 'UCLS=HKU\' + $sid + '_Classes' } else { 'UCLS=HKU\' + $sid + '\Software\Classes' }
     }
 }
+# OneDrive en uso: una cuenta iniciada con mas de 3 archivos. Windows obliga a
+# entrar con cuenta Microsoft y deja OneDrive configurado aunque nadie lo use;
+# hasta 3 son los de bienvenida. Se cuenta hasta 4: si OneDrive guarda el Escritorio
+# y los Documentos, la carpeta puede tener miles.
+$od = 'N'
+$hive = 'Registry::HKEY_CURRENT_USER'
+if ($sid -like 'S-1-*' -and (Test-Path -LiteralPath ('Registry::HKEY_USERS\' + $sid))) { $hive = 'Registry::HKEY_USERS\' + $sid }
+foreach ($a in @(Get-ChildItem -LiteralPath ($hive + '\Software\Microsoft\OneDrive\Accounts'))) {
+    $carpeta = [string]$a.GetValue('UserFolder')
+    if (-not $carpeta -or -not [IO.Directory]::Exists($carpeta)) { continue }
+    $archivos = 0
+    try { foreach ($f in [IO.Directory]::EnumerateFiles($carpeta, '*', 'AllDirectories')) { if ([IO.Path]::GetFileName($f) -ne 'desktop.ini') { $archivos++; if ($archivos -gt 3) { break } } } } catch { }
+    if ($archivos -gt 3) { $od = 'S' }
+}
+'ONEDRIVE=' + $od
 # Solo si hay dato: cmd compara BUILD con GEQ, y vacio seria un error de sintaxis.
 $b = (Get-ItemProperty -LiteralPath 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion').CurrentBuildNumber
 if ($b) { 'BUILD=' + $b }
@@ -1520,23 +1521,21 @@ function QuitarApp([string]$Nombre) {
         if ($ok) { $p.Name }
     }
 }
-if ($env:QUITARAPPS -eq 'S') {
-    Write-Output '  Quitando apps preinstaladas para todos los usuarios, puede tardar...'
-    $apps = 'Microsoft.549981C3F5F10','Microsoft.BingNews','Microsoft.BingSearch','Microsoft.GetHelp','Microsoft.Getstarted','Microsoft.Messaging','Microsoft.Microsoft3DViewer','Microsoft.MicrosoftOfficeHub','Microsoft.MicrosoftSolitaireCollection','Microsoft.MicrosoftStickyNotes','Microsoft.MixedReality.Portal','Microsoft.MSPaint','Microsoft.Office.OneNote','Microsoft.OneConnect','Microsoft.OutlookForWindows','Microsoft.People','Microsoft.PowerAutomateDesktop','Microsoft.Print3D','Microsoft.SkypeApp','Microsoft.Todos','Microsoft.Wallet','Microsoft.WindowsAlarms','Microsoft.WindowsFeedbackHub','Microsoft.WindowsMaps','microsoft.windowscommunicationsapps','Microsoft.YourPhone','Microsoft.ZuneMusic','Microsoft.ZuneVideo','Microsoft.GamingApp','Microsoft.XboxApp','Microsoft.Xbox.TCUI','Microsoft.XboxGameOverlay','Microsoft.XboxGamingOverlay','Microsoft.XboxIdentityProvider','Microsoft.XboxSpeechToTextOverlay','Clipchamp.Clipchamp','MicrosoftTeams','MSTeams','king.com.*','Microsoft.Windows.DevHome','MicrosoftCorporationII.MicrosoftFamily','MicrosoftCorporationII.QuickAssist','Microsoft.Edge.GameAssist','*StartExperiencesApp'
-    foreach ($a in $apps) { QuitarApp $a | ForEach-Object { Write-Output ('    - ' + $_) } }
-    # El complemento de Teams para Office y el instalador de Teams para todas las
-    # cuentas son MSI. Sin Teams no sirven, y el complemento se carga con cada Outlook.
-    $u = 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*', 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*', ($env:UPS + '\Software\Microsoft\Windows\CurrentVersion\Uninstall\*')
-    Get-ItemProperty -Path $u -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -like 'Microsoft Teams Meeting Add-in*' -or $_.DisplayName -eq 'Teams Machine-Wide Installer' } | ForEach-Object {
-        if ($_.UninstallString -match '\{[0-9A-Fa-f-]{36}\}') {
-            Start-Process msiexec.exe -ArgumentList ('/x ' + $Matches[0] + ' /qn /norestart') -Wait
-            Write-Output ('    - ' + $_.DisplayName)
-        }
+Write-Output '  Quitando apps preinstaladas para todos los usuarios, puede tardar...'
+$apps = 'Microsoft.549981C3F5F10','Microsoft.BingNews','Microsoft.BingSearch','Microsoft.GetHelp','Microsoft.Getstarted','Microsoft.Messaging','Microsoft.Microsoft3DViewer','Microsoft.MicrosoftOfficeHub','Microsoft.MicrosoftSolitaireCollection','Microsoft.MicrosoftStickyNotes','Microsoft.MixedReality.Portal','Microsoft.MSPaint','Microsoft.Office.OneNote','Microsoft.OneConnect','Microsoft.OutlookForWindows','Microsoft.People','Microsoft.PowerAutomateDesktop','Microsoft.Print3D','Microsoft.SkypeApp','Microsoft.Todos','Microsoft.Wallet','Microsoft.WindowsAlarms','Microsoft.WindowsFeedbackHub','Microsoft.WindowsMaps','microsoft.windowscommunicationsapps','Microsoft.YourPhone','Microsoft.ZuneMusic','Microsoft.ZuneVideo','Microsoft.GamingApp','Microsoft.XboxApp','Microsoft.Xbox.TCUI','Microsoft.XboxGameOverlay','Microsoft.XboxGamingOverlay','Microsoft.XboxIdentityProvider','Microsoft.XboxSpeechToTextOverlay','Clipchamp.Clipchamp','MicrosoftTeams','MSTeams','king.com.*','Microsoft.Windows.DevHome','MicrosoftCorporationII.MicrosoftFamily','MicrosoftCorporationII.QuickAssist','Microsoft.Edge.GameAssist','*StartExperiencesApp'
+foreach ($a in $apps) { QuitarApp $a | ForEach-Object { Write-Output ('    - ' + $_) } }
+# El complemento de Teams para Office y el instalador de Teams para todas las
+# cuentas son MSI. Sin Teams no sirven, y el complemento se carga con cada Outlook.
+$u = 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*', 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*', ($env:UPS + '\Software\Microsoft\Windows\CurrentVersion\Uninstall\*')
+Get-ItemProperty -Path $u -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -like 'Microsoft Teams Meeting Add-in*' -or $_.DisplayName -eq 'Teams Machine-Wide Installer' } | ForEach-Object {
+    if ($_.UninstallString -match '\{[0-9A-Fa-f-]{36}\}') {
+        Start-Process msiexec.exe -ArgumentList ('/x ' + $Matches[0] + ' /qn /norestart') -Wait
+        Write-Output ('    - ' + $_.DisplayName)
     }
-    Write-Output '  [OK] Apps preinstaladas quitadas.'
 }
-# Copilot, siempre: no depende de la pregunta de las apps. Lo que no es una app
-# (el boton, Recall, Click to Do) lo apagan las politicas del paso 6.
+Write-Output '  [OK] Apps preinstaladas quitadas.'
+# Copilot: lo que no es una app (el boton, Recall, Click to Do) lo apagan las
+# politicas del paso 6.
 [void](QuitarApp 'Microsoft.Copilot')
 # Copilot tambien llega como programa, con el instalador de Edge: --force-uninstall
 # lo quita sin preguntar, en unos 10 s. Para que no vuelva esta la politica del paso 6.
