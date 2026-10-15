@@ -9,6 +9,7 @@ title Optimizar PC Vieja v2
 ::  Para Windows 10 con disco mecanico (HDD) y 2 GB de RAM.
 ::
 ::  Un solo archivo, con menu:
+::    A. PC apestada: cierra todos los programas y sigue con la opcion 1.
 ::    1. Optimizar la PC.
 ::    2. Limpiar restos de Windows Update (DISM /ResetBase, irreversible).
 ::    3. Desfragmentar a fondo.
@@ -62,6 +63,7 @@ echo   OPTIMIZAR PC VIEJA v2 - Windows 10, disco mecanico, 2 GB de RAM
 echo ==========================================================================
 if "%REINICIO_PENDIENTE%"=="1" echo   Falta REINICIAR para que se apliquen los cambios.
 echo.
+echo     A. PC apestada: cerrar todo y optimizar
 echo     1. Optimizar la PC
 echo     2. Limpiar restos de Windows Update (avanzado, irreversible, hasta 1 h)
 echo     3. Desfragmentar a fondo (de vez en cuando, puede tardar horas)
@@ -72,15 +74,16 @@ echo     7. Verificar el estado (solo mira, no cambia nada)
 echo     0. Salir
 echo.
 :: choice responde a una sola tecla, sin Enter, e ignora cualquier otra.
-choice /c 12345670 /n /m "  Toca un numero: "
-if errorlevel 8 goto :salir
-if errorlevel 7 goto :op_verificar
-if errorlevel 6 goto :op_revertir
-if errorlevel 5 goto :op_chrome_aula
-if errorlevel 4 goto :op_instalar
-if errorlevel 3 goto :op_desfragmentar
-if errorlevel 2 goto :op_limpiar_wu
-if errorlevel 1 goto :op_optimizar
+choice /c A12345670 /n /m "  Toca un numero o la A: "
+if errorlevel 9 goto :salir
+if errorlevel 8 goto :op_verificar
+if errorlevel 7 goto :op_revertir
+if errorlevel 6 goto :op_chrome_aula
+if errorlevel 5 goto :op_instalar
+if errorlevel 4 goto :op_desfragmentar
+if errorlevel 3 goto :op_limpiar_wu
+if errorlevel 2 goto :op_optimizar
+if errorlevel 1 goto :op_apestada
 goto :menu
 
 :: Final de las opciones que cambian el sistema: ofrecer reiniciar. Si no,
@@ -102,6 +105,34 @@ shutdown /r /t 10 /c "Reiniciando para aplicar los cambios de OptimizarPC"
 exit /b 0
 
 :: =========================================================================
+::  A. PC APESTADA
+::  Para una PC tan trabada que el script mismo tardaria horas: cierra todos los
+::  programas de la sesion (seccion CERRAR) y sigue con la opcion 1 sin volver a
+::  preguntar. Lo hace solo si se toca la A: quien la toca sabe lo que hace.
+:: =========================================================================
+:op_apestada
+title Optimizar PC Vieja v2 - PC apestada
+cls
+echo ==========================================================================
+echo   PC APESTADA: CERRAR TODO Y OPTIMIZAR
+echo ==========================================================================
+echo.
+echo   Cierra TODOS los programas abiertos, tambien los que corren escondidos:
+echo   impresoras, actualizadores, mensajeros. Despues sigue sola con la opcion 1.
+echo   Windows y los programas de acceso remoto no se tocan.
+echo.
+echo   LO QUE NO ESTE GUARDADO SE PIERDE.
+echo.
+choice /c SN /n /m "  CERRAR TODO Y OPTIMIZAR? [S/N]: "
+if errorlevel 2 goto :menu
+:: Antes de cerrar nada: :detectar reconoce al usuario de la sesion por su Explorer.
+call :detectar
+echo.
+call :ps CERRAR
+set "SIN_CONFIRMAR=1"
+goto :op_optimizar
+
+:: =========================================================================
 ::  1. OPTIMIZAR
 :: =========================================================================
 :op_optimizar
@@ -118,7 +149,8 @@ call :detectar
 :: -------------------------------------------------------------------------
 :: Presentacion
 :: -------------------------------------------------------------------------
-cls
+:: Viniendo de la A, sin borrar la pantalla: queda a la vista lo que se cerro.
+if not "%SIN_CONFIRMAR%"=="1" cls
 echo ==========================================================================
 echo   OPTIMIZAR PC VIEJA v2 - Windows 10, disco mecanico, 2 GB de RAM
 echo ==========================================================================
@@ -161,9 +193,12 @@ echo   - En un disco mecanico puede tardar entre 10 y 20 minutos. La primera vez
 echo     bastante mas: quitar las caracteristicas opcionales es lento.
 echo   - Al terminar hay que REINICIAR la PC.
 echo.
+:: La A ya pregunto una vez: no se pregunta de nuevo.
+if "%SIN_CONFIRMAR%"=="1" goto :confirmado
 choice /c SN /n /m "  Continuar? [S/N]: "
 if errorlevel 2 goto :menu
-
+:confirmado
+set "SIN_CONFIRMAR="
 
 :: =========================================================================
 call :titulo "1/11  Seguridad: reparando lo que otra herramienta pudo apagar"
@@ -1646,6 +1681,34 @@ foreach ($k in $ks) {
     }
 }
 #FINAL-FIN#
+#CERRAR-INICIO#
+# Opcion A, como Onyx en Mac: cierra todos los programas de la sesion de la
+# pantalla. El criterio es donde estan instalados y no una lista de nombres: todo
+# lo que esta fuera de la carpeta de Windows se cierra (lo que la persona abrio y
+# lo que arranca solo: impresoras, actualizadores, mensajeros). Lo de Windows
+# queda: sin eso la sesion se cierra o se cuelga, y ahi estan este cmd, Explorer
+# y PowerShell. El acceso remoto tambien queda, por si alguien ayuda a distancia.
+$ErrorActionPreference = 'SilentlyContinue'
+$antes = [int64](Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory
+$sesion = (Get-Process -Id $PID).SessionId
+$win = $env:SystemRoot.TrimEnd('\') + '\'
+function Objetivos {
+    Get-Process | Where-Object { $_.SessionId -eq $sesion -and $_.Path -and -not $_.Path.StartsWith($win, [StringComparison]::OrdinalIgnoreCase) -and $_.Name -notmatch 'anydesk|rustdesk|teamviewer|screenconnect|splashtop' }
+}
+$nombres = @(Objetivos | ForEach-Object Name | Sort-Object -Unique)
+if (-not $nombres.Count) { Write-Output '  [OK] No habia programas abiertos.'; exit 0 }
+Write-Output ('  Cerrando ' + $nombres.Count + ' programas: ' + ($nombres -join ', '))
+# Primero se les pide cerrar, como con la X, y se esperan hasta 10 s. Despues se
+# fuerza todo lo que quede, incluidos los que corren sin ventana.
+Objetivos | Where-Object { $_.MainWindowHandle -ne 0 } | ForEach-Object { [void]$_.CloseMainWindow() }
+for ($k = 0; $k -lt 10 -and @(Objetivos | Where-Object { $_.MainWindowHandle -ne 0 }).Count; $k++) { Start-Sleep -Seconds 1 }
+Objetivos | Stop-Process -Force
+Start-Sleep -Seconds 2
+$quedan = @(Objetivos | ForEach-Object Name | Sort-Object -Unique)
+$despues = [int64](Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory
+Write-Output ('  [OK] RAM libre: ' + [math]::Round($antes / 1KB) + ' MB antes, ' + [math]::Round($despues / 1KB) + ' MB ahora.')
+if ($quedan.Count) { Write-Output ('  No se dejaron cerrar: ' + ($quedan -join ', ') + '. Suelen ser antivirus.') }
+#CERRAR-FIN#
 #LIMPIEZA-INICIO#
 $ErrorActionPreference = 'SilentlyContinue'
 $self = $env:OPT_SELF

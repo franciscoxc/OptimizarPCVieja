@@ -24,6 +24,7 @@ suspende (ver [Perfiles](#perfiles-según-el-hardware)).
 
 | Tecla | Opción | Modifica |
 |---|---|---|
+| `A` | PC apestada: cierra todos los programas de la sesión y sigue con la `1` sin volver a preguntar. Pide confirmación. | Sí |
 | `1` | Optimizar. Incluye la revisión del script v1. | Sí |
 | `2` | Limpiar WinSxS con DISM `/ResetBase`. Avanzado, irreversible. Pide confirmación. Hasta 1 h. | Sí |
 | `3` | Desfragmentación completa. Horas. | Sí |
@@ -34,7 +35,14 @@ suspende (ver [Perfiles](#perfiles-según-el-hardware)).
 | `0` | Salir. | |
 
 Cada opción vuelve al menú. `1` y `6` ofrecen reiniciar; si se pospone, el menú lo recuerda y lo ofrece al salir.
-Secuencia habitual: `1`, `4`.
+Secuencia habitual: `1`, `4`. En una PC trabada: `A` (que sigue sola con la `1`) y después `4`.
+
+**Opción A.** Como Onyx en Mac: cierra todo lo de la sesión instalado fuera de `C:\Windows`, con lo que caen los
+programas abiertos y los que arrancan solos sin que nadie los conozca (impresoras, actualizadores, mensajeros). Primero
+les pide cerrarse, como la X, y a los 10 s fuerza lo que quede; lo no guardado se pierde. Quedan Windows, Explorer
+(la opción 1 lo necesita para reconocer al usuario) y el acceso remoto (AnyDesk, RustDesk, TeamViewer, ScreenConnect,
+Splashtop). Si lo que traba es Windows Update o Defender, son servicios y no se cierran: ahí sirve más reiniciar y
+correr el script antes de abrir nada.
 
 **Usuario destino.** Los ajustes de usuario se escriben en `HKEY_USERS\<SID>` del dueño del `explorer.exe` de la
 sesión, no en `HKCU`, que al elevar con otra cuenta apunta al administrador. La opción 1 muestra el usuario detectado.

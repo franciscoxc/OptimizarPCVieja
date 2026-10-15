@@ -17,6 +17,7 @@ README = (RAIZ / "README.md").read_text(encoding="utf-8")
 # Que palabra tiene que aparecer en el texto de cada opcion, segun a que
 # etiqueta salta. Si se agrega una opcion, va aca.
 CLAVE = {
+    ":op_apestada": "apestada",
     ":op_optimizar": "optimizar",
     ":op_limpiar_wu": "limpiar",
     ":op_desfragmentar": "desfragment",
@@ -40,9 +41,9 @@ despacho = {}
 for nivel, etiqueta in re.findall(r"^if errorlevel (\d) goto (:\w+)", BAT[BAT.index(":menu"):BAT.index(":fin_con_reinicio")], re.M):
     despacho[teclas[int(nivel) - 1]] = etiqueta
 
-menu = dict(re.findall(r"^echo {5}(\d)\. (.+)$", BAT[BAT.index(":menu"):BAT.index("choice /c " + teclas)], re.M))
-cabecera = dict(re.findall(r"^:: {4}(\d)\. (.+)$", BAT[:BAT.index(":arquitectura_ok")], re.M))
-tabla = dict(re.findall(r"^\| `(\d)` \| ([^|]+) \|", README, re.M))
+menu = dict(re.findall(r"^echo {5}(\w)\. (.+)$", BAT[BAT.index(":menu"):BAT.index("choice /c " + teclas)], re.M))
+cabecera = dict(re.findall(r"^:: {4}(\w)\. (.+)$", BAT[:BAT.index(":arquitectura_ok")], re.M))
+tabla = dict(re.findall(r"^\| `(\w)` \| ([^|]+) \|", README, re.M))
 
 if sorted(despacho) != sorted(teclas):
     errores.append(f"choice ofrece {teclas} pero el despacho cubre {''.join(sorted(despacho))}")
