@@ -40,8 +40,8 @@ Secuencia habitual: `1`, `4`. En una PC trabada: `A` (que sigue sola con la `1`)
 **Opción A.** Como Onyx en Mac: cierra todo lo de la sesión instalado fuera de `C:\Windows`, con lo que caen los
 programas abiertos y los que arrancan solos sin que nadie los conozca (impresoras, actualizadores, mensajeros). Primero
 les pide cerrarse, como la X, y a los 10 s fuerza lo que quede; lo no guardado se pierde. Quedan Windows, Explorer
-(la opción 1 lo necesita para reconocer al usuario) y el acceso remoto (AnyDesk, RustDesk, TeamViewer, ScreenConnect,
-Splashtop). Si lo que traba es Windows Update o Defender, son servicios y no se cierran: ahí sirve más reiniciar y
+(la opción 1 lo necesita para reconocer al usuario) y el acceso remoto (AnyDesk, RustDesk, HopToDesk, TeamViewer,
+ScreenConnect, Splashtop). Si lo que traba es Windows Update o Defender, son servicios y no se cierran: ahí sirve más reiniciar y
 correr el script antes de abrir nada.
 
 **Usuario destino.** Los ajustes de usuario se escriben en `HKEY_USERS\<SID>` del dueño del `explorer.exe` de la

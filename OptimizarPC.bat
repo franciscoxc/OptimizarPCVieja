@@ -1693,7 +1693,7 @@ $antes = [int64](Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory
 $sesion = (Get-Process -Id $PID).SessionId
 $win = $env:SystemRoot.TrimEnd('\') + '\'
 function Objetivos {
-    Get-Process | Where-Object { $_.SessionId -eq $sesion -and $_.Path -and -not $_.Path.StartsWith($win, [StringComparison]::OrdinalIgnoreCase) -and $_.Name -notmatch 'anydesk|rustdesk|teamviewer|screenconnect|splashtop' }
+    Get-Process | Where-Object { $_.SessionId -eq $sesion -and $_.Path -and -not $_.Path.StartsWith($win, [StringComparison]::OrdinalIgnoreCase) -and $_.Name -notmatch 'anydesk|rustdesk|hoptodesk|teamviewer|screenconnect|splashtop' }
 }
 $nombres = @(Objetivos | ForEach-Object Name | Sort-Object -Unique)
 if (-not $nombres.Count) { Write-Output '  [OK] No habia programas abiertos.'; exit 0 }
