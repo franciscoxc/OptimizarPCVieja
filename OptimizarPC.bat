@@ -54,7 +54,6 @@ set "REINICIO_PENDIENTE=0"
 :: Tareas de telemetria: el paso 4 las desactiva y la opcion 6 las reactiva. Una
 :: sola lista, asi deshacer no se queda atras cuando se agrega una.
 set "_tareas="\Microsoft\Windows\Application Experience\Microsoft Compatibility Appraiser" "\Microsoft\Windows\Application Experience\ProgramDataUpdater" "\Microsoft\Windows\Autochk\Proxy" "\Microsoft\Windows\Customer Experience Improvement Program\Consolidator" "\Microsoft\Windows\Customer Experience Improvement Program\UsbCeip" "\Microsoft\Windows\DiskDiagnostic\Microsoft-Windows-DiskDiagnosticDataCollector" "\Microsoft\Windows\Feedback\Siuf\DmClient" "\Microsoft\Windows\Feedback\Siuf\DmClientOnScenarioDownload" "\Microsoft\Windows\Maps\MapsUpdateTask" "\Microsoft\Windows\Maps\MapsToastTask" "\Microsoft\Windows\Windows Error Reporting\QueueReporting" "\Microsoft\Windows\Maintenance\WinSAT" "\Microsoft\XblGameSave\XblGameSaveTask""
-cls
 :menu
 title Optimizar PC Vieja v2
 echo.
@@ -112,7 +111,6 @@ exit /b 0
 :: =========================================================================
 :op_apestada
 title Optimizar PC Vieja v2 - PC apestada
-cls
 echo ==========================================================================
 echo   PC APESTADA: CERRAR TODO Y OPTIMIZAR
 echo ==========================================================================
@@ -129,6 +127,8 @@ if errorlevel 2 goto :menu
 call :detectar
 echo.
 call :ps CERRAR
+echo.
+echo   A terminado.
 set "SIN_CONFIRMAR=1"
 goto :op_optimizar
 
@@ -149,8 +149,6 @@ call :detectar
 :: -------------------------------------------------------------------------
 :: Presentacion
 :: -------------------------------------------------------------------------
-:: Viniendo de la A, sin borrar la pantalla: queda a la vista lo que se cerro.
-if not "%SIN_CONFIRMAR%"=="1" cls
 echo ==========================================================================
 echo   OPTIMIZAR PC VIEJA v2 - Windows 10, disco mecanico, 2 GB de RAM
 echo ==========================================================================
@@ -165,6 +163,7 @@ if not "%RAM_MB%"=="9999" echo   RAM: %RAM_MB% MB visibles, %RAM_INST% MB instal
 if "%PERFIL_4GB%"=="1" echo   Perfil 4 GB o mas: suspende a la hora y con la tapa, Bluetooth en Manual.
 if "%EFECTOS%"=="1" echo   Video con driver: efectos visuales en "mejor apariencia".
 if "%SSD%"=="1" echo   Disco SSD: indexador de busqueda como de fabrica.
+if "%OUTLOOK%"=="S" echo   Outlook nuevo: se uso en el ultimo ano, queda instalado.
 if "%ONEDRIVE%"=="S" (echo   OneDrive: en uso, queda como esta.) else (echo   OneDrive: sin cuenta o casi vacio, deja de arrancar con Windows.)
 if %RAM_MB% GEQ 1500 goto :ram_ok
 echo   AVISO: tiene menos de 2 GB de RAM. Windows 10 de 64 bits pide 2 GB como minimo.
@@ -692,6 +691,8 @@ echo   por tipo de archivo, busca .pdf y elegi el navegador. Como Reader ya no s
 echo   actualiza solo, si no lo usas para nada conviene desinstalarlo.
 :final_sin_adobe
 echo ==========================================================================
+echo.
+echo   1 terminado.
 goto :fin_con_reinicio
 
 :: =========================================================================
@@ -701,8 +702,9 @@ goto :fin_con_reinicio
 :op_verificar
 title Optimizar PC Vieja v2 - Verificar estado
 call :detectar
-cls
 call :ps VERIFICAR
+echo.
+echo   7 terminado.
 goto :menu
 
 :: =========================================================================
@@ -715,19 +717,12 @@ goto :menu
 :: =========================================================================
 :op_limpiar_wu
 title Optimizar PC Vieja v2 - Limpiar restos de Windows Update
-cls
 echo ==========================================================================
 echo   LIMPIAR RESTOS DE WINDOWS UPDATE
 echo ==========================================================================
 echo.
 echo   DISM /StartComponentCleanup /ResetBase: las actualizaciones instaladas ya
 echo   no se podran desinstalar. Puede tardar mas de una hora: no apagues la PC.
-echo.
-:: Pregunta antes de empezar: el menu responde a una sola tecla, sin Enter, y
-:: esta opcion es la 2, pegada a la 1. Sin esto, un 2 por error arrancaba una
-:: hora de DISM que no se puede deshacer.
-choice /c SN /n /m "  Continuar? [S/N]: "
-if errorlevel 2 goto :menu
 echo.
 
 :: DISM trabaja con el Instalador de modulos de Windows. Si otra herramienta
@@ -779,6 +774,8 @@ if %LIBERADO% LSS 0 set "LIBERADO=0"
 echo   Espacio liberado: %LIBERADO% MB.
 echo   La limpieza automatica de Windows sigue activa y se encarga del resto.
 echo   Si vas a desfragmentar (opcion 3), ahora es el momento: hay menos que mover.
+echo.
+echo   2 terminado.
 goto :menu
 
 :wu_error
@@ -810,7 +807,6 @@ for /f "usebackq delims=" %%m in (`powershell -NoProfile -ExecutionPolicy Bypass
 set "LIBRE_PCT=100"
 for /f "usebackq delims=" %%m in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "$v=Get-Volume -DriveLetter $env:SystemDrive.Substring(0,1); [string][math]::Floor(100 * $v.SizeRemaining / $v.Size)"`) do set "LIBRE_PCT=%%m"
 
-cls
 echo ==========================================================================
 echo   DESFRAGMENTAR A FONDO - disco %DISCO%
 echo ==========================================================================
@@ -827,12 +823,9 @@ echo   optimizar el arranque y analisis final.
 echo.
 echo   - En un Atom con disco lento puede tardar VARIAS HORAS. Dejala enchufada.
 echo   - Mientras tanto la PC va a andar lenta: mejor no usarla.
-echo   - Se puede cortar en cualquier momento con Ctrl+C. No se rompe nada.
+echo   - Se puede cortar en cualquier momento con Ctrl+C o cerrando la ventana.
 echo   - Conviene hacer antes las opciones 1 y 2: borran temporales y restos de
 echo     actualizaciones, y hay menos que mover.
-echo.
-choice /c SN /n /m "  Empezar? [S/N]: "
-if errorlevel 2 goto :menu
 
 call :titulo "1/5  Analisis inicial"
 defrag %DISCO% /A /V
@@ -863,15 +856,17 @@ echo ==========================================================================
 echo   LISTO. Compara el porcentaje de fragmentacion del analisis inicial y del
 echo   final. La optimizacion semanal automatica de Windows sigue activa.
 echo ==========================================================================
+echo.
+echo   3 terminado.
 goto :menu
 
 :desfrag_ssd
 echo.
 echo   Es un SSD: desfragmentarlo no lo acelera y le gasta escrituras.
 echo   Lo que necesita es TRIM, que avisa al disco que bloques estan libres.
-choice /c SN /n /m "  Mandar TRIM ahora? [S/N]: "
-if errorlevel 2 goto :menu
 defrag %DISCO% /L /U /V
+echo.
+echo   3 terminado.
 goto :menu
 
 :: =========================================================================
@@ -884,7 +879,6 @@ goto :menu
 :op_revertir
 title Optimizar PC Vieja v2 - Revertir
 call :detectar
-cls
 echo ==========================================================================
 echo   REVERTIR LA OPTIMIZACION
 echo ==========================================================================
@@ -1028,6 +1022,8 @@ echo.
 echo ==========================================================================
 echo   LISTO. Hay que REINICIAR la PC. Usa "Reiniciar", no "Apagar".
 echo ==========================================================================
+echo.
+echo   6 terminado.
 goto :fin_con_reinicio
 
 :: =========================================================================
@@ -1040,7 +1036,6 @@ goto :fin_con_reinicio
 :: =========================================================================
 :op_instalar
 title Optimizar PC Vieja v2 - Instalar Chrome, WinRAR, VLC y Everything
-cls
 echo ==========================================================================
 echo   INSTALAR WINRAR, EVERYTHING, VLC Y CHROME
 echo ==========================================================================
@@ -1060,6 +1055,8 @@ echo.
 echo   LISTO. uBlock Origin Lite aparece en Chrome al minuto de abrirlo por primera
 echo   vez. Queda fija: desde Chrome no se puede quitar, por eso Chrome muestra
 echo   que lo administra tu organizacion.
+echo.
+echo   4 terminado.
 goto :menu
 
 :: =========================================================================
@@ -1072,7 +1069,6 @@ goto :menu
 :: =========================================================================
 :op_chrome_aula
 title Optimizar PC Vieja v2 - Chrome de aula
-cls
 echo ==========================================================================
 echo   CHROME DE AULA: CERRAR SESIONES Y BORRAR PERFILES
 echo ==========================================================================
@@ -1099,6 +1095,8 @@ call :ps AULA
 echo.
 echo   LISTO. Al abrir Chrome va directo al navegador; uBlock Origin Lite aparece
 echo   al minuto (hace falta internet).
+echo.
+echo   5 terminado.
 goto :menu
 
 :: =========================================================================
@@ -1271,6 +1269,7 @@ set "DISCO_TIPO=desconocido"
 set "DISCO_PNP="
 set "CPU_NOMBRE=desconocido"
 set "ONEDRIVE=S"
+set "OUTLOOK=S"
 :: Cada linea de EQUIPO es VARIABLE=valor. Esta lee la salida, asi que no puede
 :: usar :ps; los marcadores van partidos para que IndexOf no la encuentre a ella.
 for /f "usebackq delims=" %%l in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "$t=[IO.File]::ReadAllText($env:OPT_RUTA); $i=$t.IndexOf('#EQUIPO-' + 'INICIO#'); $j=$t.IndexOf('#EQUIPO-' + 'FIN#'); if ($i -ge 0 -and $j -gt $i) { Invoke-Expression $t.Substring($i, $j - $i) }"`) do set "%%l"
@@ -1404,6 +1403,19 @@ foreach ($a in @(Get-ChildItem -LiteralPath ($hive + '\Software\Microsoft\OneDri
     if ($archivos -gt 3) { $od = 'S' }
 }
 'ONEDRIVE=' + $od
+# Outlook nuevo en uso: guarda las cuentas y su copia del correo en
+# AppData\Local\Microsoft\Olk (borrarla obliga a cargar las cuentas de nuevo).
+# Usado en el ultimo ano: algo escrito ahi en 365 dias. Los correos enviados no
+# se pueden contar desde aca: viven en el servidor.
+$perfil = $env:USERPROFILE
+if ($sid -like 'S-1-*') { $lp = (Get-CimInstance Win32_UserProfile | Where-Object { $_.SID -eq $sid }).LocalPath; if ($lp) { $perfil = $lp } }
+$olk = Join-Path $perfil 'AppData\Local\Microsoft\Olk'
+$ol = 'N'
+if ([IO.Directory]::Exists($olk)) {
+    $hace = (Get-Date).AddDays(-365)
+    try { foreach ($f in [IO.Directory]::EnumerateFiles($olk, '*', 'AllDirectories')) { if ([IO.File]::GetLastWriteTime($f) -gt $hace) { $ol = 'S'; break } } } catch { }
+}
+'OUTLOOK=' + $ol
 # Solo si hay dato: cmd compara BUILD con GEQ, y vacio seria un error de sintaxis.
 $b = (Get-ItemProperty -LiteralPath 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion').CurrentBuildNumber
 if ($b) { 'BUILD=' + $b }
@@ -1552,7 +1564,10 @@ function QuitarApp([string]$Nombre) {
 }
 Write-Output '  Quitando apps preinstaladas para todos los usuarios, puede tardar...'
 $apps = 'Microsoft.549981C3F5F10','Microsoft.BingNews','Microsoft.BingSearch','Microsoft.GetHelp','Microsoft.Getstarted','Microsoft.Messaging','Microsoft.Microsoft3DViewer','Microsoft.MicrosoftOfficeHub','Microsoft.MicrosoftSolitaireCollection','Microsoft.MicrosoftStickyNotes','Microsoft.MixedReality.Portal','Microsoft.MSPaint','Microsoft.Office.OneNote','Microsoft.OneConnect','Microsoft.OutlookForWindows','Microsoft.People','Microsoft.PowerAutomateDesktop','Microsoft.Print3D','Microsoft.SkypeApp','Microsoft.Todos','Microsoft.Wallet','Microsoft.WindowsAlarms','Microsoft.WindowsFeedbackHub','Microsoft.WindowsMaps','microsoft.windowscommunicationsapps','Microsoft.YourPhone','Microsoft.ZuneMusic','Microsoft.ZuneVideo','Microsoft.GamingApp','Microsoft.XboxApp','Microsoft.Xbox.TCUI','Microsoft.XboxGameOverlay','Microsoft.XboxGamingOverlay','Microsoft.XboxIdentityProvider','Microsoft.XboxSpeechToTextOverlay','Clipchamp.Clipchamp','MicrosoftTeams','MSTeams','king.com.*','Microsoft.Windows.DevHome','MicrosoftCorporationII.MicrosoftFamily','MicrosoftCorporationII.QuickAssist','Microsoft.Edge.GameAssist','*StartExperiencesApp'
-foreach ($a in $apps) { QuitarApp $a | ForEach-Object { Write-Output ('    - ' + $_) } }
+foreach ($a in $apps) {
+    if ($a -eq 'Microsoft.OutlookForWindows' -and $env:OUTLOOK -eq 'S') { Write-Output '    (Outlook nuevo queda: se uso en el ultimo ano)'; continue }
+    QuitarApp $a | ForEach-Object { Write-Output ('    - ' + $_) }
+}
 # El complemento de Teams para Office y el instalador de Teams para todas las
 # cuentas son MSI. Sin Teams no sirven, y el complemento se carga con cada Outlook.
 $u = 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*', 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*', ($env:UPS + '\Software\Microsoft\Windows\CurrentVersion\Uninstall\*')
@@ -1895,7 +1910,7 @@ L ('Equipo:           ' + $env:COMPUTERNAME)
 L ('Windows:          ' + $os.Caption + ' ' + $ver + ' (compilacion ' + $os.BuildNumber + ', ' + $os.OSArchitecture + ')')
 # El perfil sale de :detectar, el mismo calculo que usa la opcion 1.
 L ('RAM:              ' + [Math]::Round($cs.TotalPhysicalMemory / 1GB, 1) + ' GB visibles, ' + $env:RAM_INST + ' MB instalados')
-L ('Perfil opcion 1:  4 GB o mas: ' + ($env:PERFIL_4GB -eq '1') + ' | mejor apariencia: ' + ($env:EFECTOS -eq '1') + ' | disco del sistema: ' + $env:DISCO_TIPO + ' | OneDrive en uso: ' + ($env:ONEDRIVE -eq 'S'))
+L ('Perfil opcion 1:  4 GB o mas: ' + ($env:PERFIL_4GB -eq '1') + ' | mejor apariencia: ' + ($env:EFECTOS -eq '1') + ' | disco del sistema: ' + $env:DISCO_TIPO + ' | OneDrive en uso: ' + ($env:ONEDRIVE -eq 'S') + ' | Outlook en uso: ' + ($env:OUTLOOK -eq 'S'))
 Get-PhysicalDisk | ForEach-Object { L ('Disco:            ' + $_.FriendlyName + ' - ' + $_.MediaType + ' - ' + [Math]::Round($_.Size / 1GB) + ' GB') }
 $c = Get-PSDrive -Name $env:SystemDrive.Substring(0, 1)
 L ('Libre en ' + $env:SystemDrive + '       ' + [Math]::Round($c.Free / 1GB, 1) + ' GB')

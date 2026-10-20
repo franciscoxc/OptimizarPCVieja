@@ -26,7 +26,7 @@ suspende (ver [Perfiles](#perfiles-según-el-hardware)).
 |---|---|---|
 | `A` | PC apestada: cierra todos los programas de la sesión y sigue con la `1` sin volver a preguntar. Pide confirmación. | Sí |
 | `1` | Optimizar. Incluye la revisión del script v1. | Sí |
-| `2` | Limpiar WinSxS con DISM `/ResetBase`. Avanzado, irreversible. Pide confirmación. Hasta 1 h. | Sí |
+| `2` | Limpiar WinSxS con DISM `/ResetBase`. Avanzado, irreversible. Hasta 1 h. | Sí |
 | `3` | Desfragmentación completa. Horas. | Sí |
 | `4` | Instalar WinRAR, Everything, VLC y Chrome con winget. | Sí |
 | `5` | Chrome de aula: cierra Chrome y borra todos sus perfiles; arranca sin pedir iniciar sesión. Pide confirmación. | Sí |
@@ -34,7 +34,8 @@ suspende (ver [Perfiles](#perfiles-según-el-hardware)).
 | `7` | Verificar: hardware, antirrobo CI, estado de cada ajuste. Reporte `.txt` junto al script. | No |
 | `0` | Salir. | |
 
-Cada opción vuelve al menú. `1` y `6` ofrecen reiniciar; si se pospone, el menú lo recuerda y lo ofrece al salir.
+Nada borra la pantalla: queda el registro de todo lo hecho, y cada opción termina con «`N` terminado». Cada
+opción vuelve al menú. `1` y `6` ofrecen reiniciar; si se pospone, el menú lo recuerda y lo ofrece al salir.
 Secuencia habitual: `1`, `4`. En una PC trabada: `A` (que sigue sola con la `1`) y después `4`.
 
 **Opción A.** Como Onyx en Mac: cierra todo lo de la sesión instalado fuera de `C:\Windows`, con lo que caen los
@@ -252,7 +253,8 @@ Las apps preinstaladas se quitan siempre, y se deshabilitan sus servicios de sin
 
 Apps quitadas (todos los usuarios): Xbox, Solitario, Candy Crush, Noticias, Skype, Enlace Móvil (`Microsoft.YourPhone`),
 Obtener ayuda (`Microsoft.GetHelp`), Sugerencias (`Microsoft.Getstarted`), Contactos, Mapas, Correo y Calendario,
-Outlook nuevo, OneNote para Win10, Notas rápidas, Alarmas, Groove, Películas y TV, Paint 3D, Visor 3D, Portal de
+Outlook nuevo (salvo que se haya usado en el último año: algo escrito en su carpeta de datos,
+`AppData\Local\Microsoft\Olk`), OneNote para Win10, Notas rápidas, Alarmas, Groove, Películas y TV, Paint 3D, Visor 3D, Portal de
 realidad mixta, Centro de comentarios, To Do, Cortana, Dev Home, Clipchamp, Power Automate y, en Windows 11, Teams,
 Microsoft Family, Asistencia rápida, Edge para Game Bar y Experiencias de Inicio. Con Teams se van el complemento de
 Teams para Office y el instalador de Teams para todas las cuentas (MSI, `msiexec /x /qn`). Quedan: Store,
@@ -456,7 +458,8 @@ versión libre).
 
 `Dism.exe /Online /Cleanup-Image /StartComponentCleanup /ResetBase`
 ([Microsoft Learn](https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/clean-up-the-winsxs-folder)).
-Pide confirmación antes de empezar: el menú responde a una tecla y esta opción está pegada a la 1.
+Arranca sin preguntar, igual que la 3 y la 4: si se eligió por error, se cierra la ventana. Cerrarla con DISM ya
+corriendo deja `DisableResetbase` en `0` en lugar de devolverle su valor (ver abajo).
 
 - Borra las versiones reemplazadas de los componentes ya, sin esperar los 30 días de la tarea automática.
 - `/ResetBase`: las actualizaciones instaladas pasan a ser la base y **no se pueden desinstalar**. Las siguientes sí.
@@ -628,7 +631,7 @@ Sin probar en Windows real: las opciones 2 y 3.
    - [ ] Win+Shift+S funciona.
    - [ ] Ventana visible al arrastrar; carpetas de fotos con íconos.
    - [ ] Adobe Reader: fuera del inicio; *Adobe Acrobat Update Service* deshabilitado.
-   - [ ] Opción 2 pide confirmación, termina y muestra lo liberado; `DisableResetbase` queda como estaba.
+   - [ ] Opción 2 arranca sin preguntar, termina y muestra lo liberado; `DisableResetbase` queda como estaba.
    - [ ] Menú de apagado sin *Hibernar*; *Suspender* solo con 4 GB o más.
    - [ ] Opción 7: la línea "Perfil opción 1" coincide con la RAM, el video y el disco de la PC.
    - [ ] Botón de encendido apaga (en UTM: apagado normal de la VM). Tapa: en la netbook real.

@@ -1,0 +1,8 @@
+Set-Service sshd -StartupType Automatic; Start-Service sshd
+
+
+Set-Content C:\ProgramData\ssh\administrators_authorized_keys 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILWAE7SmhCd1AnT4EPBTcKO/QN4K1WxiryZc2YFtwe3p claude-optimizarpc' -Encoding ascii
+
+
+
+icacls C:\ProgramData\ssh\administrators_authorized_keys /inheritance:r /grant *S-1-5-32-544:F /grant *S-1-5-18:F
