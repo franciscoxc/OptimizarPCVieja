@@ -347,9 +347,9 @@ McAfee también: *Security Scan Plus* (viene con Adobe) y *WebAdvisor* en silenc
 Total Protection, la de fábrica) no tienen desinstalación silenciosa, hasta la herramienta oficial MCPR pide un
 captcha, así que el script abre su desinstalador y sigue: el técnico toca *Quitar*. Defender se activa solo cuando
 McAfee se va. Matar sus procesos no es una opción: mientras McAfee esté registrado como antivirus, Defender queda
-apagado y la PC quedaría sin ninguno, y su autoprotección no deja parar los servicios. Lo que sí sale del inicio
-es su bandeja (`mcui`), que no es la protección; sus tareas programadas (firmas, análisis) quedan mientras sea el
-antivirus, y el final de la opción 1 avisa si sigue instalado.
+apagado y la PC quedaría sin ninguno, y su autoprotección no deja parar los servicios. Y si no se puede matar, no
+se esconde: su bandeja queda, porque escondido se olvida que corre. Sus tareas programadas (firmas, análisis)
+quedan mientras sea el antivirus, y el final de la opción 1 avisa si sigue instalado.
 
 ### 11. Inicio de Windows: lo que arranca solo
 
