@@ -1537,16 +1537,28 @@ goto :eof
 #COMUN-INICIO#
 # Funciones que usan varias secciones. :ps pega esta seccion adelante de la que corre;
 # :detectar corre EQUIPO por su cuenta y no la recibe.
-# Windows instalando una actualizacion (TiWorker con CPU): se espera. Cortarla la
-# deja a medias y la rehace entera despues, y DISM falla mientras tanto. TiWorker
-# queda unos minutos sin hacer nada al terminar: por eso se mira la CPU y no solo
-# que exista.
+# Windows instalando una actualizacion: se espera. Cortarla la deja a medias y la
+# rehace entera despues, y DISM falla mientras tanto. Primero lo que Windows Update
+# sabe de si mismo (IsBusy); si esa COM no responde, se mira TiWorker. TiWorker queda
+# unos minutos sin hacer nada al terminar: por eso se mide y no solo que exista.
+function TiWorkerMedida {
+    $ps = @(Get-CimInstance -ClassName Win32_Process -Filter "Name='TiWorker.exe'" -ErrorAction SilentlyContinue)
+    if (-not $ps.Count) { return $null }
+    $cpu = 0; $io = 0
+    foreach ($x in $ps) { $cpu += ($x.KernelModeTime + $x.UserModeTime) / 1e7; $io += $x.ReadTransferCount + $x.WriteTransferCount }
+    return @{ cpu = $cpu; io = $io }
+}
 function TiWorkerOcupado {
-    $a = 0; foreach ($p in @(Get-Process -Name TiWorker -ErrorAction SilentlyContinue)) { $a += $p.TotalProcessorTime.TotalSeconds }
-    if ($a -eq 0) { return $false }
+    try { if ((New-Object -ComObject Microsoft.Update.Installer).IsBusy) { return $true } } catch { }
+    $a = TiWorkerMedida
+    if (-not $a) { return $false }
     Start-Sleep -Seconds 10
-    $b = 0; foreach ($p in @(Get-Process -Name TiWorker -ErrorAction SilentlyContinue)) { $b += $p.TotalProcessorTime.TotalSeconds }
-    return ($b -gt 0 -and ($b - $a) -gt 0.5)
+    $b = TiWorkerMedida
+    if (-not $b) { return $false }
+    # Preparando una actualizacion grande en disco mecanico TiWorker casi no usa CPU: con
+    # 0,36 s cada 10 s, el umbral de 0,5 s lo dio por ocioso y el reinicio cancelo un
+    # 26H2 al 52%. Por eso tambien los bytes de disco.
+    return (($b.cpu - $a.cpu) -gt 0.5 -or ($b.io - $a.io) -gt 1MB)
 }
 function EsperarTiWorker {
     $t0 = Get-Date
