@@ -654,7 +654,7 @@ La caché de archivos ya usa toda la RAM libre. Tweaks evaluados:
 
 | Tweak | Veredicto |
 |---|---|
-| `LargeSystemCache=1` | No: prioriza caché sobre programas; pensado para servidores ([TweakHound](https://www.tweakhound.com/2011/09/20/bad-tweaks/)). |
+| `LargeSystemCache=1` | No: prioriza caché sobre programas; pensado para servidores ([TweakHound](https://www.tweakhound.com/2011/09/20/bad-tweaks/)). Medido el 30/10/2026 en la laptop i3 (HDD a 80 MB/s) limitada a 4 GB con `bcdedit /set removememory 4096`, con un programa de 2 GB abierto y leyendo dos veces 512 MB, 1,5 GB y 3 GB: con 0 y con 1 la segunda lectura vino del disco igual (85-130 MB/s contra 4,8 GB/s cuando la caché tiene lugar), y con 1 Windows le recortó 759 MB al programa abierto contra 354 MB con 0. Más recorte, ninguna lectura más rápida. Con 8 GB y la misma prueba, 0 y 1 dan lo mismo: sobra lugar y no hay nada que elegir. |
 | `fsutil behavior set memoryusage 2` | No: solo útil con memoria de sobra ([Microsoft Learn](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/fsutil-behavior)). |
 | `fsutil behavior set mftzone` | No: útil solo con muchísimos archivos chicos. |
 | `IoPageLockLimit` | Ignorado por Windows. |
