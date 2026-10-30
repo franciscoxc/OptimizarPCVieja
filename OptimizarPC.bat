@@ -2027,6 +2027,12 @@ Get-Process | Where-Object { $_.Path -and -not $_.Path.StartsWith($win, [StringC
 }
 # Una actualizacion a medias se termina al reiniciar, y en un disco mecanico tarda:
 # que no apaguen la PC apenas vuelve.
+$u = 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*', 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*'
+foreach ($p in @(Get-ItemProperty -Path $u -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -match '^McAfee' -and $_.DisplayName -notmatch '^McAfee (Security Scan|WebAdvisor)' })) {
+    Write-Output ''
+    Write-Output ('  AVISO: ' + $p.DisplayName + ' sigue instalado. Pide plata y mientras este, Defender')
+    Write-Output '  queda apagado. Sacalo en Configuracion, Aplicaciones; Defender se activa solo.'
+}
 if (ReinicioPendiente) {
     Write-Output ''
     Write-Output '  Windows Update tiene una actualizacion a medias: la termina al reiniciar. Deja'
@@ -2138,8 +2144,10 @@ if ($env:USID) { $lp = (Get-CimInstance Win32_UserProfile | Where-Object { $_.SI
 # Actualizadores, bandejas de drivers, "optimizadores", torrents, lanzadores de
 # juegos y mensajeros: ninguno hace falta al iniciar sesion. Que Spotify o WhatsApp
 # arranquen solos no lo pidio nadie: se abren cuando se usan. Fuera de la lista: el
-# acceso remoto, los monitores de impresora, los antivirus y las nubes en uso.
-$patron = 'jusched|SunJavaUpdateSched|iTunesHelper|QuickTime Task|APSDaemon|igfxtray|hkcmd|igfxpers|HotKeysCmds|\bPersistence\b|RTHDVCPL|RtHDVBg|RAVCpl64|RtkNGUI|CCleaner|IObit|Driver Booster|Advanced SystemCare|uTorrent|BitTorrent|EpsonCustomerParticipation|EPSON Customer Research|Logitech Download Assistant|KiesTrayAgent|Wondershare|\bSteam\b|EpicGamesLauncher|\bSpotify\b|\bSkype\b|\bDiscord\b|\bWhatsApp\b|\bTelegram\b|\bZoom\b'
+# acceso remoto, los monitores de impresora, los antivirus y las nubes en uso. De
+# McAfee sale solo la bandeja (mcui): la proteccion son sus servicios, y matarla
+# dejaria la PC sin antivirus, porque Defender queda apagado mientras McAfee este.
+$patron = 'McAfee|mcui|jusched|SunJavaUpdateSched|iTunesHelper|QuickTime Task|APSDaemon|igfxtray|hkcmd|igfxpers|HotKeysCmds|\bPersistence\b|RTHDVCPL|RtHDVBg|RAVCpl64|RtkNGUI|CCleaner|IObit|Driver Booster|Advanced SystemCare|uTorrent|BitTorrent|EpsonCustomerParticipation|EPSON Customer Research|Logitech Download Assistant|KiesTrayAgent|Wondershare|\bSteam\b|EpicGamesLauncher|\bSpotify\b|\bSkype\b|\bDiscord\b|\bWhatsApp\b|\bTelegram\b|\bZoom\b'
 # Nubes: se quedan si se usan. Dropbox, con el criterio de OneDrive: mas de 3 archivos
 # en su carpeta (sin su cache). Google Drive no guarda los archivos en una carpeta que
 # se pueda contar: se queda si hay una cuenta iniciada (carpeta numerica en DriveFS).
@@ -2255,7 +2263,8 @@ foreach ($s in @(Get-Service | Where-Object { $_.Name -match $patronServ -or $_.
 # desactivado no se anota, asi no se reactiva lo que apago otro.
 # GoogleUpdate y GoogleSystem son el actualizador de Chrome; GoogleUserPEH (Platform
 # Experience Helper) son metricas y se desactiva.
-$quedan = 'GoogleUpdate|GoogleSystem|MicrosoftEdgeUpdate|Office|OneDrive|Dropbox|Brave|Opera|Vivaldi|OptimizarPC|CreateExplorerShellUnelevatedTask'
+# McAfee queda: sus tareas son las firmas y los analisis mientras sea el antivirus.
+$quedan = 'GoogleUpdate|GoogleSystem|MicrosoftEdgeUpdate|Office|OneDrive|Dropbox|Brave|Opera|Vivaldi|OptimizarPC|CreateExplorerShellUnelevatedTask|McAfee'
 $anot = Join-Path $env:ProgramData 'OptimizarPC\tareas-desactivadas.txt'
 if ($volver) {
     foreach ($t in @(Get-Content -LiteralPath $anot)) {
