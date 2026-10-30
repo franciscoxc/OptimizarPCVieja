@@ -5,16 +5,18 @@
 $ErrorActionPreference = 'Stop'
 $bat = [IO.File]::ReadAllText((Join-Path $PSScriptRoot '..' 'OptimizarPC.bat'))
 $fallas = @()
-$nombres = @([regex]::Matches($bat, '(?m)^#(\w+)-INICIO#$') | ForEach-Object { $_.Groups[1].Value })
+# El .bat es CRLF: el $ de .NET corta antes del \n, no antes del \r.
+$nombres = @([regex]::Matches($bat, '(?m)^#(\w+)-INICIO#\r?$') | ForEach-Object { $_.Groups[1].Value })
 foreach ($n in $nombres) {
     $i = $bat.IndexOf('#' + $n + '-INICIO#'); $j = $bat.IndexOf('#' + $n + '-FIN#')
     $tokens = $null; $errores = $null
     [void][System.Management.Automation.Language.Parser]::ParseInput($bat.Substring($i, $j - $i), [ref]$tokens, [ref]$errores)
     foreach ($e in @($errores)) { $fallas += ($n + ', linea ' + $e.Extent.StartLineNumber + ': ' + $e.Message) }
 }
-# Los PowerShell de una linea que cmd lanza con -Command: lo que va entre comillas dobles.
-foreach ($m in [regex]::Matches($bat, '(?m)^.*powershell -NoProfile -ExecutionPolicy Bypass -Command "(.*)"\s*(>nul 2>&1)?\s*$')) {
-    $codigo = $m.Groups[1].Value -replace '%~1', 'X' -replace '%[A-Z_]+%', 'X' -replace '\^', ''
+# Los PowerShell de una linea que cmd lanza con -Command: lo que va entre comillas
+# dobles, que adentro no hay (cmd no lo permite). Las variables de cmd se reemplazan.
+foreach ($m in [regex]::Matches($bat, '-Command "([^"]*)"')) {
+    $codigo = $m.Groups[1].Value -replace '%~\d', 'X' -replace '%[A-Za-z_][A-Za-z_0-9]*%', 'X'
     $tokens = $null; $errores = $null
     [void][System.Management.Automation.Language.Parser]::ParseInput($codigo, [ref]$tokens, [ref]$errores)
     foreach ($e in @($errores)) { $fallas += ('una linea: ' + $e.Message + ' en: ' + $codigo.Substring(0, [Math]::Min(80, $codigo.Length))) }
