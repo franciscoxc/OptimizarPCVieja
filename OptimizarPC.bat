@@ -7,6 +7,8 @@ set "OPT_RUTA=%~f0"
 :: la ronda N. Se guarda antes de elevar: al elevar, los argumentos hay que pasarlos.
 set "OPT_ARG=%~1"
 set "OPT_RONDA=%~2"
+:: Al publicar en GitHub, "local" se reemplaza por el numero de version y la fecha.
+set "OPT_VERSION=local"
 title Optimizar PC Vieja v2
 :: =========================================================================
 ::  OPTIMIZAR PC VIEJA v2
@@ -55,7 +57,7 @@ exit /b 1
 ::  MENU
 :: =========================================================================
 set "REINICIO_PENDIENTE=0"
-:: Tareas de telemetria y de avisos: el paso 4 las desactiva y la opcion 6 las reactiva.
+:: Tareas de telemetria y de avisos: el paso 3 las desactiva y la opcion 6 las reactiva.
 :: Una sola lista, asi deshacer no se queda atras cuando se agrega una. Las ultimas:
 :: censo del equipo (devicecensus), PushToInstall (instalar apps desde la web de la
 :: Store), modelos de voz, el escaneo
@@ -71,6 +73,7 @@ title Optimizar PC Vieja v2
 echo.
 echo ==========================================================================
 echo   OPTIMIZAR PC VIEJA v2 - Windows 10, disco mecanico, 2 GB de RAM
+echo   Version %OPT_VERSION%
 echo ==========================================================================
 if "%REINICIO_PENDIENTE%"=="1" echo   Falta REINICIAR para que se apliquen los cambios.
 echo.
@@ -164,6 +167,7 @@ call :detectar
 :: -------------------------------------------------------------------------
 echo ==========================================================================
 echo   OPTIMIZAR PC VIEJA v2 - Windows 10, disco mecanico, 2 GB de RAM
+echo   Version %OPT_VERSION%
 echo ==========================================================================
 echo.
 echo   Usuario al que se le aplican los ajustes: "%UNAME%"
@@ -213,7 +217,7 @@ if errorlevel 2 goto :menu
 set "SIN_CONFIRMAR="
 
 :: =========================================================================
-call :titulo "1/11  Seguridad: reparando lo que otra herramienta pudo apagar"
+call :titulo "1/10  Seguridad: reparando lo que otra herramienta pudo apagar"
 :: =========================================================================
 :: Servicios esenciales: solo se tocan si estan DESHABILITADOS, y vuelven a
 :: su valor de fabrica de Windows 10. Formato servicio:tipo.
@@ -288,39 +292,7 @@ for %%t in ("\Microsoft\Windows\Defrag\ScheduledDefrag" "\Microsoft\Windows\Serv
 echo   [OK] Tareas de mantenimiento y seguridad activas.
 
 :: =========================================================================
-call :titulo "2/11  Script original v1: revisando lo perjudicial"
-:: =========================================================================
-:: Solo se repara lo que quedo en un estado perjudicial; lo que esta bien no
-:: se toca. Delivery Optimization ya se reviso en el paso 1. Los placebos
-:: IOPageLockLimit y DontVerifyRandomDrivers no hacen dano: se dejan.
-set "_reparado=0"
-:: SysMain: compresion de memoria. Teclado tactil: escritura en el Inicio,
-:: Configuracion y apps UWP. Biometria: huella. Ubicacion: luz nocturna.
-call :asegurar SysMain auto
-call :asegurar TabletInputService demand
-call :asegurar WbioSrvc demand
-call :asegurar lfsvc demand
-:: Con poca RAM, fijar el kernel en memoria le saca RAM a los programas.
-:: Precarga del arranque y de los programas: en disco mecanico junta muchas
-:: lecturas sueltas en una sola en bloque. 3 es el valor de fabrica; otros
-:: optimizadores la apagan con 0 y cada programa tarda mas en abrir.
-:: Se escriben sin leerlos antes: el resultado es el mismo y es un reg menos.
-call :dword "%_mm%" DisablePagingExecutive 0
-call :dword "%_mm%\PrefetchParameters" EnablePrefetcher 3
-call :dword "%_mm%\PrefetchParameters" EnableSuperfetch 3
-:: Vaciar la paginacion al apagar lo activan algunos scripts de "privacidad": con
-:: 4 GB de paginacion, cada apagado escribe 4 GB en el disco.
-call :dword "%_mm%" ClearPageFileAtShutdown 0
-if "%_reparado%"=="0" echo   [OK] Nada perjudicial del v1: SysMain, teclado tactil, biometria y ubicacion.
-echo   [OK] DisablePagingExecutive y la precarga en sus valores de fabrica; la
-echo        paginacion no se vacia al apagar.
-:: Compresion de memoria activa y sin precarga de apps UWP en RAM.
-sc start SysMain >nul 2>&1
-powershell -NoProfile -ExecutionPolicy Bypass -Command "Enable-MMAgent -MemoryCompression -ErrorAction SilentlyContinue; Disable-MMAgent -ApplicationPreLaunch -ErrorAction SilentlyContinue" >nul 2>&1
-echo   [OK] Compresion de memoria activa.
-
-:: =========================================================================
-call :titulo "3/11  Servicios: Manual siempre que se pueda"
+call :titulo "2/10  Servicios: Manual siempre que se pueda"
 :: =========================================================================
 :: Deshabilitados: telemetria, Xbox y Registro remoto.
 for %%s in (DiagTrack dmwappushservice RemoteRegistry) do call :servicio %%s disabled
@@ -352,14 +324,14 @@ call :servicio LanmanServer auto
 echo   [OK] Impresion: Automatico retrasado. Compartir en red: Automatico.
 
 :: =========================================================================
-call :titulo "4/11  Tareas programadas de telemetria"
+call :titulo "3/10  Tareas programadas de telemetria"
 :: =========================================================================
 for %%t in (%_tareas%) do schtasks /change /tn %%t /disable >nul 2>&1
 echo   [OK] Desactivadas: Compatibility Appraiser, CEIP, comentarios, mapas,
 echo        informe de errores, WinSAT y Xbox.
 
 :: =========================================================================
-call :titulo "5/11  Defender: solo lo imprescindible"
+call :titulo "4/10  Defender: solo lo imprescindible"
 :: =========================================================================
 :: Se queda: tiempo real, comportamiento, nube, descargas, firmas, SmartScreen.
 :: Se suma el bloqueo de aplicaciones potencialmente no deseadas: adware, toolbars,
@@ -378,7 +350,7 @@ echo   [OK] Sin notificaciones no criticas. El icono de la bandeja queda visible
 echo   [OK] Sin la herramienta MRT mensual, redundante con Defender en tiempo real.
 
 :: =========================================================================
-call :titulo "6/11  Telemetria, publicidad y procesos en segundo plano"
+call :titulo "5/10  Telemetria, publicidad y procesos en segundo plano"
 :: =========================================================================
 set "_pol=HKLM\SOFTWARE\Policies\Microsoft\Windows"
 call :dword "%_pol%\DataCollection" AllowTelemetry 0
@@ -399,7 +371,7 @@ call :dword "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager" DisableWpbtE
 call :dword "HKLM\SYSTEM\Maps" AutoUpdateEnabled 0
 :: Copilot y la IA de Windows, apagados por politica en Windows 10 y 11. Recall y
 :: Click to Do solo existen en algunas PCs con Windows 11; en el resto no hacen nada.
-:: La app y el programa de Copilot se quitan en el paso 10, siempre.
+:: La app y el programa de Copilot se quitan en el paso 9, siempre.
 call :dword "%_pol%\WindowsCopilot" TurnOffWindowsCopilot 1
 call :dword "%UHIVE%\Software\Policies\Microsoft\Windows\WindowsCopilot" TurnOffWindowsCopilot 1
 :: El programa de Copilot lo maneja el actualizador de Edge, y esta es su politica para
@@ -410,7 +382,7 @@ call :dword "%_pol%\WindowsAI" AllowRecallEnablement 0
 call :dword "%_pol%\WindowsAI" DisableClickToDo 1
 :: Widgets de Windows 11, el equivalente de Noticias e intereses (EnableFeeds).
 call :dword "HKLM\SOFTWARE\Policies\Microsoft\Dsh" AllowNewsAndInterests 0
-:: Recoleccion de compatibilidad (CompatTelRunner, el que deja el disco al tope): el paso 4
+:: Recoleccion de compatibilidad (CompatTelRunner, el que deja el disco al tope): el paso 3
 :: desactiva su tarea, pero Windows Update la vuelve a activar. Con estas politicas,
 :: aunque corra, no tiene nada que recolectar.
 call :dword "%_pol%\AppCompat" DisableInventory 1
@@ -468,7 +440,7 @@ echo   [OK] Microsoft Store: las apps ya no se actualizan solas. Para actualizar
 echo        abri la Store: Biblioteca, Obtener actualizaciones.
 
 :: =========================================================================
-call :titulo "7/11  Interfaz y Explorador"
+call :titulo "6/10  Interfaz y Explorador"
 :: =========================================================================
 set "_desk=%UHIVE%\Control Panel\Desktop"
 set "_adv=%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced"
@@ -527,7 +499,7 @@ call :dword "%_adv%" Start_TrackProgs 0
 :: Barra de tareas: sin caja ni lupa de busqueda (abriendo el Inicio y escribiendo
 :: se busca igual), sin los botones de Cortana, Copilot y Vista de tareas, y con el
 :: nombre de cada ventana: los botones se agrupan recien cuando la barra se llena.
-:: Los Widgets de Windows 11 ya los apaga la politica del paso 6.
+:: Los Widgets de Windows 11 ya los apaga la politica del paso 5.
 call :dword "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Search" SearchboxTaskbarMode 0
 call :dword "%_adv%" ShowCortanaButton 0
 call :dword "%_adv%" ShowCopilotButton 0
@@ -564,11 +536,30 @@ call :ps LUZ
 if "%GPU_BASICA%"=="1" echo        Con el adaptador de video basico, Windows no ofrece la luz nocturna.
 
 :: =========================================================================
-call :titulo "8/11  Memoria, disco y energia"
+call :titulo "7/10  Memoria, disco y energia"
 :: =========================================================================
 fsutil behavior set DisableLastAccess 1 >nul 2>&1
 fsutil behavior set Disable8dot3 1 >nul 2>&1
 echo   [OK] NTFS sin registro de ultimo acceso ni nombres cortos 8.3.
+
+:: Valores de fabrica que otros "optimizadores" rompen. Con poca RAM, fijar el
+:: kernel en memoria (DisablePagingExecutive) le saca RAM a los programas. La
+:: precarga del arranque y de los programas (3 es el de fabrica) junta en disco
+:: mecanico muchas lecturas sueltas en una sola en bloque; apagada con 0, cada
+:: programa tarda mas en abrir. Vaciar la paginacion al apagar lo activan algunos
+:: scripts de "privacidad": con 4 GB de paginacion, cada apagado escribe 4 GB.
+:: Se escriben sin leerlos antes: el resultado es el mismo y es un reg menos.
+call :dword "%_mm%" DisablePagingExecutive 0
+call :dword "%_mm%\PrefetchParameters" EnablePrefetcher 3
+call :dword "%_mm%\PrefetchParameters" EnableSuperfetch 3
+call :dword "%_mm%" ClearPageFileAtShutdown 0
+echo   [OK] DisablePagingExecutive y la precarga en sus valores de fabrica; la
+echo        paginacion no se vacia al apagar.
+:: Compresion de memoria activa (la maneja SysMain) y sin precarga de apps UWP en RAM.
+call :asegurar SysMain auto
+sc start SysMain >nul 2>&1
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Enable-MMAgent -MemoryCompression -ErrorAction SilentlyContinue; Disable-MMAgent -ApplicationPreLaunch -ErrorAction SilentlyContinue" >nul 2>&1
+echo   [OK] Compresion de memoria activa.
 
 :: VBS e integridad de memoria (HVCI): Windows corre adentro de un hipervisor y
 :: cada acceso a memoria paga ese peaje. Sin MBEC en el procesador (Intel anterior
@@ -641,7 +632,7 @@ echo   [OK] Sin hibernacion ni inicio rapido: cada apagado es completo.
 if "%PERFIL_4GB%"=="1" (echo   [OK] Menu de apagado: Suspender queda, Hibernar no aparece.) else (echo   [OK] Suspender e Hibernar ya no aparecen en el menu de apagado.)
 
 :: =========================================================================
-call :titulo "9/11  Navegadores"
+call :titulo "8/10  Navegadores"
 :: =========================================================================
 set "_edge=HKLM\SOFTWARE\Policies\Microsoft\Edge"
 for %%v in (StartupBoostEnabled BackgroundModeEnabled HubsSidebarEnabled WebWidgetAllowed ShowRecommendationsEnabled EdgeShoppingAssistantEnabled ShowMicrosoftRewards PersonalizationReportingEnabled DiagnosticData UserFeedbackAllowed DefaultBrowserSettingEnabled) do call :dword "%_edge%" %%v 0
@@ -670,7 +661,7 @@ echo        Van a decir "Administrado por tu organizacion": es normal.
 call :politica_ublock
 
 :: =========================================================================
-call :titulo "10/11  Inicio de Windows, apps, clasicos de Windows 7 y Adobe Reader"
+call :titulo "9/10  Inicio de Windows, apps, clasicos de Windows 7 y Adobe Reader"
 :: =========================================================================
 if "%ONEDRIVE%"=="S" goto :onedrive_listo
 reg delete "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Run" /v OneDrive /f >nul 2>&1
@@ -723,7 +714,7 @@ echo   [OK] Deshabilitados sus servicios de sincronizacion: OneSyncSvc,
 echo        PimIndexMaintenanceSvc, UnistoreSvc, UserDataSvc y MessagingService.
 
 :: =========================================================================
-call :titulo "11/11  Limpieza de temporales"
+call :titulo "10/10  Limpieza de temporales"
 :: =========================================================================
 :: Vaciado de todas las carpetas temporales de Windows. El codigo esta en la
 :: seccion LIMPIEZA al final de este archivo. Lo que esta en uso se saltea, y la
@@ -1028,9 +1019,8 @@ goto :menu
 :: =========================================================================
 ::  6. REVERTIR LA OPTIMIZACION
 ::  Vuelve a los valores de fabrica de Windows 10 lo que la opcion 1 cambia y
-::  que podria molestar. A proposito NO revierte la seguridad reparada, las
-::  correcciones del v1, la telemetria apagada ni las apps quitadas (se
-::  reinstalan desde la Store).
+::  que podria molestar. A proposito NO revierte la seguridad reparada, la
+::  telemetria apagada ni las apps quitadas (se reinstalan desde la Store).
 :: =========================================================================
 :op_revertir
 title Optimizar PC Vieja v2 - Revertir
@@ -1370,7 +1360,6 @@ if /i "%~2"=="auto" set "_t=Automatico"
 if /i "%~2"=="delayed-auto" set "_t=Automatico retrasado"
 if /i "%~2"=="demand" set "_t=Manual"
 echo   [REPARADO] %~1 estaba deshabilitado: vuelve a %_t%
-set "_reparado=1"
 call :servicio %~1 %~2
 goto :eof
 
@@ -1546,15 +1535,15 @@ goto :eof
 ::   - COMUN: funciones que usan varias secciones; :ps la pega adelante de cada una.
 ::   - EQUIPO: usuario de la sesion y hardware (opciones 1 y 6, via :detectar).
 ::   - DISCO: paginacion, cache de escritura, CompactOS y Restaurar sistema
-::     (paso 8 de la opcion 1).
+::     (paso 7 de la opcion 1).
 ::   - QUITAR: apps, app Fotos, caracteristicas opcionales y Adobe Reader
-::     (paso 10 de la opcion 1).
-::   - LIMPIEZA: vaciado de temporales (paso 11 de la opcion 1).
+::     (paso 9 de la opcion 1).
+::   - LIMPIEZA: vaciado de temporales (paso 10 de la opcion 1).
 ::   - FINAL: estado de Defender e inicio de Windows (final de la opcion 1).
-::   - ARRANQUE: lo que arranca solo con Windows (paso 10 de la opcion 1 y opcion 6).
+::   - ARRANQUE: lo que arranca solo con Windows (paso 9 de la opcion 1 y opcion 6).
 ::   - ACTUALIZAR: todo lo pendiente de Windows Update (opcion 2).
 ::   - VERIFICAR: el reporte de la opcion 7.
-::   - LUZ: luz nocturna del anochecer al amanecer (paso 7 de la opcion 1).
+::   - LUZ: luz nocturna del anochecer al amanecer (paso 6 de la opcion 1).
 ::   - AULA: borrado de perfiles de Chrome (opcion 5).
 :: =========================================================================
 #COMUN-INICIO#
@@ -1697,7 +1686,7 @@ foreach ($k in 'HKLM:\SYSTEM\CurrentControlSet\Control\DeviceGuard', 'HKLM:\SYST
 'VBS_LOCK=' + $lock
 #EQUIPO-FIN#
 #DISCO-INICIO#
-# Paso 8 de la opcion 1: paginacion, cache de escritura, CompactOS, Restaurar sistema,
+# Paso 7 de la opcion 1: paginacion, cache de escritura, CompactOS, Restaurar sistema,
 # BitLocker y almacenamiento reservado. Usa RAM_INST, DISCO_TIPO y DISCO_PNP de EQUIPO.
 $cs = Get-CimInstance Win32_ComputerSystem
 $nombre = $env:SystemDrive + '\pagefile.sys'
@@ -1820,7 +1809,7 @@ if ($vol -and ($vol.Free + $vol.Used) -gt 0 -and ($vol.Free * 100 / ($vol.Free +
 }
 #DISCO-FIN#
 #QUITAR-INICIO#
-# Paso 10 de la opcion 1: lo que se quita. Sale con 2 si Adobe Reader esta
+# Paso 9 de la opcion 1: lo que se quita. Sale con 2 si Adobe Reader esta
 # instalado, para el aviso final sobre los PDF.
 # Los paquetes provisionados se leen una sola vez: en una PC vieja, cada consulta
 # a DISM tarda varios segundos.
@@ -1862,10 +1851,10 @@ Get-ItemProperty -Path $u -ErrorAction SilentlyContinue | Where-Object { $_.Disp
 }
 Write-Output '  [OK] Apps preinstaladas quitadas.'
 # Copilot: lo que no es una app (el boton, Recall, Click to Do) lo apagan las
-# politicas del paso 6.
+# politicas del paso 5.
 [void](QuitarApp 'Microsoft.Copilot')
 # Copilot tambien llega como programa, con el instalador de Edge: --force-uninstall
-# lo quita sin preguntar, en unos 10 s. Para que no vuelva esta la politica del paso 6.
+# lo quita sin preguntar, en unos 10 s. Para que no vuelva esta la politica del paso 5.
 $c = Get-ItemProperty -LiteralPath 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Microsoft Copilot', 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\Microsoft Copilot' -ErrorAction SilentlyContinue | Select-Object -First 1
 if ($c.UninstallString -match '^"([^"]+)"\s*(.*)$') { Start-Process -FilePath $Matches[1] -ArgumentList ($Matches[2] + ' --force-uninstall') -Wait -WindowStyle Hidden }
 Write-Output '  [OK] Copilot quitado; el resto de la IA de Windows queda apagado por politica.'
@@ -2135,7 +2124,7 @@ Write-Output '  [AVISO] No se pudo instalar ninguna: se sigue con el resto.'
 exit 1
 #ACTUALIZAR-FIN#
 #ARRANQUE-INICIO#
-# Paso 10 de la opcion 1; con ARRANQUE_MODO=volver, la opcion 6. Lo que arranca con
+# Paso 9 de la opcion 1; con ARRANQUE_MODO=volver, la opcion 6. Lo que arranca con
 # Windows sin que nadie lo pida. Se desactiva igual que en el Administrador de
 # tareas (StartupApproved, primer byte 03): el programa sigue instalado, abre a mano
 # y en Administrador de tareas > Inicio se reactiva con un clic. No se borra nada.
@@ -2305,7 +2294,7 @@ else {
 # y PowerShell. El acceso remoto tambien queda, por si alguien ayuda a distancia.
 $ErrorActionPreference = 'SilentlyContinue'
 # Con una actualizacion instalandose se espera (COMUN): cortarla la deja a medias y
-# el paso 10 usa DISM, que falla mientras tanto.
+# el paso 9 usa DISM, que falla mientras tanto.
 EsperarTiWorker
 # Windows Update, descargas y el orquestador, parados mientras corre el script. Solo
 # parados: al reiniciar vuelven solos, y el paso 1 solo repara lo deshabilitado.
@@ -2513,6 +2502,7 @@ $os = Get-CimInstance Win32_OperatingSystem
 $cs = Get-CimInstance Win32_ComputerSystem
 $ver = Leer 'HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion' 'DisplayVersion'
 L ('Fecha:            ' + (Get-Date -Format 'yyyy-MM-dd HH:mm'))
+L ('Version:          ' + $env:OPT_VERSION)
 L ('Equipo:           ' + $env:COMPUTERNAME)
 L ('Windows:          ' + $os.Caption + ' ' + $ver + ' (compilacion ' + $os.BuildNumber + ', ' + $os.OSArchitecture + ')')
 # El perfil sale de :detectar, el mismo calculo que usa la opcion 1.

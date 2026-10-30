@@ -15,7 +15,8 @@ UAC, SmartScreen, Windows Update).
 4. Reiniciar.
 
 Descarga: el navegador puede pedir confirmación para un `.bat`, y SmartScreen avisa al ejecutarlo (*Más información >
-Ejecutar de todas formas*). *Propiedades > Desbloquear* quita la marca de internet.
+Ejecutar de todas formas*). *Propiedades > Desbloquear* quita la marca de internet. El menú y el reporte de la
+opción 7 muestran la versión: el número de cambios publicados del script y la fecha del último.
 
 Después de la opción 1, el botón de encendido apaga el equipo. La tapa también, salvo con 4 GB o más de RAM: ahí
 suspende (ver [Perfiles](#perfiles-según-el-hardware)).
@@ -25,7 +26,7 @@ suspende (ver [Perfiles](#perfiles-según-el-hardware)).
 | Tecla | Opción | Modifica |
 |---|---|---|
 | `A` | PC apestada: cierra todos los programas de la sesión, frena Windows Update y sigue con la `1` sin volver a preguntar. Pide confirmación. | Sí |
-| `1` | Optimizar. Incluye la revisión del script v1. | Sí |
+| `1` | Optimizar. | Sí |
 | `2` | Actualizar Windows a fondo (todo lo pendiente, con reinicios automáticos), actualizar los programas con winget y limpiar WinSxS con DISM `/ResetBase`. Horas; la limpieza es irreversible. | Sí |
 | `3` | Desfragmentación completa. Horas. | Sí |
 | `4` | Instalar WinRAR, Everything, VLC y Chrome con winget. | Sí |
@@ -44,7 +45,7 @@ les pide cerrarse, como la X, y a los 10 s fuerza lo que quede; lo no guardado s
 (la opción 1 lo necesita para reconocer al usuario) y el acceso remoto (AnyDesk, RustDesk, HopToDesk, TeamViewer,
 ScreenConnect, Splashtop). Windows Update se frena mientras corre el script: si está instalando una actualización
 (`TiWorker.exe` con CPU), espera a que termine, porque cortarla la deja a medias y la rehace entera después, y el
-paso 10 usa DISM, que falla mientras tanto; después detiene `wuauserv`, `UsoSvc`, `BITS` y `DoSvc` hasta el reinicio
+paso 9 usa DISM, que falla mientras tanto; después detiene `wuauserv`, `UsoSvc`, `BITS` y `DoSvc` hasta el reinicio
 (parados, no deshabilitados). Si lo que traba es Defender, es un servicio y no se cierra.
 
 **Usuario destino.** Los ajustes de usuario se escriben en `HKEY_USERS\<SID>` del dueño del `explorer.exe` de la
@@ -106,7 +107,7 @@ PC vieja con instalación limpia rara vez está encendida: la tabla de Microsoft
 | Elemento | Acción |
 |---|---|
 | Servicios esenciales | Si están deshabilitados, vuelven a su valor de fábrica: Defender, Centro de seguridad, Firewall, Windows Update (`BITS`, `UsoSvc`, `WaaSMedicSvc`, `DoSvc`), Store y licencias, `Appinfo` (UAC), `VSS`, `swprv`, `W32Time`, red, audio, temas. |
-| Defender | Borra políticas que lo desactivan. El bloqueo de PUA se activa en el [paso 5](#5-defender). |
+| Defender | Borra políticas que lo desactivan. El bloqueo de PUA se activa en el [paso 4](#4-defender). |
 | Firewall | Encendido en los 3 perfiles; borra políticas que lo apagan. |
 | SmartScreen | Borra políticas que lo apagan (Windows y Edge). |
 | UAC | Si está apagado o en "no notificar nunca", vuelve al valor de fábrica. |
@@ -116,29 +117,7 @@ PC vieja con instalación limpia rara vez está encendida: la tabla de Microsoft
 | Reproducción automática | Desactivada en todas las unidades. |
 | Tareas | Asegura activas: `ScheduledDefrag`, `StartComponentCleanup`, `DiskDiagnosticResolver`, análisis de Defender. |
 
-### 2. Revisión del script v1
-
-Se lee el estado de cada cambio del v1 y se repara solo lo que está en un valor perjudicial (`[REPARADO]` en
-pantalla); si no hay nada, lo informa. Lo correcto o inocuo no se toca.
-
-| Ajuste del v1 | Veredicto | Si se encuentra |
-|---|---|---|
-| `SysMain` deshabilitado | Perjudicial: gestiona la compresión de memoria y el prefetch de arranque. | Automático. |
-| `TabletInputService` deshabilitado | Perjudicial: rompe la escritura en Inicio, Configuración y apps UWP. | Manual (fábrica). |
-| `WbioSrvc` deshabilitado | Perjudicial: rompe la huella. | Manual (fábrica). |
-| `lfsvc` deshabilitado | Perjudicial: rompe la luz nocturna del anochecer al amanecer. | Manual (fábrica). |
-| `DisablePagingExecutive=1` | Perjudicial con poca RAM: fija el kernel en memoria. | `0`. |
-| `EnablePrefetcher` o `EnableSuperfetch` distintos de `3` | Perjudicial en disco mecánico: sin precarga, el arranque y cada programa leen el disco de a pedazos. | `3` (fábrica). |
-| `ClearPageFileAtShutdown=1` | Perjudicial: lo activan scripts de "privacidad", y con 4 GB de paginación cada apagado escribe 4 GB en el disco. | `0` (fábrica). |
-| `DoSvc` con `Start=4` | Perjudicial: puede romper Windows Update. | Fábrica (paso 1) + `DODownloadMode=0` (sin P2P). |
-| `IOPageLockLimit`, `DontVerifyRandomDrivers` | Placebos: Windows los ignora. | Sin cambios. |
-| `compact /CompactOS:never` | Correcto en HDD. | Se mantiene; descomprime solo si estaba comprimido y hay 6 GB libres. |
-| `DisableLastAccess`, `Disable8dot3` | Correctos. | Sin cambios. |
-| Telemetría, Xbox, Bluetooth, Mapas, Retail Demo | Correctos. | Sin cambios (la opción 1 aplica su propia configuración de servicios). |
-
-La compresión de memoria se activa siempre (paso 8).
-
-### 3. Servicios
+### 2. Servicios
 
 | Inicio | Servicios | Motivo |
 |---|---|---|
@@ -154,7 +133,7 @@ La compresión de memoria se activa siempre (paso 8).
 | Automático (retrasado) | `Spooler` | Siempre: una impresora que deja de andar sin aviso cuesta más que lo que ahorra. |
 | Automático | `LanmanServer` | Siempre, para compartir carpetas e impresoras en la red. |
 | Deshabilitado | `OneSyncSvc`, `PimIndexMaintenanceSvc`, `UnistoreSvc`, `UserDataSvc`, `MessagingService` | Sincronizan Correo, Calendario, Contactos y Mensajes. Sin las apps no tienen nada que hacer. Son servicios por usuario: rigen desde el próximo inicio de sesión. |
-| Manual | Servicios de fabricante y de actualizadores que arrancan solos (ver [Inicio de Windows](#11-inicio-de-windows-lo-que-arranca-solo)) | Los levanta el programa que los necesita. |
+| Manual | Servicios de fabricante y de actualizadores que arrancan solos (ver [Inicio de Windows](#10-inicio-de-windows-lo-que-arranca-solo)) | Los levanta el programa que los necesita. |
 | Automático | `SysMain` | Compresión de memoria desde el arranque. |
 
 Sin "todo a Manual": el *Set Services to Manual* de WinUtil (~190 servicios) rompió Windows Update
@@ -164,7 +143,7 @@ Sin "todo a Manual": el *Set Services to Manual* de WinUtil (~190 servicios) rom
 en abril de 2026 lo redujeron a 5. Quedan en Automático: audio, red (`Dhcp`, `Dnscache`, `NlaSvc`, Wi-Fi), Firewall,
 Defender, registro de eventos, `Themes`, `FontCache`, notificaciones de usuario.
 
-### 4. Tareas programadas
+### 3. Tareas programadas
 
 Desactivadas: *Microsoft Compatibility Appraiser* (`CompatTelRunner`, disco al 100%), *ProgramDataUpdater*,
 *Autochk Proxy*, CEIP (*Consolidator*, *UsbCeip*), *DiskDiagnosticDataCollector*, Feedback (*DmClient*,
@@ -178,7 +157,7 @@ modelos de voz, *StartupAppTask*, *MareBackup* (inventario con `compattelrunner`
 *PLUGScheduler* (los avisos de "pasate a Windows 11", corre a diario) no: la tarea es de TrustedInstaller y
 `schtasks /change` responde "Acceso denegado" aun como administrador; medido en la laptop i3.
 
-### 5. Defender
+### 4. Defender
 
 | Se mantiene | Se recorta |
 |---|---|
@@ -190,7 +169,7 @@ modelos de voz, *StartupAppTask*, *MareBackup* (inventario con `compattelrunner`
 
 Sin exclusiones.
 
-### 6. Telemetría y procesos en segundo plano
+### 5. Telemetría y procesos en segundo plano
 
 | Ajuste | Estado |
 |---|---|
@@ -198,12 +177,12 @@ Sin exclusiones.
 | Contenido sugerido, instalaciones silenciosas, consejos, "terminá de configurar tu PC" | Apagado. |
 | Noticias e intereses (`EnableFeeds`) y los Widgets de Windows 11 (`AllowNewsAndInterests=0`) | Apagado. |
 | Cortana, Bing y destacados en la búsqueda | Apagado. |
-| Copilot y la IA de Windows | Apagados por política: `TurnOffWindowsCopilot` (equipo y usuario) y, en las PCs con Windows 11 que los tienen, Recall (`DisableAIDataAnalysis=1`, `AllowRecallEnablement=0`) y Click to Do (`DisableClickToDo=1`). La app de Copilot y el programa, que instala el actualizador de Edge, se quitan siempre (paso 10). La política de EdgeUpdate `Install{C50565E9-CCCF-44B4-BA15-5AC5C6569197}=0` debería impedirle reinstalarlo; sin comprobar, porque no se encontró cómo pedirle que lo reinstale. |
+| Copilot y la IA de Windows | Apagados por política: `TurnOffWindowsCopilot` (equipo y usuario) y, en las PCs con Windows 11 que los tienen, Recall (`DisableAIDataAnalysis=1`, `AllowRecallEnablement=0`) y Click to Do (`DisableClickToDo=1`). La app de Copilot y el programa, que instala el actualizador de Edge, se quitan siempre (paso 9). La política de EdgeUpdate `Install{C50565E9-CCCF-44B4-BA15-5AC5C6569197}=0` debería impedirle reinstalarlo; sin comprobar, porque no se encontró cómo pedirle que lo reinstale. |
 | Barra de juegos y Game DVR | Apagado. |
 | Historial de actividad | No se publica ni se sube. |
 | Informe de errores (WER) | Apagado. |
 | Apps en segundo plano | Con menos de 4 GB, interruptor general apagado (`GlobalUserDisabled=1`, `BackgroundAppGlobalToggle=0`). Contras: el Inicio puede tardar en encontrar apps nuevas de la Store ([PR #42](https://github.com/Disassembler0/Win10-Initial-Setup-Script/pull/42)); alarmas y avisos de apps cerradas no funcionan. No afecta programas Win32. Con 4 GB o más, de fábrica. |
-| Recolección de compatibilidad | `AppCompat`: `DisableInventory=1`, `AITEnable=0`. La tarea del *Compatibility Appraiser* se desactiva en el paso 4, pero Windows Update la vuelve a activar; con las políticas, `CompatTelRunner` no tiene qué recolectar. |
+| Recolección de compatibilidad | `AppCompat`: `DisableInventory=1`, `AITEnable=0`. La tarea del *Compatibility Appraiser* se desactiva en el paso 3, pero Windows Update la vuelve a activar; con las políticas, `CompatTelRunner` no tiene qué recolectar. |
 | Experiencias compartidas y Vincular al teléfono | `System`: `EnableCdp=0`, `EnableMmx=0`. Buscan celulares por Bluetooth y red; en Windows 11 es `CrossDeviceService`. |
 | Actualización automática de la Store | Apagada: política `HKLM\SOFTWARE\Policies\Microsoft\WindowsStore` `AutoDownload=2` (más el valor del interruptor viejo). Desde 2025 la Store solo permite pausar 1-5 semanas ([Tom's Hardware](https://www.tomshardware.com/software/windows/microsoft-store-change-removes-the-ability-to-stop-app-updates-pausing-automatic-updates-now-limited-to-a-5-week-duration)); la política sigue vigente ([The Windows Club](https://www.thewindowsclub.com/disable-automatic-microsoft-store-updates)). Actualizar a mano: *Store > Biblioteca > Obtener actualizaciones* (incluye winget). |
 | Precarga de apps (`ApplicationPreLaunch`) | Apagada. |
@@ -219,7 +198,7 @@ en Configuración > Notificaciones (`Notifications\Settings\Windows.SystemToast.
 se esconde la página de inicio de Configuración, donde viven esas tarjetas: `SettingsPageVisibility=hide:home`,
 y Configuración abre en Sistema. La opción 6 borra todo eso.
 
-### 7. Interfaz y Explorador
+### 6. Interfaz y Explorador
 
 - Efectos visuales en "mejor rendimiento", excepto: contenido de ventana al arrastrar; suavizado de fuentes;
   animación al minimizar y maximizar, solo con driver de video. Con 4 GB y driver: "mejor apariencia" (ver
@@ -233,7 +212,7 @@ y Configuración abre en Sistema. La opción 6 borra todo eso.
 - Barra de tareas: sin caja ni lupa de búsqueda (`SearchboxTaskbarMode=0`; se busca abriendo el Inicio y
   escribiendo), sin los botones de Cortana, Copilot y Vista de tareas (`ShowTaskViewButton=0`), y con el nombre de
   cada ventana: los botones se agrupan recién cuando la barra se llena (`TaskbarGlomLevel=1`). En Windows 11, sin
-  Widgets (la política del paso 6) ni el botón de *Reanudar* (`IsEnabled=0` en `Explorer\Advanced`, según
+  Widgets (la política del paso 5) ni el botón de *Reanudar* (`IsEnabled=0` en `Explorer\Advanced`, según
   [elevenforum](https://www.elevenforum.com/t/turn-on-or-off-resume-app-button-on-taskbar-in-windows-11.40288/)).
 - Sin detección automática del tipo de carpeta (WinUtil). Efecto secundario: se reinician las vistas guardadas.
 - Windows 11 con 2 GB o menos: menú del botón derecho clásico, sin *Mostrar más opciones* (ver
@@ -247,9 +226,12 @@ y Configuración abre en Sistema. La opción 6 borra todo eso.
   `DisableLocationScripting`): la luz nocturna la necesita para calcular la puesta y la salida del sol. La opción 6
   no la apaga.
 
-### 8. Memoria, disco y energía
+### 7. Memoria, disco y energía
 
-- Compresión de memoria activada.
+- Compresión de memoria activada (`SysMain` en Automático).
+- `DisablePagingExecutive=0`, `EnablePrefetcher` y `EnableSuperfetch` en `3`, `ClearPageFileAtShutdown=0`: valores de
+  fábrica que otros optimizadores rompen. Con `1`, el kernel queda fijo en RAM; sin precarga, el arranque y cada
+  programa leen el disco de a pedazos; vaciar la paginación al apagar escribe 4 GB en cada apagado.
 - Archivo de paginación: si alguien lo quitó, vuelve a administrarlo Windows. Después, fijo en 2 × RAM con tope de
   8 GB (2 GB: 4096 MB; 8 GB: 8192 MB). Sin espacio suficiente, queda como estaba.
 - Caché de escritura activada y vaciado del búfer desactivado (`UserWriteCacheSetting=1`,
@@ -291,7 +273,7 @@ Inicio rápido: acelera el arranque en HDD, pero el kernel nunca se reinicia; co
 (caso de `ntoskrnl.exe` al 10-15% de CPU: [HP Community](https://h30434.www3.hp.com/t5/Notebook-Boot-and-Lockup/Fast-startup-causing-high-cpu-usage/td-p/7888113)).
 Sin él, *Apagar* es un apagado completo.
 
-### 9. Navegadores
+### 8. Navegadores
 
 - Edge: sin arranque acelerado, sin modo de fondo, sin barra lateral ni Edge bar, sin recomendaciones ni compras;
   pestañas en suspensión a los 5 min (fábrica: 2 h). Su entrada de inicio (`MicrosoftEdgeAutoLaunch_*`) se borra en el
@@ -311,7 +293,7 @@ el botón de Chrome para hacerse predeterminado: eso se elige en Configuración 
 Chrome no abre pestañas de bienvenida tras cada actualización (`PromotionalTabsEnabled=0`) ni pregunta por Privacy
 Sandbox (`PrivacySandboxPromptEnabled=0`). Antes esas tres estaban solo en la opción 5.
 
-### 10. OneDrive y apps preinstaladas
+### 9. OneDrive y apps preinstaladas
 
 Sin preguntas. OneDrive se da por usado si tiene una cuenta iniciada con más de 3 archivos en su carpeta (sin
 contar `desktop.ini`), y entonces no se toca. Si no, sale del inicio y se desactivan sus tareas diarias de
@@ -353,7 +335,7 @@ apagado y la PC quedaría sin ninguno, y su autoprotección no deja parar los se
 se esconde: su bandeja queda, porque escondido se olvida que corre. Sus tareas programadas (firmas, análisis)
 quedan mientras sea el antivirus, y el final de la opción 1 avisa si sigue instalado.
 
-### 11. Inicio de Windows: lo que arranca solo
+### 10. Inicio de Windows: lo que arranca solo
 
 En las PCs de verdad, lo que más RAM se lleva después de Defender son cosas de 20-30 MB que nadie pidió y que suman:
 actualizadores, bandejas de drivers, "optimizadores", lanzadores, mensajeros y servicios del fabricante. Se desactivan
@@ -391,13 +373,13 @@ lista crezca con datos de PCs reales.
 Lenovo, NVIDIA, Avast, *Google Platform Experience Helper*, *SoftLanding*). Se desactivan todas salvo los
 actualizadores de navegadores (`GoogleUpdate*`, `GoogleSystem`, `MicrosoftEdgeUpdate*`, Brave, Opera, Vivaldi), Office,
 OneDrive, Dropbox y `CreateExplorerShellUnelevatedTask`, que son seguridad o los necesita Windows. Dentro de
-`\Microsoft\Windows` no se toca nada más que la lista del paso 4: la mayoría son disparadores dormidos y varias
+`\Microsoft\Windows` no se toca nada más que la lista del paso 3: la mayoría son disparadores dormidos y varias
 benefician (desfragmentación, Defender, hora, `StartComponentCleanup`, Windows Update, la compilación de .NET, la
 copia del registro). Lo que se desactivó queda anotado en `%ProgramData%\OptimizarPC\tareas-desactivadas.txt`, y la
 opción 6 reactiva solo eso: lo que ya estaba desactivado no se anota, así no se reactiva lo que apagó otro. La
 opción 7 lista todas las tareas fuera de `\Microsoft` con su estado.
 
-### 12. Características opcionales
+### 11. Características opcionales
 
 *Configuración > Aplicaciones > Características opcionales*, vía `Remove-WindowsCapability`:
 
@@ -408,7 +390,7 @@ opción 7 lista todas las tareas fuera de `\Microsoft` con su estado.
 | WordPad | `Microsoft.Windows.WordPad` | Quitar |
 | Reproductor de Windows Media | `Media.WindowsMediaPlayer` | Quitar (VLC, opción 4) |
 | Internet Explorer 11 | `Browser.InternetExplorer` | Quitar (el modo IE de Edge puede dejar de funcionar) |
-| Asistencia rápida integrada | `App.Support.QuickAssist` | Quitar (la de la Store sale con las apps, paso 10) |
+| Asistencia rápida integrada | `App.Support.QuickAssist` | Quitar (la de la Store sale con las apps, paso 9) |
 | Cliente OpenSSH | `OpenSSH.Client` | Quitar |
 | Windows Hello: reconocimiento facial | `Hello.Face.*` | Quitar: requiere cámara IR. PIN y huella no dependen de esto. |
 | Visor de XPS | `XPS.Viewer` | Quitar, si está |
@@ -422,7 +404,7 @@ Conexión a Escritorio remoto (`mstsc`) no es una opcional sino una característ
 (`Microsoft-RemoteDesktopConnection`): sale con `Disable-WindowsOptionalFeature`, en unos 25 s y sin reiniciar. Vuelve
 desde *Panel de control > Programas > Activar o desactivar las características de Windows*.
 
-### 13. Limpieza de temporales
+### 12. Limpieza de temporales
 
 | Carpeta | Contenido |
 |---|---|
@@ -463,7 +445,7 @@ No se tocan: caché de miniaturas, `SoftwareDistribution\Download`, `System32\sp
 borrarlas puede dejar una actualización a medias, y son de `TrustedInstaller`. Las limpia DISM (opción 2). `Windows.old`: *Liberador de espacio en
 disco > Limpiar archivos del sistema*.
 
-### 14. Adobe Reader (si está instalado)
+### 13. Adobe Reader (si está instalado)
 
 | Elemento | Acción |
 |---|---|
@@ -721,12 +703,11 @@ fija; revisar *Load/Unload Cycle Count* con [CrystalDiskInfo](https://crystalmar
 
 ## Validación
 
-- **Wine (`cmd.exe`):** las 7 opciones de punta a punta con distintas combinaciones de respuestas; estado del v1
-  simulado (incluidas políticas que apagan Defender y Windows Update), con verificación en el registro de cada valor en
-  `HKEY_USERS\<SID>`; ciclo optimizar, revertir y verificar; opción 4 con winget simulado (instalación nueva, al día,
-  actualizado, sin winget). Con el estado del v1, la opción 1 repara los 5 valores y en la pasada siguiente informa
-  que no hay nada; en la opción 2, DISM corre con `DisableResetbase=0` y `SupersededActions=3`, y después vuelven los
-  valores originales. Perfiles: la opción 1 corrió como PC de 2 GB con HDD y sin driver, y como PC de 8 GB con SSD y
+- **Wine (`cmd.exe`):** las 7 opciones de punta a punta con distintas combinaciones de respuestas; estado de otro
+  optimizador simulado (políticas que apagan Defender y Windows Update), con verificación en el registro de cada
+  valor en `HKEY_USERS\<SID>`; ciclo optimizar, revertir y verificar; opción 4 con winget simulado (instalación
+  nueva, al día, actualizado, sin winget). En la opción 2, DISM corre con `DisableResetbase=0` y
+  `SupersededActions=3`, y después vuelven los valores originales. Perfiles: la opción 1 corrió como PC de 2 GB con HDD y sin driver, y como PC de 8 GB con SSD y
   driver; en cada caso se verificaron los servicios, los efectos visuales, las miniaturas, el menú de apagado y los
   valores de `powercfg` (suspensión, tapa y botones).
 - **VM con Windows 11 (UTM, ARM):** la versión anterior del script y la actual corrieron, cada una desde el mismo
@@ -797,9 +778,8 @@ consola, con una tarea programada `/it`.
 
 1. VM Windows 10 x64 22H2, 2 GB de RAM, 2 núcleos, actualizada.
 2. Opción 7; guardar el reporte. Snapshot.
-3. (Opcional) Script v1 y opción 7; luego la opción 1 tiene que mostrar `[REPARADO]` en el paso 2.
-4. Volver al snapshot, opción 1, reiniciar, opción 7.
-5. Checklist:
+3. Volver al snapshot, opción 1, reiniciar, opción 7.
+4. Checklist:
    - [ ] Búsqueda del Inicio encuentra apps ("calc").
    - [ ] Escritura en Configuración y en Calculadora.
    - [ ] Windows Update busca actualizaciones.
@@ -840,7 +820,7 @@ consola, con una tarea programada `/it`.
      muestra; al terminar, Windows no vuelve a cifrar al entrar con cuenta Microsoft.
    - [ ] Windows 11 con 2 GB: botón derecho con el menú clásico. Con 4 GB: el nuevo.
    - [ ] Opción 7: líneas de VBS, BitLocker y ciclos de cabezal con datos.
-6. Opción 6 y verificar la vuelta a fábrica.
+5. Opción 6 y verificar la vuelta a fábrica.
 
 ## Fuentes
 

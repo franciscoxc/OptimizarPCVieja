@@ -26,6 +26,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Toda la historia: el numero de version se cuenta con git.
+          fetch-depth: 0
 
       # Antes de publicar: si el menu del .bat y la tabla del README no dicen lo
       # mismo, la release no se toca y queda la anterior.
@@ -41,6 +44,17 @@ jobs:
       - name: Comprobar la sintaxis de PowerShell
         run: pwsh -NoProfile pruebas/sintaxis.ps1
 
+      # La version es la cantidad de commits que tocaron el .bat, con la fecha del
+      # ultimo: la lleva git, no una mano, asi no se desincroniza. Se estampa solo
+      # en el archivo publicado; el del repositorio dice "local".
+      - name: Numerar la version
+        run: |
+          N=$(git rev-list --count HEAD -- OptimizarPC.bat)
+          F=$(git log -1 --format=%cd --date=format:%d/%m/%Y -- OptimizarPC.bat)
+          sed -i "s|^set \"OPT_VERSION=local\"|set \"OPT_VERSION=$N ($F)\"|" OptimizarPC.bat
+          grep -q "^set \"OPT_VERSION=$N ($F)\"" OptimizarPC.bat
+          echo "VERSION=$N ($F)" >> "$GITHUB_ENV"
+
       - name: Publicar como ultima version
         env:
           GH_TOKEN: ${{ github.token }}
@@ -49,6 +63,6 @@ jobs:
         run: |
           gh release upload ultima OptimizarPC.bat --clobber || gh release create ultima OptimizarPC.bat \
             --target "$GITHUB_SHA" \
-            --title "OptimizarPC (ultima version)" \
             --notes "Descarga OptimizarPC.bat y ejecutalo con doble clic." \
             --latest
+          gh release edit ultima --title "OptimizarPC, version $VERSION"
