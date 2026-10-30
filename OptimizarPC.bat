@@ -1996,17 +1996,23 @@ if ($env:OPT_RONDA -eq '1' -and (ReinicioPendiente)) { Write-Output '  Hay una a
 # TiWorker quieto y sin reinicio pendiente: vaciarla con una instalacion en curso la
 # rompe, que es justo lo que se quiere arreglar.
 $dl = Join-Path $env:SystemRoot 'SoftwareDistribution\Download'
-foreach ($s in 'wuauserv', 'BITS') { Stop-Service -Name $s -Force }
-try { (Get-Service -Name wuauserv).WaitForStatus('Stopped', '00:02:00') } catch { }
+Stop-Service -Name BITS -Force
+# Stop-Service wuauserv se queda esperando sin fin si Windows Update esta bajando algo
+# (en la laptop de prueba, 12 minutos de "Esperando a que se detenga el servicio" y
+# seguia): se le pide parar y se le da un minuto. Si no para, se sigue sin vaciar la
+# cache: la busqueda y la descarga de abajo esperan a la que ya esta en curso.
+$svc = Get-Service -Name wuauserv
+try { $svc.Stop() } catch { }
+try { $svc.WaitForStatus('Stopped', '00:01:00') } catch { }
 # Se renombra y se borra aparte: medir o borrar miles de archivos en un disco mecanico
 # tarda minutos (3,6 GB de 26H2 en la laptop de prueba: mas de diez), y mientras tanto
 # la busqueda ya puede correr. Windows Update crea Download de nuevo al arrancar.
 $viejo = $dl + '.viejo' + (Get-Date -Format 'HHmmss')
-Rename-Item -Path $dl -NewName (Split-Path -Leaf $viejo)
+if ((Get-Service -Name wuauserv).Status -eq 'Stopped') { Rename-Item -Path $dl -NewName (Split-Path -Leaf $viejo) }
 if (Test-Path -LiteralPath $viejo) {
     Write-Output '  Cache de descargas de Windows Update apartada; se borra de fondo.'
 } else {
-    Write-Output '  [AVISO] No se pudo apartar la cache de descargas; se sigue igual.'
+    Write-Output '  [AVISO] Windows Update esta ocupado y no suelta la cache de descargas; se sigue sin vaciarla.'
 }
 foreach ($v in @(Get-ChildItem -Path (Split-Path -Parent $dl) -Directory -Filter 'Download.viejo*')) {
     Start-Process -FilePath cmd.exe -ArgumentList ('/c rd /s /q "' + $v.FullName + '"') -WindowStyle Hidden
