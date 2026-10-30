@@ -796,9 +796,10 @@ echo ==========================================================================
 echo   ACTUALIZAR WINDOWS A FONDO Y LIMPIAR RESTOS
 echo ==========================================================================
 echo.
-echo   1. Instala TODO lo pendiente de Windows Update (calidad, drivers, version),
-echo      reinicia las veces que haga falta y sigue sola al iniciar sesion,
-echo      hasta que no quede nada. Horas en un disco mecanico.
+echo   1. Vacia la cache de descargas de Windows Update e instala TODO lo
+echo      pendiente (calidad, drivers, version), reinicia las veces que haga
+echo      falta y sigue sola al iniciar sesion, hasta que no quede nada.
+echo      Horas en un disco mecanico.
 echo   2. Actualiza los programas con winget.
 echo   3. DISM /ResetBase: las actualizaciones instaladas ya no se podran
 echo      desinstalar. Hasta una hora mas. No apagues la PC.
@@ -1398,9 +1399,12 @@ for /f "tokens=1,2 delims=:" %%a in ("%~1") do call :asegurar %%a %%b
 goto :eof
 
 :: Corre una seccion de PowerShell de este archivo (ver SECCIONES EN POWERSHELL,
-:: al final). El errorlevel queda con el exit de la seccion. Uso: call :ps NOMBRE
+:: al final), con la seccion COMUN pegada adelante: las funciones que usan varias
+:: viven una sola vez. El errorlevel queda con el exit de la seccion. Uso: call :ps NOMBRE
 :ps
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$t=[IO.File]::ReadAllText($env:OPT_RUTA); $i=$t.IndexOf('#%~1-INICIO#'); $j=$t.IndexOf('#%~1-FIN#'); if ($i -ge 0 -and $j -gt $i) { Invoke-Expression $t.Substring($i, $j - $i) }"
+:: El marcador se arma por partes: escrito entero en esta linea, IndexOf lo encontraria
+:: aca primero y correria basura.
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$t=[IO.File]::ReadAllText($env:OPT_RUTA); $code=''; foreach ($n in 'COMUN', '%~1') { $i=$t.IndexOf('#' + $n + '-INICIO#'); $j=$t.IndexOf('#' + $n + '-FIN#'); if ($i -ge 0 -and $j -gt $i) { $code += $t.Substring($i, $j - $i) } }; Invoke-Expression $code"
 goto :eof
 
 :: Usuario de la sesion abierta y datos del equipo, de la seccion EQUIPO. Si
@@ -1516,6 +1520,7 @@ goto :eof
 ::  con "exit /b", "goto :menu" o "goto :eof". Se corren con call :ps NOMBRE.
 ::  Una seccion por paso y no un PowerShell por ajuste: en una PC de 2 GB con
 ::  disco mecanico, cada PowerShell que arranca cuesta varios segundos.
+::   - COMUN: funciones que usan varias secciones; :ps la pega adelante de cada una.
 ::   - EQUIPO: usuario de la sesion y hardware (opciones 1 y 6, via :detectar).
 ::   - DISCO: paginacion, cache de escritura, CompactOS y Restaurar sistema
 ::     (paso 8 de la opcion 1).
@@ -1529,6 +1534,34 @@ goto :eof
 ::   - LUZ: luz nocturna del anochecer al amanecer (paso 7 de la opcion 1).
 ::   - AULA: borrado de perfiles de Chrome (opcion 5).
 :: =========================================================================
+#COMUN-INICIO#
+# Funciones que usan varias secciones. :ps pega esta seccion adelante de la que corre;
+# :detectar corre EQUIPO por su cuenta y no la recibe.
+# Windows instalando una actualizacion (TiWorker con CPU): se espera. Cortarla la
+# deja a medias y la rehace entera despues, y DISM falla mientras tanto. TiWorker
+# queda unos minutos sin hacer nada al terminar: por eso se mira la CPU y no solo
+# que exista.
+function TiWorkerOcupado {
+    $a = 0; foreach ($p in @(Get-Process -Name TiWorker -ErrorAction SilentlyContinue)) { $a += $p.TotalProcessorTime.TotalSeconds }
+    if ($a -eq 0) { return $false }
+    Start-Sleep -Seconds 10
+    $b = 0; foreach ($p in @(Get-Process -Name TiWorker -ErrorAction SilentlyContinue)) { $b += $p.TotalProcessorTime.TotalSeconds }
+    return ($b -gt 0 -and ($b - $a) -gt 0.5)
+}
+function EsperarTiWorker {
+    $t0 = Get-Date
+    while (TiWorkerOcupado) {
+        $min = [int]((Get-Date) - $t0).TotalMinutes
+        if ($min -eq 0) { Write-Output '  Windows esta instalando una actualizacion. Se espera a que termine: cortarla'; Write-Output '  la deja a medias y la rehace entera despues.' }
+        Write-Output ('    ... ' + $min + ' min')
+        Start-Sleep -Seconds 50
+    }
+}
+# Windows Update o el servicio de componentes dejaron algo que se termina al reiniciar.
+function ReinicioPendiente {
+    return ((Test-Path -LiteralPath 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired') -or (Test-Path -LiteralPath 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending'))
+}
+#COMUN-FIN#
 #EQUIPO-INICIO#
 # Lo que cmd necesita saber del equipo, una linea VARIABLE=valor por dato:
 # :detectar hace set con cada una, asi que nada mas puede escribir en la salida.
@@ -1920,7 +1953,7 @@ Get-Process | Where-Object { $_.Path -and -not $_.Path.StartsWith($win, [StringC
 }
 # Una actualizacion a medias se termina al reiniciar, y en un disco mecanico tarda:
 # que no apaguen la PC apenas vuelve.
-if ((Test-Path -LiteralPath 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired') -or (Test-Path -LiteralPath 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending')) {
+if (ReinicioPendiente) {
     Write-Output ''
     Write-Output '  Windows Update tiene una actualizacion a medias: la termina al reiniciar. Deja'
     Write-Output '  la PC prendida y enchufada hasta que el disco se calme, aunque tarde media hora.'
@@ -1935,11 +1968,28 @@ Get-CimInstance -Namespace root\CIMV2\Security\MicrosoftVolumeEncryption -ClassN
 #ACTUALIZAR-INICIO#
 # Opcion 2, paso 1: todo lo pendiente de Windows Update con la API COM de Windows
 # (anda en Home, sin modulos): calidad, drivers, versiones nuevas. Van de a una, para
-# que se vea avanzar; las de version se instalan solas igual. Quedan afuera las
-# optativas que no son drivers (las acumulativas "preview" se instalarian dos veces)
-# y las que piden interaccion. Sale con 0 si no queda nada, 2 si instalo y hay que
-# volver a buscar, 3 si hay que reiniciar, 1 si no pudo buscar.
+# que se vea avanzar; las de version se instalan solas igual. Quedan afuera solo las
+# optativas que no son drivers (las acumulativas "preview" se instalarian dos veces).
+# Sale con 0 si no queda nada, 2 si instalo y hay que volver a buscar, 3 si hay que
+# reiniciar, 1 si no pudo buscar.
 $ErrorActionPreference = 'SilentlyContinue'
+EsperarTiWorker
+# Con un reinicio pendiente las instalaciones nuevas fallan: primero se reinicia. Solo
+# en la ronda 1: si despues del reinicio sigue marcado, es una marca vieja y se sigue.
+if ($env:OPT_RONDA -eq '1' -and (ReinicioPendiente)) { Write-Output '  Hay una actualizacion a medias que se termina al reiniciar.'; exit 3 }
+# Descarga rota (0x80240034, 0x8024200D): Windows la reintenta cada dia, una hora con
+# el disco al 100%, y vuelve a fallar; la laptop de prueba llevaba siete intentos.
+# Vaciar la carpeta de descargas es el remedio exacto, y lo pendiente se baja de
+# nuevo. Solo Download: DataStore es el historial y el catalogo. Recien aca, con
+# TiWorker quieto y sin reinicio pendiente: vaciarla con una instalacion en curso la
+# rompe, que es justo lo que se quiere arreglar.
+$dl = Join-Path $env:SystemRoot 'SoftwareDistribution\Download'
+$mb = [int]((Get-ChildItem -Path $dl -Recurse -Force | Measure-Object -Property Length -Sum).Sum / 1MB)
+foreach ($s in 'wuauserv', 'BITS') { Stop-Service -Name $s -Force }
+Remove-Item -Path (Join-Path $dl '*') -Recurse -Force
+Delete-DeliveryOptimizationCache -Force
+Start-Service -Name wuauserv
+Write-Output ('  Cache de descargas de Windows Update vaciada: ' + $mb + ' MB.')
 $ses = New-Object -ComObject Microsoft.Update.Session
 $ses.ClientApplicationID = 'OptimizarPC'
 Write-Output '  Buscando actualizaciones, puede tardar varios minutos...'
@@ -1947,7 +1997,7 @@ $r = $null
 try { $r = $ses.CreateUpdateSearcher().Search('IsInstalled=0 and IsHidden=0') } catch { }
 if (-not $r) { Write-Output '  [AVISO] No se pudo buscar actualizaciones. Hay internet? Se sigue con el resto.'; exit 1 }
 # Type 2 = driver. BrowseOnly = optativa.
-$pend = @($r.Updates | Where-Object { (-not $_.BrowseOnly -or $_.Type -eq 2) -and -not $_.InstallationBehavior.CanRequestUserInput })
+$pend = @($r.Updates | Where-Object { -not $_.BrowseOnly -or $_.Type -eq 2 })
 if (-not $pend.Count) { Write-Output '  [OK] Windows esta al dia: no queda nada pendiente.'; exit 0 }
 Write-Output ('  ' + $pend.Count + ' pendientes:')
 foreach ($u in $pend) { Write-Output ('    - ' + $u.Title + ' (' + [math]::Round($u.MaxDownloadSize / 1MB) + ' MB)') }
@@ -1956,15 +2006,17 @@ foreach ($u in $pend) {
     if (-not $u.EulaAccepted) { $u.AcceptEula() }
     $col = New-Object -ComObject Microsoft.Update.UpdateColl
     [void]$col.Add($u)
-    if (-not $u.IsDownloaded) {
-        Write-Output ('  Descargando ' + $u.Title + '...')
-        $d = $ses.CreateUpdateDownloader(); $d.Updates = $col
-        $dr = $null
-        try { $dr = $d.Download() } catch { }
-        # ResultCode 2 = bien, 3 = bien con errores.
-        if (-not $dr -or $dr.ResultCode -gt 3) { Write-Output '    [AVISO] no se pudo descargar; se saltea.'; continue }
-    }
+    # Siempre se descarga: con la cache recien vaciada IsDownloaded puede seguir en True,
+    # y con los archivos ya ahi la descarga vuelve enseguida.
+    Write-Output ('  Descargando ' + $u.Title + '...')
+    $d = $ses.CreateUpdateDownloader(); $d.Updates = $col
+    $dr = $null
+    try { $dr = $d.Download() } catch { }
+    # ResultCode 2 = bien, 3 = bien con errores.
+    if (-not $dr -or $dr.ResultCode -gt 3) { Write-Output '    [AVISO] no se pudo descargar; se saltea.'; continue }
     Write-Output ('  Instalando ' + $u.Title + '... (en disco mecanico, una acumulativa tarda mas de media hora)')
+    # ForceQuiet: las que declaran que podrian preguntar algo (los drivers, casi siempre)
+    # se instalan calladas igual; si una falla por eso, se sigue con la siguiente.
     $i = $ses.CreateUpdateInstaller(); $i.Updates = $col; $i.ForceQuiet = $true; $i.AllowSourcePrompts = $false
     $ir = $null
     try { $ir = $i.Install() } catch { }
@@ -2119,24 +2171,9 @@ else {
 # queda: sin eso la sesion se cierra o se cuelga, y ahi estan este cmd, Explorer
 # y PowerShell. El acceso remoto tambien queda, por si alguien ayuda a distancia.
 $ErrorActionPreference = 'SilentlyContinue'
-# Windows instalando una actualizacion (TiWorker con CPU): se espera. Cortarla la
-# deja a medias y la rehace entera despues, y el paso 10 usa DISM, que falla mientras
-# tanto. TiWorker queda unos minutos sin hacer nada al terminar: por eso se mira la
-# CPU y no solo que exista.
-function TiWorkerOcupado {
-    $a = 0; foreach ($p in @(Get-Process -Name TiWorker)) { $a += $p.TotalProcessorTime.TotalSeconds }
-    if ($a -eq 0) { return $false }
-    Start-Sleep -Seconds 10
-    $b = 0; foreach ($p in @(Get-Process -Name TiWorker)) { $b += $p.TotalProcessorTime.TotalSeconds }
-    return ($b -gt 0 -and ($b - $a) -gt 0.5)
-}
-$t0 = Get-Date
-while (TiWorkerOcupado) {
-    $min = [int]((Get-Date) - $t0).TotalMinutes
-    if ($min -eq 0) { Write-Output '  Windows esta instalando una actualizacion. Se espera a que termine: cortarla' ; Write-Output '  la deja a medias y la rehace entera despues.' }
-    Write-Output ('    ... ' + $min + ' min')
-    Start-Sleep -Seconds 50
-}
+# Con una actualizacion instalandose se espera (COMUN): cortarla la deja a medias y
+# el paso 10 usa DISM, que falla mientras tanto.
+EsperarTiWorker
 # Windows Update, descargas y el orquestador, parados mientras corre el script. Solo
 # parados: al reiniciar vuelven solos, y el paso 1 solo repara lo deshabilitado.
 foreach ($s in 'wuauserv', 'UsoSvc', 'BITS', 'DoSvc') { Stop-Service -Name $s -Force }
@@ -2459,8 +2496,7 @@ try { $au = (New-Object -ComObject Microsoft.Update.AutoUpdate).Results } catch 
 if ($au) {
     L ('Ultima busqueda / ultima instalacion: ' + $au.LastSearchSuccessDate + ' / ' + $au.LastInstallationSuccessDate + '  (hora UTC)')
 }
-$rp = (Test-Path -LiteralPath 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired') -or (Test-Path -LiteralPath 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending')
-L ('Reinicio pendiente de una actualizacion: ' + $rp)
+L ('Reinicio pendiente de una actualizacion: ' + (ReinicioPendiente))
 L ('Instalador de modulos (TiWorker) corriendo ahora: ' + [bool](Get-Process -Name TiWorker))
 
 Titulo 'Tareas programadas'

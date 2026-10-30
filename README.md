@@ -544,13 +544,20 @@ lecturas y escrituras chicas, lo peor para un disco mecánico, y apagar en el me
 próximo arranque, con la persona encima otra vez. Se juntan, y la PC está lenta por eso. Forzarlas hasta el final en
 el taller es lo que la deja bien. Arranca sin preguntar, igual que la 3 y la 4.
 
-1. **Windows Update hasta el final** (sección `ACTUALIZAR`): con la API COM de Windows (`Microsoft.Update.Session`,
-   anda en Home, sin módulos) busca `IsInstalled=0 and IsHidden=0` e instala todo de a una: calidad, drivers,
-   versiones nuevas. Afuera quedan las optativas que no son drivers (las acumulativas *preview* se instalarían dos
-   veces) y las que piden interacción. Si alguna pide reinicio, crea una tarea `onlogon` (`/it /rl highest`) que
-   vuelve a abrir el script con `/actualizar N` y reinicia en 15 s; al iniciar sesión sigue solo con la ronda
-   siguiente, sin pasar por el menú ni pedir permisos. Repite hasta que la búsqueda no devuelva nada, con tope de 5
-   rondas. Sin internet, avisa y sigue con lo demás. Una actualización de versión (24H2) entra igual: horas en HDD,
+1. **Windows Update hasta el final** (sección `ACTUALIZAR`): primero espera a que TiWorker termine lo que esté
+   instalando, y si hay un reinicio pendiente de antes reinicia antes de buscar (solo en la ronda 1: si después del
+   reinicio sigue marcado, es una marca vieja). Después vacía `SoftwareDistribution\Download` y la caché de
+   Delivery Optimization: una descarga rota (`0x80240034`, `0x8024200D`) Windows la reintenta cada día, una hora
+   con el disco al 100 %, y vuelve a fallar; la laptop de prueba llevaba siete intentos de 26H2 en tres días.
+   Solo `Download`, nunca `DataStore`, que es el historial y el catálogo. Con la API COM de Windows
+   (`Microsoft.Update.Session`, anda en Home, sin módulos) busca `IsInstalled=0 and IsHidden=0` e instala todo de
+   a una: calidad, drivers, versiones nuevas. Afuera quedan solo las optativas que no son drivers (las acumulativas
+   *preview* se instalarían dos veces); las que declaran que podrían preguntar algo (los drivers, casi siempre) se
+   instalan con `ForceQuiet`. Siempre descarga antes de instalar: con la caché recién vaciada `IsDownloaded` puede
+   seguir en `True`. Si alguna pide reinicio, crea una tarea `onlogon` (`/it /rl highest`) que vuelve a abrir el
+   script con `/actualizar N` y reinicia en 15 s; al iniciar sesión sigue solo con la ronda siguiente, sin pasar
+   por el menú ni pedir permisos. Repite hasta que la búsqueda no devuelva nada, con tope de 5 rondas. Sin
+   internet, avisa y sigue con lo demás. Una actualización de versión (24H2, 26H2) entra igual: horas en HDD,
    pero es tiempo de taller.
 2. **Programas con winget**: `winget upgrade --all --include-unknown --source winget --silent`. Muestra la lista
    antes. `--include-unknown` porque los VLC y WinRAR viejos no declaran bien su versión y sin eso winget los

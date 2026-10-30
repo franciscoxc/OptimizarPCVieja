@@ -15,6 +15,8 @@ errores = []
 llamadas = set(re.findall(r"^call :ps (\w+)\s*$", BAT, re.M))
 # :detectar corre EQUIPO por su cuenta, porque necesita leer la salida.
 llamadas.add("EQUIPO")
+# COMUN no la llama nadie: :ps la pega adelante de cada seccion.
+llamadas.add("COMUN")
 secciones = set(re.findall(r"^#(\w+)-INICIO#$", BAT, re.M))
 
 for nombre in sorted(llamadas | secciones):
