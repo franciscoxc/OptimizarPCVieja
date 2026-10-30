@@ -1885,6 +1885,36 @@ if ((Get-WindowsOptionalFeature -Online -FeatureName Microsoft-RemoteDesktopConn
         Write-Output '  [OK] Conexion a Escritorio remoto quitada.'
     } catch {}
 }
+# Avast, AVG y CCleaner: fuera siempre. Defender ya cubre lo que prometen, y en 2 GB
+# un antivirus de terceros es medio giga de RAM; el limpiador de registro de CCleaner
+# rompe mas de lo que arregla. Desinstalacion silenciosa con el desinstalador de cada
+# uno: Instup.exe (Avast y AVG) con /instop:uninstall /silent, uninst.exe (CCleaner,
+# NSIS) con /S. Puede pedir reiniciar.
+$u = 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*', 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*'
+$patronAv = '^Avast (Free |Premium )?(Antivirus|Security|One)|^AVG (AntiVirus|Internet Security)|^CCleaner'
+foreach ($p in @(Get-ItemProperty -Path $u -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -match $patronAv -and $_.UninstallString -match '^"?([A-Za-z]:\\[^"]+?\.exe)' })) {
+    $exe = $Matches[1]
+    if ($exe -match 'Instup\.exe$') { $arg = '/instop:uninstall /silent' } else { $arg = '/S' }
+    if (-not (Test-Path -LiteralPath $exe)) { continue }
+    Write-Output ('  Desinstalando ' + $p.DisplayName + '...')
+    $pr = Start-Process -FilePath $exe -ArgumentList $arg -PassThru -WindowStyle Hidden
+    if ($pr -and $pr.WaitForExit(600000)) { Write-Output ('  [OK] ' + $p.DisplayName + ' desinstalado.') }
+    else { Write-Output ('  [AVISO] ' + $p.DisplayName + ': el desinstalador no termino; desinstalalo desde Configuracion.') }
+}
+# Lo que dejan atras, con producto o sin el: la tarea Overseer, que cada 3 horas y
+# media se actualiza sola y puede volver a instalar Avast. En la laptop de prueba
+# estaba de fabrica, en C:\Windows\OEM, sin ningun Avast instalado.
+if (-not @(Get-ItemProperty -Path $u -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -match '^(Avast|AVG) ' }).Count) {
+    foreach ($st in @(Get-ScheduledTask -ErrorAction SilentlyContinue | Where-Object { $_.TaskPath -match '^\\(Avast Software|AVG)\\' })) {
+        Stop-Process -Name Overseer -Force -ErrorAction SilentlyContinue
+        $st | Unregister-ScheduledTask -Confirm:$false -ErrorAction SilentlyContinue
+        foreach ($a in $st.Actions) {
+            $exe = [string]$a.Execute -replace '"', ''
+            if ($exe -match 'Overseer\.exe$' -and (Test-Path -LiteralPath $exe)) { Remove-Item -LiteralPath $exe -Force -ErrorAction SilentlyContinue }
+        }
+        Write-Output ('  [OK] Resto de Avast quitado: tarea ' + $st.TaskPath + $st.TaskName)
+    }
+}
 # Adobe Reader, si esta instalado: fuera todo lo que arranca solo con Windows,
 # incluido su actualizador automatico (tarea y servicio). Los PDF quedan para
 # Edge o Chrome. Reader sigue andando si alguien lo abre.
@@ -2186,11 +2216,41 @@ foreach ($s in @(Get-Service | Where-Object { $_.Name -match $patronServ -or $_.
         Write-Output ('    - servicio ' + $s.DisplayName); $n++
     }
 }
+# Tareas programadas fuera de \Microsoft: actualizadores, telemetria y "asistentes" de
+# fabricantes (HP, Dell, Lenovo, NVIDIA, Avast). Se desactivan todas salvo los
+# actualizadores de navegadores, Office, OneDrive y Dropbox, que son seguridad. Lo que
+# se desactiva queda anotado para que la opcion 6 lo devuelva; lo que ya estaba
+# desactivado no se anota, asi no se reactiva lo que apago otro.
+# GoogleUpdate y GoogleSystem son el actualizador de Chrome; GoogleUserPEH (Platform
+# Experience Helper) son metricas y se desactiva.
+$quedan = 'GoogleUpdate|GoogleSystem|MicrosoftEdgeUpdate|Office|OneDrive|Dropbox|Brave|Opera|Vivaldi|OptimizarPC|CreateExplorerShellUnelevatedTask'
+$anot = Join-Path $env:ProgramData 'OptimizarPC\tareas-desactivadas.txt'
+if ($volver) {
+    foreach ($t in @(Get-Content -LiteralPath $anot)) {
+        $i = $t.LastIndexOf('\')
+        if ($i -lt 0) { continue }
+        $st = Get-ScheduledTask -TaskPath $t.Substring(0, $i + 1) -TaskName $t.Substring($i + 1)
+        if ($st -and [string]$st.State -eq 'Disabled') { $st | Enable-ScheduledTask | Out-Null; Write-Output ('    - tarea ' + $t); $n++ }
+    }
+    Remove-Item -LiteralPath $anot -Force
+} else {
+    $lista = @(Get-Content -LiteralPath $anot)
+    foreach ($st in @(Get-ScheduledTask | Where-Object { $_.TaskPath -notlike '\Microsoft\*' -and [string]$_.State -ne 'Disabled' -and $_.TaskName -notmatch ('^(' + $quedan + ')') -and $_.TaskPath -notmatch ('^\\(' + $quedan + ')') })) {
+        $st | Disable-ScheduledTask | Out-Null
+        $lista += ($st.TaskPath + $st.TaskName)
+        Write-Output ('    - tarea ' + $st.TaskPath + $st.TaskName); $n++
+    }
+    if ($lista.Count) {
+        New-Item -ItemType Directory -Path (Split-Path -Parent $anot) -Force | Out-Null
+        Set-Content -LiteralPath $anot -Value ($lista | Select-Object -Unique)
+    }
+}
 if ($n -eq 0) { Write-Output '    (nada que tocar)' }
 elseif ($volver) { Write-Output ('  [OK] ' + $n + ' vuelven a arrancar con Windows.') }
 else {
     Write-Output ('  [OK] ' + $n + ' ya no arrancan con Windows. Siguen instalados y abren a mano; se')
-    Write-Output '       reactivan en Administrador de tareas, pestana Inicio.'
+    Write-Output '       reactivan en Administrador de tareas, pestana Inicio (las tareas, en el'
+    Write-Output '       Programador de tareas).'
 }
 #ARRANQUE-FIN#
 #CERRAR-INICIO#
@@ -2548,6 +2608,10 @@ foreach ($t in $tareas) {
     $st = Get-ScheduledTask -TaskPath $ruta -TaskName $nom
     $estado = if ($st) { [string]$st.State } else { 'no existe' }
     L ($estado.PadRight(10) + $t)
+}
+L 'Fuera de \Microsoft (la v2 desactiva todas salvo actualizadores de navegadores, Office, OneDrive y Dropbox):'
+foreach ($st in @(Get-ScheduledTask | Where-Object { $_.TaskPath -notlike '\Microsoft\*' } | Sort-Object TaskPath, TaskName)) {
+    L (([string]$st.State).PadRight(10) + $st.TaskPath + $st.TaskName)
 }
 
 # --- Politicas del equipo -------------------------------------------------------
