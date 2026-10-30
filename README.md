@@ -170,11 +170,13 @@ Desactivadas: *Microsoft Compatibility Appraiser* (`CompatTelRunner`, disco al 1
 *Autochk Proxy*, CEIP (*Consolidator*, *UsbCeip*), *DiskDiagnosticDataCollector*, Feedback (*DmClient*,
 *DmClientOnScenarioDownload*), Mapas (*MapsUpdateTask*, *MapsToastTask*), WER *QueueReporting*, WinSAT,
 *XblGameSaveTask*. Y desde octubre de 2026, vistas corriendo en la laptop de prueba: el censo del equipo
-(*Device Information\Device* y *Device User*, `devicecensus.exe`), RUXIM *PLUGScheduler* (los avisos de "pasate a
-Windows 11"), *PushToInstall* (*LoginCheck*, *Registration*: instalar apps desde la web de la Store), la descarga de
+(*Device Information\Device* y *Device User*, `devicecensus.exe`), *PushToInstall* (*LoginCheck*,
+*Registration*: instalar apps desde la web de la Store), la descarga de
 modelos de voz, *StartupAppTask*, *MareBackup* (inventario con `compattelrunner`), *PI\Sqm-Tasks*,
 *RecommendedTroubleshootingScanner*, *NetTrace\GatherNetworkInfo*, *KernelCeipTask*, *BthSQM* y los dos
-*OfficeTelemetryAgent* de Office 2016. Las que no existen en esa versión de Windows se saltean solas.
+*OfficeTelemetryAgent* de Office 2016. Las que no existen en esa versión de Windows se saltean solas. RUXIM
+*PLUGScheduler* (los avisos de "pasate a Windows 11", corre a diario) no: la tarea es de TrustedInstaller y
+`schtasks /change` responde "Acceso denegado" aun como administrador; medido en la laptop i3.
 
 ### 5. Defender
 
