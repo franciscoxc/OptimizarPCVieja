@@ -55,9 +55,13 @@ exit /b 1
 ::  MENU
 :: =========================================================================
 set "REINICIO_PENDIENTE=0"
-:: Tareas de telemetria: el paso 4 las desactiva y la opcion 6 las reactiva. Una
-:: sola lista, asi deshacer no se queda atras cuando se agrega una.
-set "_tareas="\Microsoft\Windows\Application Experience\Microsoft Compatibility Appraiser" "\Microsoft\Windows\Application Experience\ProgramDataUpdater" "\Microsoft\Windows\Autochk\Proxy" "\Microsoft\Windows\Customer Experience Improvement Program\Consolidator" "\Microsoft\Windows\Customer Experience Improvement Program\UsbCeip" "\Microsoft\Windows\DiskDiagnostic\Microsoft-Windows-DiskDiagnosticDataCollector" "\Microsoft\Windows\Feedback\Siuf\DmClient" "\Microsoft\Windows\Feedback\Siuf\DmClientOnScenarioDownload" "\Microsoft\Windows\Maps\MapsUpdateTask" "\Microsoft\Windows\Maps\MapsToastTask" "\Microsoft\Windows\Windows Error Reporting\QueueReporting" "\Microsoft\Windows\Maintenance\WinSAT" "\Microsoft\XblGameSave\XblGameSaveTask""
+:: Tareas de telemetria y de avisos: el paso 4 las desactiva y la opcion 6 las reactiva.
+:: Una sola lista, asi deshacer no se queda atras cuando se agrega una. Las ultimas:
+:: censo del equipo (devicecensus), RUXIM (los avisos de "pasate a Windows 11"),
+:: PushToInstall (instalar apps desde la web de la Store), modelos de voz, el escaneo
+:: de apps de inicio, MareBackup (inventario con compattelrunner), SQM y la telemetria
+:: de Office 2016. Las que no existen en esa version de Windows se saltean solas.
+set "_tareas="\Microsoft\Windows\Application Experience\Microsoft Compatibility Appraiser" "\Microsoft\Windows\Application Experience\ProgramDataUpdater" "\Microsoft\Windows\Autochk\Proxy" "\Microsoft\Windows\Customer Experience Improvement Program\Consolidator" "\Microsoft\Windows\Customer Experience Improvement Program\UsbCeip" "\Microsoft\Windows\DiskDiagnostic\Microsoft-Windows-DiskDiagnosticDataCollector" "\Microsoft\Windows\Feedback\Siuf\DmClient" "\Microsoft\Windows\Feedback\Siuf\DmClientOnScenarioDownload" "\Microsoft\Windows\Maps\MapsUpdateTask" "\Microsoft\Windows\Maps\MapsToastTask" "\Microsoft\Windows\Windows Error Reporting\QueueReporting" "\Microsoft\Windows\Maintenance\WinSAT" "\Microsoft\XblGameSave\XblGameSaveTask" "\Microsoft\Windows\Device Information\Device" "\Microsoft\Windows\Device Information\Device User" "\Microsoft\Windows\WindowsUpdate\RUXIM\PLUGScheduler" "\Microsoft\Windows\PushToInstall\LoginCheck" "\Microsoft\Windows\PushToInstall\Registration" "\Microsoft\Windows\Speech\SpeechModelDownloadTask" "\Microsoft\Windows\Application Experience\StartupAppTask" "\Microsoft\Windows\Application Experience\MareBackup" "\Microsoft\Windows\PI\Sqm-Tasks" "\Microsoft\Windows\Diagnosis\RecommendedTroubleshootingScanner" "\Microsoft\Windows\NetTrace\GatherNetworkInfo" "\Microsoft\Windows\Customer Experience Improvement Program\KernelCeipTask" "\Microsoft\Windows\Customer Experience Improvement Program\BthSQM" "\Microsoft\Office\OfficeTelemetryAgentLogOn2016" "\Microsoft\Office\OfficeTelemetryAgentFallBack2016""
 :: Vuelta de un reinicio de la opcion 2: sigue con la ronda que toca, sin menu.
 if /i "%OPT_ARG%"=="/actualizar" goto :op_limpiar_wu
 :menu

@@ -169,7 +169,12 @@ Defender, registro de eventos, `Themes`, `FontCache`, notificaciones de usuario.
 Desactivadas: *Microsoft Compatibility Appraiser* (`CompatTelRunner`, disco al 100%), *ProgramDataUpdater*,
 *Autochk Proxy*, CEIP (*Consolidator*, *UsbCeip*), *DiskDiagnosticDataCollector*, Feedback (*DmClient*,
 *DmClientOnScenarioDownload*), Mapas (*MapsUpdateTask*, *MapsToastTask*), WER *QueueReporting*, WinSAT,
-*XblGameSaveTask*.
+*XblGameSaveTask*. Y desde octubre de 2026, vistas corriendo en la laptop de prueba: el censo del equipo
+(*Device Information\Device* y *Device User*, `devicecensus.exe`), RUXIM *PLUGScheduler* (los avisos de "pasate a
+Windows 11"), *PushToInstall* (*LoginCheck*, *Registration*: instalar apps desde la web de la Store), la descarga de
+modelos de voz, *StartupAppTask*, *MareBackup* (inventario con `compattelrunner`), *PI\Sqm-Tasks*,
+*RecommendedTroubleshootingScanner*, *NetTrace\GatherNetworkInfo*, *KernelCeipTask*, *BthSQM* y los dos
+*OfficeTelemetryAgent* de Office 2016. Las que no existen en esa versión de Windows se saltean solas.
 
 ### 5. Defender
 
@@ -315,6 +320,15 @@ netbook de prueba. Si para todas las cuentas no se puede, se quita al menos de l
 También: [clásicos de Windows 7](#clásicos-de-windows-7), características opcionales y Restaurar sistema
 desactivado.
 
+**Avast, AVG y CCleaner se desinstalan siempre.** Defender ya cubre lo que prometen, en 2 GB un antivirus de
+terceros es medio giga de RAM encima de Defender, y el limpiador de registro de CCleaner rompe más de lo que arregla.
+Se usa el desinstalador de cada uno en silencio: `Instup.exe /instop:uninstall /silent` (Avast y AVG, puede pedir
+reiniciar) y `uninst.exe /S` (CCleaner, NSIS). Después, con producto o sin él, se quita lo que dejan atrás: la tarea
+programada *Overseer* (`\Avast Software\Overseer`), que cada 3 horas y media se actualiza sola desde internet y
+"remedia" los productos Avast (su `overseer.def` lista `forced_update`, `ui_not_running`), y su exe. En la laptop de
+prueba (TEDGE NBi3, imagen OEM de 2023) estaba de fábrica en `C:\Windows\OEM\CustomizationFiles`, sin ningún Avast
+instalado, firmado por Gen Digital y con fecha de septiembre de 2026. Sin probar la desinstalación de los productos.
+
 ### 11. Inicio de Windows: lo que arranca solo
 
 En las PCs de verdad, lo que más RAM se lleva después de Defender son cosas de 20-30 MB que nadie pidió y que suman:
@@ -348,6 +362,16 @@ Intel (`DSAService`), NVIDIA (`NvTelemetryContainer`), Logitech (`LGHUBUpdaterSe
 WebAdvisor. `Apple Mobile Device Service` no: sin él iTunes no ve el iPhone. Los nombres salen de memoria y de guías;
 la opción 7 y el final de la opción 1 listan lo que sigue corriendo fuera de `C:\Windows` con sus MB, para que la
 lista crezca con datos de PCs reales.
+
+**Tareas programadas fuera de `\Microsoft`:** actualizadores, telemetría y "asistentes" de fabricantes (HP, Dell,
+Lenovo, NVIDIA, Avast, *Google Platform Experience Helper*, *SoftLanding*). Se desactivan todas salvo los
+actualizadores de navegadores (`GoogleUpdate*`, `GoogleSystem`, `MicrosoftEdgeUpdate*`, Brave, Opera, Vivaldi), Office,
+OneDrive, Dropbox y `CreateExplorerShellUnelevatedTask`, que son seguridad o los necesita Windows. Dentro de
+`\Microsoft\Windows` no se toca nada más que la lista del paso 4: la mayoría son disparadores dormidos y varias
+benefician (desfragmentación, Defender, hora, `StartComponentCleanup`, Windows Update, la compilación de .NET, la
+copia del registro). Lo que se desactivó queda anotado en `%ProgramData%\OptimizarPC\tareas-desactivadas.txt`, y la
+opción 6 reactiva solo eso: lo que ya estaba desactivado no se anota, así no se reactiva lo que apagó otro. La
+opción 7 lista todas las tareas fuera de `\Microsoft` con su estado.
 
 ### 12. Características opcionales
 
@@ -544,12 +568,19 @@ lecturas y escrituras chicas, lo peor para un disco mecánico, y apagar en el me
 próximo arranque, con la persona encima otra vez. Se juntan, y la PC está lenta por eso. Forzarlas hasta el final en
 el taller es lo que la deja bien. Arranca sin preguntar, igual que la 3 y la 4.
 
-1. **Windows Update hasta el final** (sección `ACTUALIZAR`): primero espera a que TiWorker termine lo que esté
-   instalando, y si hay un reinicio pendiente de antes reinicia antes de buscar (solo en la ronda 1: si después del
-   reinicio sigue marcado, es una marca vieja). Después vacía `SoftwareDistribution\Download` y la caché de
-   Delivery Optimization: una descarga rota (`0x80240034`, `0x8024200D`) Windows la reintenta cada día, una hora
-   con el disco al 100 %, y vuelve a fallar; la laptop de prueba llevaba siete intentos de 26H2 en tres días.
-   Solo `Download`, nunca `DataStore`, que es el historial y el catálogo. Con la API COM de Windows
+1. **Windows Update hasta el final** (sección `ACTUALIZAR`): primero espera a que Windows termine lo que esté
+   instalando. Le pregunta a Windows Update (`IsBusy` del instalador) y, si esa COM no responde, mide CPU **y bytes
+   de disco** de `TiWorker` cada 10 s: preparando 26H2 en la laptop de prueba, `TiWorker` usaba 0,36 s de CPU cada
+   10 s y un umbral de solo CPU lo dio por ocioso; el reinicio canceló la instalación al 52 % (`Cancel was
+   requested` en `UpdateAgent.log`). Si hay un reinicio pendiente de antes reinicia antes de buscar (solo en la
+   ronda 1: si después del reinicio sigue marcado, es una marca vieja). Después aparta
+   `SoftwareDistribution\Download` renombrándola y la borra de fondo (borrar sus miles de archivos en un disco
+   mecánico tardaba más de diez minutos) y vacía la caché de Delivery Optimization: una descarga rota
+   (`0x80240034`, `0x8024200D`) Windows la reintenta cada día, una hora con el disco al 100 %, y vuelve a fallar;
+   la laptop de prueba llevaba siete intentos de 26H2 en tres días. Para eso pide parar `wuauserv` con tope de un
+   minuto: `Stop-Service` espera sin fin si Windows Update está bajando algo (12 minutos de "Esperando a que se
+   detenga el servicio" en la laptop); si no para, sigue sin vaciar la caché. Solo `Download`, nunca `DataStore`,
+   que es el historial y el catálogo. Con la API COM de Windows
    (`Microsoft.Update.Session`, anda en Home, sin módulos) busca `IsInstalled=0 and IsHidden=0` e instala todo de
    a una: calidad, drivers, versiones nuevas. Afuera quedan solo las optativas que no son drivers (las acumulativas
    *preview* se instalarían dos veces); las que declaran que podrían preguntar algo (los drivers, casi siempre) se
@@ -722,10 +753,14 @@ fija; revisar *Load/Unload Cycle Count* con [CrystalDiskInfo](https://crystalmar
   parser oficial, sin ejecutarlos: `:ps` corre las secciones con `Invoke-Expression`, y una llave de más tira el paso
   entero sin que el resto se entere. Corre antes de publicar.
 
-Sin probar en Windows real: las opciones 2 y 3, y lo nuevo de octubre de 2026: el inicio de Windows
-(`StartupApproved`, tareas de inicio de la Store, servicios de fabricante), BitLocker, VBS, el menú clásico de
-Windows 11, el ID de uBlock Origin Lite en Edge, `PreventDeviceEncryption` en 24H2, la espera a `TiWorker` de la
-opción A y la instalación de actualizaciones con reinicios automáticos de la opción 2.
+Sin probar en Windows real: la opción 3, y lo nuevo de octubre de 2026: el inicio de Windows (`StartupApproved`,
+tareas de inicio de la Store, servicios de fabricante), BitLocker, VBS, el menú clásico de Windows 11, el ID de
+uBlock Origin Lite en Edge, `PreventDeviceEncryption` en 24H2, la desinstalación de Avast, AVG y CCleaner, y de la
+opción 2 la instalación de actualizaciones con reinicios automáticos. De la opción 2 sí se probó en la laptop i3
+(Windows 11 25H2, HDD): la tarea `onlogon` arranca al iniciar sesión, la caché se aparta, winget actualiza y
+`ResetBase` corre. **Por SSH no se puede probar Windows Update:** en una sesión de OpenSSH Windows niega las COM del
+descargador, el instalador y `SystemInfo` (`E_ACCESSDENIED`), aunque la búsqueda anda; se prueba en la sesión de
+consola, con una tarea programada `/it`.
 
 ## Prueba en VM (UTM)
 
