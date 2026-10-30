@@ -144,7 +144,7 @@ call :detectar
 ::    unos 3,2 GB y el video se queda con un pedazo): suspension a la hora,
 ::    tapa que suspende, Suspender en el menu y Bluetooth en Manual;
 ::  - eso y placa de video con driver: efectos visuales en "mejor apariencia";
-::  - disco del sistema SSD: indexador de busqueda de fabrica.
+::  - disco del sistema SSD y 4 GB o mas: indexador de busqueda de fabrica.
 
 :: -------------------------------------------------------------------------
 :: Presentacion
@@ -162,7 +162,7 @@ echo   Procesador: %CPU_NOMBRE%
 if not "%RAM_MB%"=="9999" echo   RAM: %RAM_MB% MB visibles, %RAM_INST% MB instalados. Disco del sistema: %DISCO_TIPO%.
 if "%PERFIL_4GB%"=="1" echo   Perfil 4 GB o mas: suspende a la hora y con la tapa, Bluetooth en Manual.
 if "%EFECTOS%"=="1" echo   Video con driver: efectos visuales en "mejor apariencia".
-if "%SSD%"=="1" echo   Disco SSD: indexador de busqueda como de fabrica.
+if "%BUSQUEDA%"=="1" echo   SSD y 4 GB o mas: indexador de busqueda como de fabrica.
 if "%OUTLOOK%"=="S" echo   Outlook nuevo: se uso en el ultimo ano, queda instalado.
 if "%ONEDRIVE%"=="S" (echo   OneDrive: en uso, queda como esta.) else (echo   OneDrive: sin cuenta o casi vacio, deja de arrancar con Windows.)
 if %RAM_MB% GEQ 1500 goto :ram_ok
@@ -295,8 +295,12 @@ call :asegurar lfsvc demand
 call :dword "%_mm%" DisablePagingExecutive 0
 call :dword "%_mm%\PrefetchParameters" EnablePrefetcher 3
 call :dword "%_mm%\PrefetchParameters" EnableSuperfetch 3
+:: Vaciar la paginacion al apagar lo activan algunos scripts de "privacidad": con
+:: 4 GB de paginacion, cada apagado escribe 4 GB en el disco.
+call :dword "%_mm%" ClearPageFileAtShutdown 0
 if "%_reparado%"=="0" echo   [OK] Nada perjudicial del v1: SysMain, teclado tactil, biometria y ubicacion.
-echo   [OK] DisablePagingExecutive y la precarga en sus valores de fabrica.
+echo   [OK] DisablePagingExecutive y la precarga en sus valores de fabrica; la
+echo        paginacion no se vacia al apagar.
 :: Compresion de memoria activa y sin precarga de apps UWP en RAM.
 sc start SysMain >nul 2>&1
 powershell -NoProfile -ExecutionPolicy Bypass -Command "Enable-MMAgent -MemoryCompression -ErrorAction SilentlyContinue; Disable-MMAgent -ApplicationPreLaunch -ErrorAction SilentlyContinue" >nul 2>&1
@@ -309,10 +313,12 @@ call :titulo "3/11  Servicios: Manual siempre que se pueda"
 for %%s in (DiagTrack dmwappushservice RemoteRegistry) do call :servicio %%s disabled
 for %%s in (XblAuthManager XblGameSave XboxNetApiSvc XboxGipSvc xbgm) do call :servicio %%s disabled
 echo   [OK] Deshabilitados: telemetria, Xbox y Registro remoto.
-:: Indexador de busqueda: en un disco mecanico lee y relee el disco; en un SSD
-:: no molesta y queda como de fabrica.
-if "%SSD%"=="1" (call :servicio WSearch delayed-auto) else (call :servicio WSearch disabled)
-if "%SSD%"=="1" (echo   [OK] Indexador de busqueda: como de fabrica, el disco es SSD.) else (echo   [OK] Indexador de busqueda: deshabilitado, castiga al disco mecanico.)
+:: Indexador de busqueda: en un disco mecanico lee y relee el disco, y su proceso
+:: se queda con 50 a 100 MB. Queda como de fabrica solo con SSD y 4 GB o mas.
+set "_ws=disabled"
+if "%BUSQUEDA%"=="1" set "_ws=delayed-auto"
+call :servicio WSearch %_ws%
+if "%BUSQUEDA%"=="1" (echo   [OK] Indexador de busqueda: como de fabrica, hay SSD y 4 GB o mas.) else (echo   [OK] Indexador de busqueda: deshabilitado; castiga al disco mecanico o gasta RAM que no sobra.)
 :: Bluetooth: con 4 GB o mas queda en Manual, su valor de fabrica (sin adaptador
 :: no gasta nada); con menos, deshabilitado.
 set "_bt=disabled"
@@ -391,9 +397,19 @@ call :dword "%_pol%\WindowsAI" AllowRecallEnablement 0
 call :dword "%_pol%\WindowsAI" DisableClickToDo 1
 :: Widgets de Windows 11, el equivalente de Noticias e intereses (EnableFeeds).
 call :dword "HKLM\SOFTWARE\Policies\Microsoft\Dsh" AllowNewsAndInterests 0
+:: Recoleccion de compatibilidad (CompatTelRunner, el que deja el disco al tope): el paso 4
+:: desactiva su tarea, pero Windows Update la vuelve a activar. Con estas politicas,
+:: aunque corra, no tiene nada que recolectar.
+call :dword "%_pol%\AppCompat" DisableInventory 1
+call :dword "%_pol%\AppCompat" AITEnable 0
+:: Experiencias compartidas y Vincular al telefono (en Windows 11, CrossDeviceService):
+:: buscan celulares por Bluetooth y por la red todo el tiempo.
+call :dword "%_pol%\System" EnableCdp 0
+call :dword "%_pol%\System" EnableMmx 0
 echo   [OK] Telemetria al minimo, sin Noticias e intereses, sin Cortana ni destacados,
 echo        sin barra de juegos, sin P2P de actualizaciones ni informe de errores.
 echo   [OK] Copilot y la IA de Windows apagados por politica (Recall y Click to Do incluidos).
+echo   [OK] Sin recoleccion de compatibilidad ni busqueda de celulares (Vincular al telefono).
 
 :: Ajustes del usuario de la sesion
 set "_cdm=%UHIVE%\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager"
@@ -410,11 +426,17 @@ call :dword "%UHIVE%\System\GameConfigStore" GameDVR_Enabled 0
 call :dword "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\GameDVR" AppCaptureEnabled 0
 echo   [OK] Sin apps sugeridas, instalaciones silenciosas, consejos ni resultados web.
 
-:: Apps en segundo plano: todas apagadas con el interruptor general. Contra: la
-:: busqueda del Inicio puede tardar en encontrar las apps recien instaladas.
-call :dword "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications" GlobalUserDisabled 1
-call :dword "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Search" BackgroundAppGlobalToggle 0
-echo   [OK] Apps en segundo plano: todas apagadas con el interruptor general.
+:: Apps en segundo plano: con menos de 4 GB, todas apagadas con el interruptor
+:: general. Contras: los avisos de las apps cerradas (WhatsApp de la Store) no
+:: llegan, y el Inicio puede tardar en encontrar las apps recien instaladas. Con
+:: 4 GB o mas, como de fabrica: ahi pesan mas los avisos que esos MB.
+set "_bg=1"
+set "_bgt=0"
+if "%PERFIL_4GB%"=="1" set "_bg=0"
+if "%PERFIL_4GB%"=="1" set "_bgt=1"
+call :dword "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications" GlobalUserDisabled %_bg%
+call :dword "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Search" BackgroundAppGlobalToggle %_bgt%
+if "%_bg%"=="1" (echo   [OK] Apps en segundo plano: todas apagadas con el interruptor general.) else (echo   [OK] Apps en segundo plano: como de fabrica, hay 4 GB o mas.)
 :: Microsoft Store: las apps se actualizan a mano, abriendola. Desde 2025 la Store
 :: solo deja pausar de 1 a 5 semanas; la politica de equipo "Desactivar la descarga
 :: e instalacion automatica de actualizaciones" sigue mandando. Va tambien el valor
@@ -496,6 +518,13 @@ call :dword "%_adv%" TaskbarGlomLevel 1
 call :dword "%_adv%" IsEnabled 0
 echo   [OK] Barra de tareas: sin busqueda, Cortana, Copilot, Vista de tareas ni Reanudar;
 echo        muestra el nombre de cada ventana hasta que se llena.
+:: Windows 11 con 2 GB: el menu del boton derecho nuevo lo dibuja XAML y tarda en
+:: aparecer; vuelve el clasico, completo. Con mas RAM queda el nuevo.
+if %BUILD% LSS 22000 goto :menu_clasico_listo
+if %RAM_INST% GTR 2048 goto :menu_clasico_listo
+reg add "%UCLS%\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32" /ve /t REG_SZ /d "" /f >nul 2>&1
+echo   [OK] Windows 11 con 2 GB: menu del boton derecho clasico, sin "Mostrar mas opciones".
+:menu_clasico_listo
 :: Sin deteccion automatica del tipo de carpeta (tweak de WinUtil).
 reg delete "%UCLS%\Local Settings\Software\Microsoft\Windows\Shell\BagMRU" /f >nul 2>&1
 reg delete "%UCLS%\Local Settings\Software\Microsoft\Windows\Shell\Bags" /f >nul 2>&1
@@ -520,8 +549,28 @@ fsutil behavior set DisableLastAccess 1 >nul 2>&1
 fsutil behavior set Disable8dot3 1 >nul 2>&1
 echo   [OK] NTFS sin registro de ultimo acceso ni nombres cortos 8.3.
 
-:: Archivo de paginacion, cache de escritura del disco, CompactOS y Restaurar
-:: sistema, en la seccion DISCO.
+:: VBS e integridad de memoria (HVCI): Windows corre adentro de un hipervisor y
+:: cada acceso a memoria paga ese peaje. Sin MBEC en el procesador (Intel anterior
+:: a Kaby Lake, AMD anterior a Zen 2) se emula y cuesta mucho mas. Microsoft solo
+:: lo enciende de fabrica con MBEC, 8 GB y SSD: la misma regla, al reves. Si la PC
+:: no la cumple, se apaga; si la cumple, queda, porque es seguridad real.
+if not "%VBS%"=="1" goto :vbs_listo
+set "_vbs=0"
+if not "%MBEC%"=="1" set "_vbs=1"
+if %RAM_INST% LSS 8192 set "_vbs=1"
+if not "%SSD%"=="1" set "_vbs=1"
+if "%_vbs%"=="0" echo   [OK] VBS e integridad de memoria: quedan, la PC tiene MBEC, 8 GB y SSD.
+if "%_vbs%"=="0" goto :vbs_listo
+if "%VBS_LOCK%"=="1" echo   [AVISO] VBS corriendo y bloqueada desde UEFI: no se puede apagar desde aca.
+if "%VBS_LOCK%"=="1" goto :vbs_listo
+call :dword "HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity" Enabled 0
+call :dword "HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard" EnableVirtualizationBasedSecurity 0
+echo   [OK] VBS e integridad de memoria apagadas, rige al reiniciar: sin MBEC, con menos
+echo        de 8 GB o con disco mecanico, Microsoft tampoco las enciende de fabrica.
+:vbs_listo
+
+:: Archivo de paginacion, cache de escritura del disco, CompactOS, Restaurar
+:: sistema, BitLocker y almacenamiento reservado, en la seccion DISCO.
 call :ps DISCO
 
 :: Energia: la prioridad es la velocidad, no el ahorro. Se aplica a los tres
@@ -577,18 +626,26 @@ set "_edge=HKLM\SOFTWARE\Policies\Microsoft\Edge"
 for %%v in (StartupBoostEnabled BackgroundModeEnabled HubsSidebarEnabled WebWidgetAllowed ShowRecommendationsEnabled EdgeShoppingAssistantEnabled ShowMicrosoftRewards PersonalizationReportingEnabled DiagnosticData UserFeedbackAllowed) do call :dword "%_edge%" %%v 0
 call :dword "%_edge%" HideFirstRunExperience 1
 call :dword "%_edge%\Recommended" SleepingTabsEnabled 1
-call :dword "%_edge%\Recommended" SleepingTabsTimeout 300
+:: Pestanas en suspension: a los 5 minutos con menos de 4 GB; con 4 GB o mas, a la
+:: media hora, que despertarlas en un procesador lento tambien cuesta.
+set "_tabs=300"
+if "%PERFIL_4GB%"=="1" set "_tabs=1800"
+call :dword "%_edge%\Recommended" SleepingTabsTimeout %_tabs%
 call :dword "HKLM\SOFTWARE\Policies\Microsoft\EdgeUpdate" CreateDesktopShortcutDefault 0
 call :dword "HKLM\SOFTWARE\Policies\Google\Chrome" BackgroundModeEnabled 0
 :: Con StartupBoostEnabled en 0, Edge se saca solo del inicio, pero recien la proxima
 :: vez que arranca: el script terminaba mostrandolo todavia en el inicio.
 for /f %%v in ('reg query "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Run" 2^>nul ^| findstr /i /c:"MicrosoftEdgeAutoLaunch_"') do reg delete "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Run" /v %%v /f >nul 2>&1
-echo   [OK] Edge: sin precarga, sin quedar de fondo, sin barra lateral; pestanas
-echo        en suspension a los 5 minutos. Chrome: sin quedar de fondo.
+echo   [OK] Edge: sin precarga, sin quedar de fondo, sin barra lateral; pestanas en
+echo        suspension a los 5 minutos (media hora con 4 GB o mas). Chrome: sin quedar de fondo.
 echo        Van a decir "Administrado por tu organizacion": es normal.
+:: uBlock Origin Lite en Chrome y en Edge, forzada por politica: en un Atom, lo que
+:: traba una pagina es el JavaScript de los avisos. Si el navegador no esta, la
+:: politica queda esperando a que se instale.
+call :politica_ublock
 
 :: =========================================================================
-call :titulo "10/11  Opcionales, clasicos de Windows 7 y Adobe Reader"
+call :titulo "10/11  Inicio de Windows, apps, clasicos de Windows 7 y Adobe Reader"
 :: =========================================================================
 if "%ONEDRIVE%"=="S" goto :onedrive_listo
 reg delete "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Run" /v OneDrive /f >nul 2>&1
@@ -597,6 +654,12 @@ taskkill /f /im OneDrive.exe >nul 2>&1
 for %%t in ("OneDrive Reporting Task" "OneDrive Standalone Update Task") do schtasks /change /tn "%%~t-%USID%" /disable >nul 2>&1
 echo   [OK] OneDrive ya no arranca con Windows ni se actualiza solo. No se desinstalo.
 :onedrive_listo
+:: Lo que arranca solo sin que nadie lo pida: actualizadores, bandejas de drivers,
+:: "optimizadores", torrents, lanzadores de juegos, mensajeros, nubes vacias y
+:: servicios de fabricante (seccion ARRANQUE). Se desactivan como en el
+:: Administrador de tareas: siguen instalados y abren a mano.
+set "ARRANQUE_MODO="
+call :ps ARRANQUE
 :: Visualizador de fotos de Windows, el de Windows 7: sigue instalado, pero
 :: Windows 10 le saco las fotos comunes. Se le devuelven con su nombre y su
 :: icono de siempre, y se registra en "Abrir con" y en Aplicaciones predeterminadas.
@@ -669,8 +732,9 @@ echo.
 echo ==========================================================================
 echo   LISTO. Hay que REINICIAR la PC para aplicar todo.
 echo.
-if "%SSD%"=="1" goto :fin_busqueda_listo
-echo   Para buscar archivos: Windows Search queda apagado porque castiga el disco.
+if "%BUSQUEDA%"=="1" goto :fin_busqueda_listo
+echo   Para buscar archivos: Windows Search queda apagado (castiga el disco mecanico
+echo   o gasta RAM que no sobra).
 echo   La opcion 4 instala Everything, que encuentra cualquier archivo al instante.
 echo.
 :fin_busqueda_listo
@@ -888,7 +952,7 @@ echo.
 echo   Vuelve a fabrica: servicios, apps en segundo plano, efectos visuales,
 echo   Explorador, energia, navegadores, recortes de Defender, tareas, cache de
 echo   escritura del disco y el actualizador de Adobe Reader.
-echo   NO apaga la seguridad ni vuelve a encender la telemetria.
+echo   NO apaga la seguridad, no enciende la telemetria ni vuelve a cifrar con BitLocker.
 echo.
 choice /c SN /n /m "  Continuar? [S/N]: "
 if errorlevel 2 goto :menu
@@ -928,6 +992,8 @@ call :borrar "%_pol%\Windows Error Reporting" Disabled
 call :borrar "%_pol%\DeliveryOptimization" DODownloadMode
 call :borrar "%_pol%\Device Metadata" PreventDeviceMetadataFromNetwork
 call :borrar "%UHIVE%\Software\Policies\Microsoft\Windows\Explorer" DisableSearchBoxSuggestions
+for %%v in (DisableInventory AITEnable) do call :borrar "%_pol%\AppCompat" %%v
+for %%v in (EnableCdp EnableMmx) do call :borrar "%_pol%\System" %%v
 powershell -NoProfile -ExecutionPolicy Bypass -Command "Enable-MMAgent -ApplicationPreLaunch -ErrorAction SilentlyContinue; $b='%UPS%\Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications'; Get-ChildItem -LiteralPath $b -ErrorAction SilentlyContinue | ForEach-Object { Remove-ItemProperty -LiteralPath $_.PSPath -Name Disabled,DisabledByUser -ErrorAction SilentlyContinue }" >nul 2>&1
 call :borrar "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications" GlobalUserDisabled
 call :borrar "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Search" BackgroundAppGlobalToggle
@@ -962,8 +1028,9 @@ call :borrar "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Explorer" AltTab
 call :borrar "HKLM\SOFTWARE\Policies\Microsoft\Windows\System" DisableAcrylicBackgroundOnLogon
 reg delete "%UCLS%\Local Settings\Software\Microsoft\Windows\Shell\BagMRU" /f >nul 2>&1
 reg delete "%UCLS%\Local Settings\Software\Microsoft\Windows\Shell\Bags" /f >nul 2>&1
-echo   [OK] Efectos visuales, desenfoque al iniciar sesion, menus, animaciones, Alt+Tab
-echo        y Explorador como de fabrica.
+reg delete "%UCLS%\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}" /f >nul 2>&1
+echo   [OK] Efectos visuales, desenfoque al iniciar sesion, menus, animaciones, Alt+Tab,
+echo        Explorador y menu del boton derecho como de fabrica.
 
 call :titulo "Cache de escritura del disco"
 :: Sin PowerShell: el disco ya lo identifico EQUIPO. Fuera de un bloque con
@@ -1000,10 +1067,19 @@ call :borrar "%_edge%\Recommended" SleepingTabsTimeout
 call :borrar "HKLM\SOFTWARE\Policies\Microsoft\EdgeUpdate" CreateDesktopShortcutDefault
 call :borrar "HKLM\SOFTWARE\Policies\Google\Chrome" BackgroundModeEnabled
 for %%v in (BrowserSignin BrowserAddPersonEnabled PromotionalTabsEnabled PrivacySandboxPromptEnabled DefaultBrowserSettingEnabled) do call :borrar "HKLM\SOFTWARE\Policies\Google\Chrome" %%v
-echo   [OK] Politicas de Edge y Chrome quitadas, incluidas las de Chrome de aula.
+:: uBlock Origin Lite deja de ser obligatoria: queda instalada y cada uno la quita.
+powershell -NoProfile -ExecutionPolicy Bypass -Command "foreach ($p in @(@('HKLM:\SOFTWARE\Policies\Google\Chrome\ExtensionInstallForcelist','ddkjiahejlhfcafbddmgiahcphecmpfh'), @('HKLM:\SOFTWARE\Policies\Microsoft\Edge\ExtensionInstallForcelist','cimighlppcgcoapaliogpjjdehbnofhn'))) { $i=Get-Item -LiteralPath $p[0] -ErrorAction SilentlyContinue; if ($i) { foreach ($v in $i.Property) { if ([string]$i.GetValue($v) -like ($p[1] + '*')) { Remove-ItemProperty -LiteralPath $p[0] -Name $v -ErrorAction SilentlyContinue } } } }" >nul 2>&1
+echo   [OK] Politicas de Edge y Chrome quitadas, incluidas las de Chrome de aula y la que
+echo        obliga a tener uBlock Origin Lite (queda instalada; se quita desde Extensiones).
 
 call :titulo "Adobe Reader"
 powershell -NoProfile -ExecutionPolicy Bypass -Command "if (-not (Get-Service -Name AdobeARMservice -ErrorAction SilentlyContinue)) { Write-Output '  Adobe Reader no esta instalado: nada que revertir.'; exit 0 }; Set-Service -Name AdobeARMservice -StartupType Automatic -ErrorAction SilentlyContinue; Start-Service -Name AdobeARMservice -ErrorAction SilentlyContinue; Get-ScheduledTask -TaskName 'Adobe Acrobat Update Task*' -ErrorAction SilentlyContinue | Enable-ScheduledTask -ErrorAction SilentlyContinue | Out-Null; Write-Output '  [OK] Adobe Reader: actualizacion automatica activada otra vez.'; Write-Output '       Las entradas de inicio viejas no vuelven: Reader no las necesita.'"
+
+call :titulo "Programas de inicio"
+:: Vuelven a arrancar los que la opcion 1 saco (seccion ARRANQUE, al reves).
+set "ARRANQUE_MODO=volver"
+call :ps ARRANQUE
+set "ARRANQUE_MODO="
 
 :: OneDrive vuelve al inicio recien cuando se lo abre; sus tareas, ya.
 for %%t in ("OneDrive Reporting Task" "OneDrive Standalone Update Task") do schtasks /change /tn "%%~t-%USID%" /enable >nul 2>&1
@@ -1011,6 +1087,10 @@ for %%t in ("OneDrive Reporting Task" "OneDrive Standalone Update Task") do scht
 echo.
 echo   Para recuperar lo que no se revierte solo:
 echo    - OneDrive: abrilo una vez y vuelve a arrancar con Windows.
+echo    - BitLocker: no se vuelve a cifrar. Si hace falta, Panel de control, Cifrado de
+echo      unidad BitLocker, y guardar la clave de recuperacion en un lugar seguro.
+echo    - VBS e integridad de memoria: Seguridad de Windows, Seguridad del dispositivo,
+echo      Aislamiento del nucleo.
 echo    - Apps quitadas: se reinstalan gratis desde la Microsoft Store.
 echo    - Caracteristicas opcionales: Configuracion, Aplicaciones, Caracteristicas
 echo      opcionales, Agregar una caracteristica.
@@ -1103,10 +1183,11 @@ goto :menu
 ::  SUBRUTINAS
 :: =========================================================================
 
-:: uBlock Origin Lite forzada en Chrome (ExtensionInstallForcelist): Chrome la
-:: instala sola desde la Chrome Web Store. Si ya esta en la lista, no la repite.
+:: uBlock Origin Lite forzada en Chrome y en Edge (ExtensionInstallForcelist): cada
+:: navegador la instala solo desde su tienda (Chrome, con la URL de la Web Store; Edge,
+:: con su ID en la tienda de Edge y sin URL). Si ya esta en la lista, no la repite.
 :politica_ublock
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$k='HKLM:\SOFTWARE\Policies\Google\Chrome\ExtensionInstallForcelist'; $id='ddkjiahejlhfcafbddmgiahcphecmpfh'; if (-not (Test-Path -LiteralPath $k)) { New-Item -Path $k -Force | Out-Null }; $ya=$false; $n=1; foreach ($v in (Get-ItemProperty -LiteralPath $k).PSObject.Properties) { if ($v.Name -match '^[0-9]+$') { if ([string]$v.Value -like ($id + '*')) { $ya=$true }; if ([int]$v.Name -ge $n) { $n=[int]$v.Name + 1 } } }; if (-not $ya) { New-ItemProperty -LiteralPath $k -Name ([string]$n) -Value ($id + ';https://clients2.google.com/service/update2/crx') -PropertyType String -Force | Out-Null }; Write-Output '  [OK] uBlock Origin Lite: Chrome la instala sola desde la Chrome Web Store.'"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "foreach ($p in @(@('HKLM:\SOFTWARE\Policies\Google\Chrome\ExtensionInstallForcelist','ddkjiahejlhfcafbddmgiahcphecmpfh;https://clients2.google.com/service/update2/crx'), @('HKLM:\SOFTWARE\Policies\Microsoft\Edge\ExtensionInstallForcelist','cimighlppcgcoapaliogpjjdehbnofhn'))) { $k=$p[0]; $id=$p[1].Split(';')[0]; if (-not (Test-Path -LiteralPath $k)) { New-Item -Path $k -Force | Out-Null }; $ya=$false; $n=1; foreach ($v in (Get-ItemProperty -LiteralPath $k).PSObject.Properties) { if ($v.Name -match '^[0-9]+$') { if ([string]$v.Value -like ($id + '*')) { $ya=$true }; if ([int]$v.Name -ge $n) { $n=[int]$v.Name + 1 } } }; if (-not $ya) { New-ItemProperty -LiteralPath $k -Name ([string]$n) -Value $p[1] -PropertyType String -Force | Out-Null } }; Write-Output '  [OK] uBlock Origin Lite: Chrome y Edge la instalan solos desde sus tiendas.'"
 goto :eof
 
 :titulo
@@ -1270,6 +1351,10 @@ set "DISCO_PNP="
 set "CPU_NOMBRE=desconocido"
 set "ONEDRIVE=S"
 set "OUTLOOK=S"
+set "VBS=0"
+set "HVCI=0"
+set "MBEC=0"
+set "VBS_LOCK=0"
 :: Cada linea de EQUIPO es VARIABLE=valor. Esta lee la salida, asi que no puede
 :: usar :ps; los marcadores van partidos para que IndexOf no la encuentre a ella.
 for /f "usebackq delims=" %%l in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "$t=[IO.File]::ReadAllText($env:OPT_RUTA); $i=$t.IndexOf('#EQUIPO-' + 'INICIO#'); $j=$t.IndexOf('#EQUIPO-' + 'FIN#'); if ($i -ge 0 -and $j -gt $i) { Invoke-Expression $t.Substring($i, $j - $i) }"`) do set "%%l"
@@ -1280,6 +1365,8 @@ set "EFECTOS=0"
 if "%PERFIL_4GB%"=="1" if not "%GPU_BASICA%"=="1" set "EFECTOS=1"
 set "SSD=0"
 if /i "%DISCO_TIPO%"=="SSD" set "SSD=1"
+set "BUSQUEDA=0"
+if "%SSD%"=="1" if "%PERFIL_4GB%"=="1" set "BUSQUEDA=1"
 goto :eof
 
 :: Busca winget y deja como llamarlo en WINGET. Prueba que responda, no solo que
@@ -1363,6 +1450,7 @@ goto :eof
 ::     (paso 10 de la opcion 1).
 ::   - LIMPIEZA: vaciado de temporales (paso 11 de la opcion 1).
 ::   - FINAL: estado de Defender e inicio de Windows (final de la opcion 1).
+::   - ARRANQUE: lo que arranca solo con Windows (paso 10 de la opcion 1 y opcion 6).
 ::   - VERIFICAR: el reporte de la opcion 7.
 ::   - LUZ: luz nocturna del anochecer al amanecer (paso 7 de la opcion 1).
 ::   - AULA: borrado de perfiles de Chrome (opcion 5).
@@ -1449,9 +1537,26 @@ if ($null -ne $n) {
     if ($w.PNPDeviceID) { 'DISCO_PNP=' + $w.PNPDeviceID }
 }
 'CPU_NOMBRE=' + ((Get-CimInstance Win32_Processor | Select-Object -First 1).Name -replace '\s+', ' ').Trim()
+# VBS e integridad de memoria (HVCI): si corren, si el procesador tiene MBEC (7 en
+# las propiedades disponibles; es lo que las hace baratas) y si UEFI las bloquea.
+$vbs = 0; $hvci = 0; $mbec = 0; $lock = 0
+$dg = Get-CimInstance -Namespace root\Microsoft\Windows\DeviceGuard -ClassName Win32_DeviceGuard
+if ($dg) {
+    if ($dg.VirtualizationBasedSecurityStatus -eq 2) { $vbs = 1 }
+    if (@($dg.SecurityServicesRunning) -contains 2) { $hvci = 1 }
+    if (@($dg.AvailableSecurityProperties) -contains 7) { $mbec = 1 }
+}
+foreach ($k in 'HKLM:\SYSTEM\CurrentControlSet\Control\DeviceGuard', 'HKLM:\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity') {
+    if ((Get-ItemProperty -LiteralPath $k).Locked -eq 1) { $lock = 1 }
+}
+'VBS=' + $vbs
+'HVCI=' + $hvci
+'MBEC=' + $mbec
+'VBS_LOCK=' + $lock
 #EQUIPO-FIN#
 #DISCO-INICIO#
-# Paso 8 de la opcion 1. Usa RAM_INST, DISCO_TIPO y DISCO_PNP de la seccion EQUIPO.
+# Paso 8 de la opcion 1: paginacion, cache de escritura, CompactOS, Restaurar sistema,
+# BitLocker y almacenamiento reservado. Usa RAM_INST, DISCO_TIPO y DISCO_PNP de EQUIPO.
 $cs = Get-CimInstance Win32_ComputerSystem
 $nombre = $env:SystemDrive + '\pagefile.sys'
 # Sin archivo de paginacion, con 2 GB de RAM los programas se cuelgan: si alguien
@@ -1536,6 +1641,40 @@ try {
 } catch {
     Write-Output '  [AVISO] No se pudo desactivar Restaurar sistema. Se puede a mano en Propiedades'
     Write-Output '          del sistema, Proteccion del sistema, Configurar.'
+}
+# BitLocker: siempre apagado. Windows 11 lo enciende solo al entrar con cuenta
+# Microsoft, sin que nadie guarde la clave de recuperacion: cuando el disco falla o
+# se cambia de PC, los datos se pierden. Y sin AES-NI (Atom, Core 2, Pentium y
+# Celeron hasta 2016) cifra por software cada lectura y escritura. Descifrar tarda
+# horas en un disco grande, sigue solo en segundo plano y continua tras reiniciar.
+# Primero los discos de datos: el del sistema guarda las claves de los otros y no
+# se deja descifrar antes.
+$ns = 'root\CIMV2\Security\MicrosoftVolumeEncryption'
+$vols = @(Get-CimInstance -Namespace $ns -ClassName Win32_EncryptableVolume | Where-Object { $_.DriveLetter -and $_.ConversionStatus -ne 0 } | Sort-Object { $_.DriveLetter -eq $env:SystemDrive })
+if (-not $vols.Count) { Write-Output '  [OK] BitLocker: ningun disco cifrado.' }
+foreach ($v in $vols) {
+    # ConversionStatus: 0 descifrado, 1 cifrado, 2 cifrando, 3 descifrando, 4 y 5 en pausa.
+    if ($v.ConversionStatus -eq 3) { Write-Output ('  BitLocker en ' + $v.DriveLetter + ' ya se esta descifrando.'); continue }
+    manage-bde.exe -off $v.DriveLetter 2>&1 | Out-Null
+    $v2 = Get-CimInstance -Namespace $ns -ClassName Win32_EncryptableVolume | Where-Object { $_.DriveLetter -eq $v.DriveLetter }
+    if ($v2.ConversionStatus -eq 0 -or $v2.ConversionStatus -eq 3) {
+        Write-Output ('  [OK] BitLocker en ' + $v.DriveLetter + ': descifrando en segundo plano. Horas en un disco grande; sigue solo aunque se reinicie.')
+    } else {
+        Write-Output ('  [AVISO] BitLocker en ' + $v.DriveLetter + ' no se pudo apagar: "manage-bde -status ' + $v.DriveLetter + '" dice por que.')
+    }
+}
+# Que Windows no vuelva a cifrar solo: es lo que hace al entrar con cuenta Microsoft.
+$kb = 'Registry::HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\BitLocker'
+if (-not (Test-Path -LiteralPath $kb)) { New-Item -Path $kb -Force | Out-Null }
+Set-ItemProperty -LiteralPath $kb -Name PreventDeviceEncryption -Value 1 -Type DWord
+Write-Output '  [OK] Windows ya no cifra el disco solo al entrar con cuenta Microsoft.'
+# Almacenamiento reservado: 7 GB que Windows guarda para sus actualizaciones. Con
+# menos del 15 % libre el disco se fragmenta y la paginacion no entra: se liberan.
+$vol = Get-PSDrive -Name $env:SystemDrive.Substring(0, 1)
+if ($vol -and ($vol.Free + $vol.Used) -gt 0 -and ($vol.Free * 100 / ($vol.Free + $vol.Used)) -lt 15) {
+    DISM.exe /Online /Set-ReservedStorageState /State:Disabled 2>&1 | Out-Null
+    if ($LASTEXITCODE -eq 0) { Write-Output '  [OK] Menos del 15 % libre: almacenamiento reservado de Windows desactivado, libera hasta 7 GB.' }
+    else { Write-Output '  [AVISO] Menos del 15 % libre, pero el almacenamiento reservado no se pudo desactivar (hay una actualizacion pendiente?).' }
 }
 #DISCO-FIN#
 #QUITAR-INICIO#
@@ -1695,7 +1834,152 @@ foreach ($k in $ks) {
         }
     }
 }
+Write-Output ''
+Write-Output '  Corriendo ahora fuera de C:\Windows, en MB privados: lo que arranca solo o'
+Write-Output '  quedo abierto. Si algo sobra: Administrador de tareas, pestana Inicio.'
+$win = $env:SystemRoot.TrimEnd('\') + '\'
+Get-Process | Where-Object { $_.Path -and -not $_.Path.StartsWith($win, [StringComparison]::OrdinalIgnoreCase) } | Group-Object Name | ForEach-Object {
+    New-Object psobject -Property @{ N = $_.Name; MB = [math]::Round(($_.Group | Measure-Object PrivateMemorySize64 -Sum).Sum / 1MB); C = $_.Count }
+} | Sort-Object MB -Descending | Select-Object -First 15 | ForEach-Object {
+    $x = ''; if ($_.C -gt 1) { $x = ' (x' + $_.C + ')' }
+    Write-Output ('    ' + ([string]$_.MB).PadLeft(5) + ' MB  ' + $_.N + $x)
+}
+# BitLocker en marcha (3 descifrando, 5 en pausa): que se sepa que sigue solo.
+Get-CimInstance -Namespace root\CIMV2\Security\MicrosoftVolumeEncryption -ClassName Win32_EncryptableVolume | Where-Object { $_.DriveLetter -and $_.ConversionStatus -ne 0 } | ForEach-Object {
+    $c = Invoke-CimMethod -InputObject $_ -MethodName GetConversionStatus
+    if ($_.ConversionStatus -eq 3 -or $_.ConversionStatus -eq 5) { Write-Output ('  BitLocker en ' + $_.DriveLetter + ': descifrando en segundo plano, queda el ' + $c.EncryptionPercentage + ' %. Se puede reiniciar: sigue solo.') }
+    else { Write-Output ('  AVISO: BitLocker en ' + $_.DriveLetter + ' sigue cifrado. "manage-bde -status ' + $_.DriveLetter + '" dice por que no se apago.') }
+}
 #FINAL-FIN#
+#ARRANQUE-INICIO#
+# Paso 10 de la opcion 1; con ARRANQUE_MODO=volver, la opcion 6. Lo que arranca con
+# Windows sin que nadie lo pida. Se desactiva igual que en el Administrador de
+# tareas (StartupApproved, primer byte 03): el programa sigue instalado, abre a mano
+# y en Administrador de tareas > Inicio se reactiva con un clic. No se borra nada.
+$ErrorActionPreference = 'SilentlyContinue'
+$volver = ($env:ARRANQUE_MODO -eq 'volver')
+$perfil = $env:USERPROFILE
+if ($env:USID) { $lp = (Get-CimInstance Win32_UserProfile | Where-Object { $_.SID -eq $env:USID }).LocalPath; if ($lp) { $perfil = $lp } }
+# Actualizadores, bandejas de drivers, "optimizadores", torrents, lanzadores de
+# juegos y mensajeros: ninguno hace falta al iniciar sesion. Que Spotify o WhatsApp
+# arranquen solos no lo pidio nadie: se abren cuando se usan. Fuera de la lista: el
+# acceso remoto, los monitores de impresora, los antivirus y las nubes en uso.
+$patron = 'jusched|SunJavaUpdateSched|iTunesHelper|QuickTime Task|APSDaemon|igfxtray|hkcmd|igfxpers|HotKeysCmds|\bPersistence\b|RTHDVCPL|RtHDVBg|RAVCpl64|RtkNGUI|CCleaner|IObit|Driver Booster|Advanced SystemCare|uTorrent|BitTorrent|EpsonCustomerParticipation|EPSON Customer Research|Logitech Download Assistant|KiesTrayAgent|Wondershare|\bSteam\b|EpicGamesLauncher|\bSpotify\b|\bSkype\b|\bDiscord\b|\bWhatsApp\b|\bTelegram\b|\bZoom\b'
+# Nubes: se quedan si se usan. Dropbox, con el criterio de OneDrive: mas de 3 archivos
+# en su carpeta (sin su cache). Google Drive no guarda los archivos en una carpeta que
+# se pueda contar: se queda si hay una cuenta iniciada (carpeta numerica en DriveFS).
+$dbx = 0
+foreach ($r in 'AppData\Roaming\Dropbox\info.json', 'AppData\Local\Dropbox\info.json') {
+    $j = Join-Path $perfil $r
+    if (-not [IO.File]::Exists($j)) { continue }
+    $info = Get-Content -LiteralPath $j -Raw | ConvertFrom-Json
+    foreach ($cuenta in 'personal', 'business') {
+        $c = [string]$info.$cuenta.path
+        if (-not $c -or -not [IO.Directory]::Exists($c)) { continue }
+        try { foreach ($f in [IO.Directory]::EnumerateFiles($c, '*', 'AllDirectories')) { if ($f -notmatch '\\\.dropbox' -and [IO.Path]::GetFileName($f) -ne 'desktop.ini') { $dbx++; if ($dbx -gt 3) { break } } } } catch { }
+    }
+}
+$drive = @(Get-ChildItem -LiteralPath (Join-Path $perfil 'AppData\Local\Google\DriveFS') -Directory | Where-Object { $_.Name -match '^\d+$' }).Count
+if ($dbx -le 3) { $patron += '|\bDropbox\b' }
+if (-not $drive) { $patron += '|GoogleDriveFS|Google Drive' }
+function Nota([string]$texto) {
+    if ($volver) { return '' }
+    if ($texto -match 'Dropbox') { return ' (3 archivos o menos en su carpeta: no se usa)' }
+    if ($texto -match 'GoogleDriveFS|Google Drive') { return ' (sin cuenta iniciada)' }
+    return ''
+}
+# Primer byte 02 activo, 03 desactivado; los otros 8 son la fecha (FILETIME).
+function Estado([string]$clave, [string]$valor) {
+    $it = Get-Item -LiteralPath $clave
+    if (-not $it) { return 2 }
+    $d = $it.GetValue($valor)
+    if ($d -is [byte[]] -and $d.Length) { return [int]$d[0] }
+    return 2
+}
+function Marcar([string]$clave, [string]$valor) {
+    $b = New-Object byte[] 12
+    if ($volver) { $b[0] = 2 } else { $b[0] = 3; [BitConverter]::GetBytes([DateTime]::Now.ToFileTime()).CopyTo($b, 4) }
+    if (-not (Test-Path -LiteralPath $clave)) { New-Item -Path $clave -Force | Out-Null }
+    Set-ItemProperty -LiteralPath $clave -Name $valor -Value $b -Type Binary
+}
+# Con volver: solo lo que esta en 03 vuelve a 02; al desactivar, lo que ya esta en 03 se saltea.
+function Toca([int]$estado) { if ($volver) { return ($estado -eq 3) } else { return ($estado -ne 3) } }
+if ($volver) { Write-Output '  Vuelven al inicio de Windows los programas que saco la opcion 1...' }
+else { Write-Output '  Sacando del inicio de Windows lo que arranca solo sin que nadie lo pida...' }
+$n = 0
+$apr = 'Microsoft\Windows\CurrentVersion\Explorer\StartupApproved'
+$hklm = 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\'
+$fuentes = @(
+    @(($hklm + 'Microsoft\Windows\CurrentVersion\Run'), ($hklm + $apr + '\Run')),
+    @(($hklm + 'WOW6432Node\Microsoft\Windows\CurrentVersion\Run'), ($hklm + $apr + '\Run32')),
+    @(($env:UPS + '\Software\Microsoft\Windows\CurrentVersion\Run'), ($env:UPS + '\Software\' + $apr + '\Run'))
+)
+foreach ($par in $fuentes) {
+    $it = Get-Item -LiteralPath $par[0]
+    if (-not $it) { continue }
+    foreach ($v in $it.Property) {
+        $texto = $v + ' ' + [string]$it.GetValue($v)
+        if ($texto -notmatch $patron) { continue }
+        if (-not (Toca (Estado $par[1] $v))) { continue }
+        Marcar $par[1] $v
+        Write-Output ('    - ' + $v + (Nota $texto)); $n++
+    }
+}
+# Accesos directos de la carpeta Inicio, la del usuario y la de todos.
+$sh = New-Object -ComObject WScript.Shell
+$carpetas = @(
+    @((Join-Path $perfil 'AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup'), ($env:UPS + '\Software\' + $apr + '\StartupFolder')),
+    @((Join-Path $env:ProgramData 'Microsoft\Windows\Start Menu\Programs\StartUp'), ($hklm + $apr + '\StartupFolder'))
+)
+foreach ($par in $carpetas) {
+    if (-not [IO.Directory]::Exists($par[0])) { continue }
+    foreach ($f in [IO.Directory]::GetFiles($par[0])) {
+        $nombre = [IO.Path]::GetFileName($f)
+        if ($nombre -eq 'desktop.ini') { continue }
+        $texto = $nombre
+        if ($nombre -like '*.lnk') { $texto += ' ' + [string]$sh.CreateShortcut($f).TargetPath }
+        if ($texto -notmatch $patron) { continue }
+        if (-not (Toca (Estado $par[1] $nombre))) { continue }
+        Marcar $par[1] $nombre
+        Write-Output ('    - ' + $nombre + ' (carpeta Inicio)' + (Nota $texto)); $n++
+    }
+}
+# Las apps de la Store (WhatsApp, Spotify, Telegram) arrancan por una tarea de inicio
+# propia: State 2 = activa, 1 = desactivada por el usuario, lo mismo que escribe el
+# Administrador de tareas.
+$ucls = $env:UCLS -replace '^HKU\\', 'Registry::HKEY_USERS\' -replace '^HKCU\\', 'Registry::HKEY_CURRENT_USER\'
+foreach ($paq in @(Get-ChildItem -LiteralPath ($ucls + '\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppModel\SystemAppData'))) {
+    if ($paq.PSChildName -notmatch 'WhatsApp|Spotify|Telegram|Skype|Discord|Zoom') { continue }
+    foreach ($t in @(Get-ChildItem -LiteralPath $paq.PSPath)) {
+        $e = (Get-ItemProperty -LiteralPath $t.PSPath).State
+        if ($null -eq $e) { continue }
+        $esperado = 2; $nuevo = 1
+        if ($volver) { $esperado = 1; $nuevo = 2 }
+        if ([int]$e -ne $esperado) { continue }
+        Set-ItemProperty -LiteralPath $t.PSPath -Name State -Value $nuevo -Type DWord
+        Write-Output ('    - ' + $paq.PSChildName.Split('_')[0] + ' (app de la Store)'); $n++
+    }
+}
+# Servicios de fabricante y de actualizadores que arrancan con Windows: a Manual (los
+# levanta el programa que los necesita) y detenidos ahora. Con volver, a Automatico.
+$patronServ = 'AGSService|AGMService|AdobeUpdateService|Bonjour|HPSupportSolutionsFrameworkService|HPTouchpointAnalytics|HP Analytics|^HP\w+Cap$|SupportAssist|DellClientManagement|DellDigitalDelivery|DellTechHub|^DDV|LenovoVantage|ImControllerService|LenovoSystemUpdate|ArmouryCrate|ASUSSystemAnalysis|ASUSSystemDiagnosis|^DSAService$|DSAUpdateService|NvTelemetryContainer|LGHUBUpdaterService|IObit|AdvancedSystemCare|LiveUpdateSvc|DriverBooster|Wondershare|WsAppService|WebAdvisor'
+foreach ($s in @(Get-Service | Where-Object { $_.Name -match $patronServ -or $_.DisplayName -match $patronServ })) {
+    if (-not $volver -and $s.StartType -eq 'Automatic') {
+        Set-Service -Name $s.Name -StartupType Manual
+        Stop-Service -Name $s.Name -Force
+        Write-Output ('    - servicio ' + $s.DisplayName); $n++
+    } elseif ($volver -and $s.StartType -eq 'Manual') {
+        Set-Service -Name $s.Name -StartupType Automatic
+        Write-Output ('    - servicio ' + $s.DisplayName); $n++
+    }
+}
+if ($n -eq 0) { Write-Output '    (nada que tocar)' }
+elseif ($volver) { Write-Output ('  [OK] ' + $n + ' vuelven a arrancar con Windows.') }
+else {
+    Write-Output ('  [OK] ' + $n + ' ya no arrancan con Windows. Siguen instalados y abren a mano; se')
+    Write-Output '       reactivan en Administrador de tareas, pestana Inicio.'
+}
+#ARRANQUE-FIN#
 #CERRAR-INICIO#
 # Opcion A, como Onyx en Mac: cierra todos los programas de la sesion de la
 # pantalla. El criterio es donde estan instalados y no una lista de nombres: todo
@@ -1910,7 +2194,7 @@ L ('Equipo:           ' + $env:COMPUTERNAME)
 L ('Windows:          ' + $os.Caption + ' ' + $ver + ' (compilacion ' + $os.BuildNumber + ', ' + $os.OSArchitecture + ')')
 # El perfil sale de :detectar, el mismo calculo que usa la opcion 1.
 L ('RAM:              ' + [Math]::Round($cs.TotalPhysicalMemory / 1GB, 1) + ' GB visibles, ' + $env:RAM_INST + ' MB instalados')
-L ('Perfil opcion 1:  4 GB o mas: ' + ($env:PERFIL_4GB -eq '1') + ' | mejor apariencia: ' + ($env:EFECTOS -eq '1') + ' | disco del sistema: ' + $env:DISCO_TIPO + ' | OneDrive en uso: ' + ($env:ONEDRIVE -eq 'S') + ' | Outlook en uso: ' + ($env:OUTLOOK -eq 'S'))
+L ('Perfil opcion 1:  4 GB o mas: ' + ($env:PERFIL_4GB -eq '1') + ' | mejor apariencia: ' + ($env:EFECTOS -eq '1') + ' | disco del sistema: ' + $env:DISCO_TIPO + ' | indexador de fabrica: ' + ($env:BUSQUEDA -eq '1') + ' | OneDrive en uso: ' + ($env:ONEDRIVE -eq 'S') + ' | Outlook en uso: ' + ($env:OUTLOOK -eq 'S'))
 Get-PhysicalDisk | ForEach-Object { L ('Disco:            ' + $_.FriendlyName + ' - ' + $_.MediaType + ' - ' + [Math]::Round($_.Size / 1GB) + ' GB') }
 $c = Get-PSDrive -Name $env:SystemDrive.Substring(0, 1)
 L ('Libre en ' + $env:SystemDrive + '       ' + [Math]::Round($c.Free / 1GB, 1) + ' GB')
@@ -1973,6 +2257,8 @@ foreach ($par in @(@($wd, 'DisableAntiSpyware'), @($wd, 'DisableAntiVirus'), @((
 $wu = 'HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate'
 L ('Politica WU NoAutoUpdate / DisableWindowsUpdateAccess: ' + (Leer ($wu + '\AU') 'NoAutoUpdate') + ' / ' + (Leer $wu 'DisableWindowsUpdateAccess'))
 L ('Reproduccion automatica NoDriveTypeAutoRun: ' + (Leer 'HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer' 'NoDriveTypeAutoRun'))
+L ('VBS / integridad de memoria / MBEC en el procesador / bloqueo UEFI: ' + ($env:VBS -eq '1') + ' / ' + ($env:HVCI -eq '1') + ' / ' + ($env:MBEC -eq '1') + ' / ' + ($env:VBS_LOCK -eq '1'))
+L '  (la v2 apaga VBS si corre sin MBEC, con menos de 8 GB o con disco mecanico)'
 
 # --- Memoria ------------------------------------------------------------------
 Titulo 'Memoria'
@@ -1989,7 +2275,7 @@ Get-CimInstance Win32_PageFileUsage | ForEach-Object { L ('Archivo de paginacion
 Titulo 'Servicios (inicio / estado / lo que espera la v2)'
 $espera = [ordered]@{
     'SysMain' = 'Automatico'; 'TabletInputService' = 'Manual'; 'DoSvc' = 'Auto retrasado'
-    'DiagTrack' = 'DESHABILITADO'; 'dmwappushservice' = 'DESHABILITADO'; 'WSearch' = 'segun disco'; 'RemoteRegistry' = 'DESHABILITADO'
+    'DiagTrack' = 'DESHABILITADO'; 'dmwappushservice' = 'DESHABILITADO'; 'WSearch' = 'segun disco y RAM'; 'RemoteRegistry' = 'DESHABILITADO'
     'XblAuthManager' = 'DESHABILITADO'; 'XblGameSave' = 'DESHABILITADO'; 'XboxNetApiSvc' = 'DESHABILITADO'; 'XboxGipSvc' = 'DESHABILITADO'; 'xbgm' = 'DESHABILITADO'
     'bthserv' = 'segun RAM'; 'BTAGService' = 'segun RAM'; 'BthAvctpSvc' = 'segun RAM'
     'PcaSvc' = 'Manual'; 'TrkWks' = 'Manual'; 'iphlpsvc' = 'Manual'; 'DPS' = 'Manual'; 'CDPSvc' = 'Manual'; 'MapsBroker' = 'Manual'; 'edgeupdate' = 'Manual'
@@ -2047,6 +2333,8 @@ $lista = @(
     @(($pol + '\DeliveryOptimization'), 'DODownloadMode'),
     @(($pol + '\Windows Error Reporting'), 'Disabled'),
     @(($pol + '\CloudContent'), 'DisableWindowsConsumerFeatures'),
+    @(($pol + '\AppCompat'), 'DisableInventory'),
+    @(($pol + '\System'), 'EnableMmx'),
     @('HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\System', 'DisableAcrylicBackgroundOnLogon'),
     @('HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows Defender Security Center\Systray', 'HideSystray'),
     @('HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows Defender Security Center\Notifications', 'DisableEnhancedNotifications'),
@@ -2089,6 +2377,7 @@ $apagadas = @($bg | Where-Object { (Get-ItemProperty -LiteralPath $_.PSPath).Dis
 L ('Apps en segundo plano apagadas: ' + $apagadas + ' de ' + @($bg).Count + '  (interruptor general GlobalUserDisabled: ' + (Leer ($U + '\Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications') 'GlobalUserDisabled') + ')')
 $cls = if ($U -eq 'HKEY_CURRENT_USER') { 'HKEY_CURRENT_USER\Software\Classes' } else { $U + '_Classes' }
 L ('Tipo de carpeta generico:       ' + (Leer ($cls + '\Local Settings\Software\Microsoft\Windows\Shell\Bags\AllFolders\Shell') 'FolderType'))
+L ('Menu del boton derecho clasico (Windows 11): ' + (Test-Path -LiteralPath ('Registry::' + $cls + '\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32')) + '   (la v2 lo pone solo con 2 GB)')
 L ('OneDrive al inicio:             ' + (Leer ($U + '\Software\Microsoft\Windows\CurrentVersion\Run') 'OneDrive'))
 $cam = '\Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\location'
 L ('Ubicacion (equipo / usuario):   ' + (Leer ('HKEY_LOCAL_MACHINE' + $cam) 'Value') + ' / ' + (Leer ($U + $cam) 'Value'))
@@ -2118,6 +2407,26 @@ $rb = @(Get-PSDrive -PSProvider FileSystem | ForEach-Object { Join-Path $_.Root 
 $rbTexto = 'no'
 if ($rb.Count) { $rbTexto = $rb -join ', ' }
 L ('ReadyBoost en uso:              ' + $rbTexto)
+# Horas encendido y ciclos de cabezal (SMART): muchos ciclos por hora es un disco que
+# estaciona el cabezal cada pocos segundos, y la PC se congela segundos al despertarlo.
+$src = $null
+if ($dd) { $src = $dd | Get-StorageReliabilityCounter }
+if ($src -and $src.PowerOnHours) {
+    $horas = [int64]$src.PowerOnHours; $ciclos = [int64]$src.LoadUnloadCycleCount
+    L ('Disco: horas encendido / ciclos de cabezal: ' + $horas + ' / ' + $ciclos + '  (' + [Math]::Round($ciclos / $horas, 1) + ' por hora; mas de 30 = estaciona el cabezal a cada rato)')
+    if ($src.Temperature) { L ('Disco: temperatura:             ' + $src.Temperature + ' C') }
+} else { L 'Disco: horas y ciclos de cabezal: el disco no los informa' }
+$bl = @(Get-CimInstance -Namespace root\CIMV2\Security\MicrosoftVolumeEncryption -ClassName Win32_EncryptableVolume | Where-Object { $_.DriveLetter })
+if ($bl.Count) {
+    foreach ($v in $bl) {
+        $conv = Invoke-CimMethod -InputObject $v -MethodName GetConversionStatus
+        $est = @{0 = 'descifrado'; 1 = 'CIFRADO'; 2 = 'cifrando'; 3 = 'descifrando'; 4 = 'cifrado en pausa'; 5 = 'descifrado en pausa'}[[int]$v.ConversionStatus]
+        $pct = ''
+        if ($conv -and $v.ConversionStatus -ge 2) { $pct = ', ' + $conv.EncryptionPercentage + ' % cifrado' }
+        L ('BitLocker en ' + $v.DriveLetter + ':                 ' + $est + $pct + '  (proteccion ' + @{0 = 'apagada'; 1 = 'ACTIVA'; 2 = '?'}[[int]$v.ProtectionStatus] + '; la v2 descifra todo)')
+    }
+} else { L 'BitLocker:                      sin discos cifrables, o Windows no lo informa' }
+L ('Cifrado automatico (PreventDeviceEncryption): ' + (Leer 'HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\BitLocker' 'PreventDeviceEncryption') + '   (1 = Windows no cifra solo)')
 $compacto = $false
 foreach ($f in 'System32\shell32.dll', 'System32\mshtml.dll', 'explorer.exe') {
     $ruta = Join-Path $env:windir $f
@@ -2216,10 +2525,14 @@ foreach ($prog in 'WinRAR', 'VLC media player', 'Google Chrome') {
     if ($r) { $ver = [string]$r.DisplayVersion }
     L (($prog + ':').PadRight(32) + $ver)
 }
-$fl = Get-ItemProperty -LiteralPath 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Google\Chrome\ExtensionInstallForcelist'
-$ub = $false
-if ($fl) { $ub = [bool]($fl.PSObject.Properties | Where-Object { [string]$_.Value -like 'ddkjiahejlhfcafbddmgiahcphecmpfh*' }) }
-L ('uBlock Origin Lite (politica):  ' + $ub)
+$ub = @()
+foreach ($par in @(@('Chrome', 'HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Google\Chrome\ExtensionInstallForcelist', 'ddkjiahejlhfcafbddmgiahcphecmpfh'), @('Edge', 'HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Edge\ExtensionInstallForcelist', 'cimighlppcgcoapaliogpjjdehbnofhn'))) {
+    $fl = Get-ItemProperty -LiteralPath ('Registry::' + $par[1])
+    $hay = $false
+    if ($fl) { $hay = [bool]($fl.PSObject.Properties | Where-Object { [string]$_.Value -like ($par[2] + '*') }) }
+    $ub += ($par[0] + ' ' + $hay)
+}
+L ('uBlock Origin Lite (politica):  ' + ($ub -join ' | '))
 L ('Chrome de aula (BrowserSignin): ' + (Leer 'HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Google\Chrome' 'BrowserSignin') + '  (0 = sin iniciar sesion en Chrome)')
 
 # --- Apps preinstaladas -------------------------------------------------------
@@ -2238,9 +2551,20 @@ L ('Conexion a Escritorio remoto:   ' + (Get-WindowsOptionalFeature -Online -Fea
 
 # --- Inicio de Windows --------------------------------------------------------
 Titulo 'Programas que arrancan con Windows'
-foreach ($k in @(($U + '\Software\Microsoft\Windows\CurrentVersion\Run'), 'HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Run', 'HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Run')) {
-    $i = Get-Item -LiteralPath ('Registry::' + $k)
-    if ($i) { $i.Property | ForEach-Object { L ('  - ' + $_) } }
+# Lo desactivado en el Administrador de tareas (o por la v2) empieza con 03 en StartupApproved.
+$apr = '\Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\'
+foreach ($par in @(@(($U + '\Software\Microsoft\Windows\CurrentVersion\Run'), ($U + $apr + 'Run')), @('HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Run', ('HKEY_LOCAL_MACHINE' + $apr + 'Run')), @('HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Run', ('HKEY_LOCAL_MACHINE' + $apr + 'Run32')))) {
+    $i = Get-Item -LiteralPath ('Registry::' + $par[0])
+    if ($i) { $i.Property | ForEach-Object { $m = ''; if ((Leer $par[1] $_) -like '03*') { $m = '   (desactivado)' }; L ('  - ' + $_ + $m) } }
+}
+L ''
+L 'Corriendo ahora fuera de C:\Windows, en MB privados: lo que arranca solo o quedo abierto.'
+$win = $env:SystemRoot.TrimEnd('\') + '\'
+Get-Process | Where-Object { $_.Path -and -not $_.Path.StartsWith($win, [StringComparison]::OrdinalIgnoreCase) } | Group-Object Name | ForEach-Object {
+    New-Object psobject -Property @{ N = $_.Name; MB = [math]::Round(($_.Group | Measure-Object PrivateMemorySize64 -Sum).Sum / 1MB); C = $_.Count }
+} | Sort-Object MB -Descending | Select-Object -First 20 | ForEach-Object {
+    $x = ''; if ($_.C -gt 1) { $x = ' (x' + $_.C + ')' }
+    L ('  ' + ([string]$_.MB).PadLeft(5) + ' MB  ' + $_.N + $x)
 }
 
 # --- Guardar --------------------------------------------------------------------

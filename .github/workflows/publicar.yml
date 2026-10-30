@@ -10,6 +10,7 @@ on:
       - pruebas/menu.py
       - pruebas/secciones.py
       - pruebas/limpieza.ps1
+      - pruebas/sintaxis.ps1
       - .github/workflows/publicar.yml
   workflow_dispatch:
 
@@ -36,6 +37,9 @@ jobs:
 
       - name: Probar la limpieza
         run: pwsh -NoProfile pruebas/limpieza.ps1
+
+      - name: Comprobar la sintaxis de PowerShell
+        run: pwsh -NoProfile pruebas/sintaxis.ps1
 
       - name: Publicar como ultima version
         env:

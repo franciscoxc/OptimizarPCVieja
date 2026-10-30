@@ -31,7 +31,7 @@ suspende (ver [Perfiles](#perfiles-según-el-hardware)).
 | `4` | Instalar WinRAR, Everything, VLC y Chrome con winget. | Sí |
 | `5` | Chrome de aula: cierra Chrome y borra todos sus perfiles; arranca sin pedir iniciar sesión. Pide confirmación. | Sí |
 | `6` | Revertir la opción 1 a valores de fábrica. | Sí |
-| `7` | Verificar: hardware, antirrobo CI, estado de cada ajuste. Reporte `.txt` junto al script. | No |
+| `7` | Verificar: hardware, antirrobo CI, estado de cada ajuste, BitLocker, VBS, ciclos del disco y lo que corre fuera de Windows. Reporte `.txt` junto al script. | No |
 | `0` | Salir. | |
 
 Nada borra la pantalla: queda el registro de todo lo hecho, y cada opción termina con «`N` terminado». Cada
@@ -57,7 +57,7 @@ Criterios:
 - Servicios: Manual siempre que se pueda; Automático (retrasado) si tienen que arrancar solos; Deshabilitado solo lo
   inútil en este hardware.
 - Nada residente que no aporte (ver [Caché de disco](#caché-de-disco-y-optimizaciones-de-windows)).
-- Sin puntos de restauración. La reversión es la opción 6.
+- Sin puntos de restauración. La reversión es la opción 6, que no vuelve a cifrar con BitLocker ni enciende VBS.
 
 Avisos de hardware al empezar: RAM baja, video sin driver (*Adaptador de pantalla básico*), antirrobo de Conectar
 Igualdad.
@@ -75,11 +75,29 @@ Cada ajuste depende del recurso que realmente cuesta: la RAM, la placa de video 
 | RAM ≥ 4 GB | *Suspender* en el menú de apagado | Oculto | Visible |
 | RAM ≥ 4 GB | Bluetooth (`bthserv`, `BTAGService`, `BthAvctpSvc`) | Deshabilitado | Manual (fábrica) |
 | RAM ≥ 4 GB y video con driver | Efectos visuales | Mejor rendimiento | Mejor apariencia (`UserPreferencesMask=9E3E078012000000`), transparencias, desenfoque del inicio de sesión, Alt+Tab moderno |
-| Disco del sistema SSD | Indexador (`WSearch`) | Deshabilitado | Automático (retrasado), fábrica |
+| RAM ≥ 4 GB | Apps en segundo plano | Interruptor general apagado | Fábrica: los avisos de las apps cerradas (WhatsApp de la Store) valen más que esos MB |
+| RAM ≥ 4 GB | Pestañas en suspensión de Edge | 5 min | 30 min: despertarlas en un procesador lento también cuesta |
+| RAM ≥ 4 GB **y** SSD | Indexador (`WSearch`) | Deshabilitado | Automático (retrasado), fábrica. Con 2 GB, `SearchIndexer` se queda con 50-100 MB aunque haya SSD |
+| RAM ≤ 2 GB y Windows 11 | Menú del botón derecho | Clásico (`CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32` vacío en el usuario): el nuevo lo dibuja XAML y tarda en aparecer | Nuevo, fábrica |
+| Sin MBEC, o RAM < 8 GB, o HDD | VBS e integridad de memoria (HVCI), si corren | Apagadas (`EnableVirtualizationBasedSecurity=0`, `HypervisorEnforcedCodeIntegrity\Enabled=0`) | Quedan |
 
 Fijo en todos: botón de encendido apaga, botón de suspensión no hace nada, sin hibernación, `MenuShowDelay` en 100 ms,
 paginación en 2 × RAM con tope de 8 GB. Sin video con driver, los efectos los dibuja el procesador, así que quedan al
 mínimo aunque haya RAM. La opción 7 muestra el perfil detectado.
+
+Lo que no cambia con la RAM, porque se midió: la compresión de memoria (con 2 GB es lo más importante; con más, Windows
+no comprime hasta que hace falta), la precarga (`EnablePrefetcher=3`: con 2 GB casi no actúa, con 8 GB y HDD es lo
+que hace que los programas abran rápido) y la paginación fija.
+
+VBS: Windows corre adentro de un hipervisor y cada acceso a memoria paga ese peaje. Sin MBEC en el procesador (Intel
+anterior a Kaby Lake, AMD anterior a Zen 2) se emula con *Restricted User Mode* y el costo es mayor
+([Microsoft](https://learn.microsoft.com/en-us/windows/security/threat-protection/device-guard/enable-virtualization-based-protection-of-code-integrity)).
+Microsoft solo la enciende de fábrica con MBEC, 8 GB y SSD
+([tabla](https://learn.microsoft.com/en-us/windows-hardware/design/device-experiences/oem-hvci-enablement)); el
+script aplica la misma regla al revés: si la PC no la cumple, se apaga; si la cumple, queda, porque es seguridad real.
+Se lee de `Win32_DeviceGuard` (`VirtualizationBasedSecurityStatus`, `SecurityServicesRunning`,
+`AvailableSecurityProperties` con 7 = MBEC). Con bloqueo UEFI (`Locked=1`) no se puede desde el registro y avisa. En una
+PC vieja con instalación limpia rara vez está encendida: la tabla de Microsoft empieza en 8.ª generación.
 
 ### 1. Seguridad (solo repara)
 
@@ -109,6 +127,7 @@ pantalla); si no hay nada, lo informa. Lo correcto o inocuo no se toca.
 | `lfsvc` deshabilitado | Perjudicial: rompe la luz nocturna del anochecer al amanecer. | Manual (fábrica). |
 | `DisablePagingExecutive=1` | Perjudicial con poca RAM: fija el kernel en memoria. | `0`. |
 | `EnablePrefetcher` o `EnableSuperfetch` distintos de `3` | Perjudicial en disco mecánico: sin precarga, el arranque y cada programa leen el disco de a pedazos. | `3` (fábrica). |
+| `ClearPageFileAtShutdown=1` | Perjudicial: lo activan scripts de "privacidad", y con 4 GB de paginación cada apagado escribe 4 GB en el disco. | `0` (fábrica). |
 | `DoSvc` con `Start=4` | Perjudicial: puede romper Windows Update. | Fábrica (paso 1) + `DODownloadMode=0` (sin P2P). |
 | `IOPageLockLimit`, `DontVerifyRandomDrivers` | Placebos: Windows los ignora. | Sin cambios. |
 | `compact /CompactOS:never` | Correcto en HDD. | Se mantiene; descomprime solo si estaba comprimido y hay 6 GB libres. |
@@ -122,7 +141,7 @@ La compresión de memoria se activa siempre (paso 8).
 | Inicio | Servicios | Motivo |
 |---|---|---|
 | Deshabilitado | `DiagTrack`, `dmwappushservice` | Telemetría. |
-| Deshabilitado (HDD) | `WSearch` | Indexa leyendo el disco; con SSD queda de fábrica. El Inicio sigue encontrando apps (20H2+); se pierde la búsqueda instantánea de archivos. Lo reemplaza [Everything](https://www.voidtools.com/) (lee la MFT), que instala la opción 4. |
+| Deshabilitado (HDD o < 4 GB) | `WSearch` | Indexa leyendo el disco y su proceso se queda con 50-100 MB; con SSD y 4 GB o más queda de fábrica. El Inicio sigue encontrando apps (20H2+); se pierde la búsqueda instantánea de archivos. Lo reemplaza [Everything](https://www.voidtools.com/) (lee la MFT), que instala la opción 4. |
 | Deshabilitado | `XblAuthManager`, `XblGameSave`, `XboxNetApiSvc`, `XboxGipSvc`, `xbgm` | Xbox. |
 | Deshabilitado (< 4 GB) | `bthserv`, `BTAGService`, `BthAvctpSvc` | Bluetooth. Con 4 GB o más, Manual (fábrica): sin adaptador no consume nada. |
 | Deshabilitado | `RemoteRegistry` | Fábrica; se asegura. |
@@ -133,6 +152,7 @@ La compresión de memoria se activa siempre (paso 8).
 | Automático (retrasado) | `Spooler` | Siempre: una impresora que deja de andar sin aviso cuesta más que lo que ahorra. |
 | Automático | `LanmanServer` | Siempre, para compartir carpetas e impresoras en la red. |
 | Deshabilitado | `OneSyncSvc`, `PimIndexMaintenanceSvc`, `UnistoreSvc`, `UserDataSvc`, `MessagingService` | Sincronizan Correo, Calendario, Contactos y Mensajes. Sin las apps no tienen nada que hacer. Son servicios por usuario: rigen desde el próximo inicio de sesión. |
+| Manual | Servicios de fabricante y de actualizadores que arrancan solos (ver [Inicio de Windows](#11-inicio-de-windows-lo-que-arranca-solo)) | Los levanta el programa que los necesita. |
 | Automático | `SysMain` | Compresión de memoria desde el arranque. |
 
 Sin "todo a Manual": el *Set Services to Manual* de WinUtil (~190 servicios) rompió Windows Update
@@ -173,7 +193,9 @@ Sin exclusiones.
 | Barra de juegos y Game DVR | Apagado. |
 | Historial de actividad | No se publica ni se sube. |
 | Informe de errores (WER) | Apagado. |
-| Apps en segundo plano | Interruptor general apagado (`GlobalUserDisabled=1`, `BackgroundAppGlobalToggle=0`). Contras: el Inicio puede tardar en encontrar apps nuevas de la Store ([PR #42](https://github.com/Disassembler0/Win10-Initial-Setup-Script/pull/42)); alarmas y avisos de apps cerradas no funcionan. No afecta programas Win32. |
+| Apps en segundo plano | Con menos de 4 GB, interruptor general apagado (`GlobalUserDisabled=1`, `BackgroundAppGlobalToggle=0`). Contras: el Inicio puede tardar en encontrar apps nuevas de la Store ([PR #42](https://github.com/Disassembler0/Win10-Initial-Setup-Script/pull/42)); alarmas y avisos de apps cerradas no funcionan. No afecta programas Win32. Con 4 GB o más, de fábrica. |
+| Recolección de compatibilidad | `AppCompat`: `DisableInventory=1`, `AITEnable=0`. La tarea del *Compatibility Appraiser* se desactiva en el paso 4, pero Windows Update la vuelve a activar; con las políticas, `CompatTelRunner` no tiene qué recolectar. |
+| Experiencias compartidas y Vincular al teléfono | `System`: `EnableCdp=0`, `EnableMmx=0`. Buscan celulares por Bluetooth y red; en Windows 11 es `CrossDeviceService`. |
 | Actualización automática de la Store | Apagada: política `HKLM\SOFTWARE\Policies\Microsoft\WindowsStore` `AutoDownload=2` (más el valor del interruptor viejo). Desde 2025 la Store solo permite pausar 1-5 semanas ([Tom's Hardware](https://www.tomshardware.com/software/windows/microsoft-store-change-removes-the-ability-to-stop-app-updates-pausing-automatic-updates-now-limited-to-a-5-week-duration)); la política sigue vigente ([The Windows Club](https://www.thewindowsclub.com/disable-automatic-microsoft-store-updates)). Actualizar a mano: *Store > Biblioteca > Obtener actualizaciones* (incluye winget). |
 | Precarga de apps (`ApplicationPreLaunch`) | Apagada. |
 | WPBT y apps acompañantes de dispositivos | Apagado (WinUtil). |
@@ -195,6 +217,8 @@ Sin exclusiones.
   Widgets (la política del paso 6) ni el botón de *Reanudar* (`IsEnabled=0` en `Explorer\Advanced`, según
   [elevenforum](https://www.elevenforum.com/t/turn-on-or-off-resume-app-button-on-taskbar-in-windows-11.40288/)).
 - Sin detección automática del tipo de carpeta (WinUtil). Efecto secundario: se reinician las vistas guardadas.
+- Windows 11 con 2 GB o menos: menú del botón derecho clásico, sin *Mostrar más opciones* (ver
+  [Perfiles](#perfiles-según-el-hardware)). Con más RAM queda el nuevo.
 - **Luz nocturna programada del anochecer al amanecer.** Se escribe el blob `windows.data.bluelightreduction.settings`
   de CloudStore (Bond CompactBinary v1, sin documentar; formato según
   [win-nightlight-cli](https://github.com/kvnxiao/win-nightlight-cli/blob/main/docs/nightlight-registry-format.md)),
@@ -213,6 +237,20 @@ Sin exclusiones.
   `CacheIsPowerProtected=1`), salvo en SSD. Riesgo asumido: pérdida de datos ante un corte de luz.
 - NTFS: `DisableLastAccess`, `Disable8dot3`.
 - Restaurar sistema desactivado; se borran todos los puntos.
+- VBS e integridad de memoria: apagadas si corren en una PC sin MBEC, con menos de 8 GB o con HDD (ver
+  [Perfiles](#perfiles-según-el-hardware)).
+- **BitLocker siempre apagado.** Windows 11 lo enciende solo al entrar con cuenta Microsoft y nadie guarda la clave de
+  recuperación: cuando el disco falla o se cambia de PC, los datos se pierden. Y sin AES-NI (Atom, Core 2, Pentium y
+  Celeron hasta 2016) cifra por software cada lectura y escritura. Se leen los volúmenes de `Win32_EncryptableVolume`
+  (`ConversionStatus` distinto de 0: cifrado, cifrando o en pausa, también el "cifrado con clave en claro" que viene de
+  fábrica) y se descifran con `manage-bde -off`, primero los de datos y al final el del sistema, que guarda las claves
+  de los otros. Descifrar tarda horas en un disco grande, sigue solo en segundo plano y continúa después de reiniciar;
+  el final de la opción 1 y la opción 7 muestran el porcentaje. `PreventDeviceEncryption=1` en
+  `HKLM\SYSTEM\CurrentControlSet\Control\BitLocker` evita que Windows vuelva a cifrar solo. La opción 6 no lo
+  recifra.
+- Almacenamiento reservado: con menos del 15 % libre, `DISM /Online /Set-ReservedStorageState /State:Disabled` libera
+  hasta 7 GB; sin ese margen el disco se fragmenta y la paginación no entra. Falla, y avisa, si hay una actualización
+  pendiente.
 
 Energía, aplicada a Equilibrado, Alto rendimiento, Economizador y al plan activo:
 
@@ -240,6 +278,13 @@ Sin él, *Apagar* es un apagado completo.
   pestañas en suspensión a los 5 min (fábrica: 2 h). Su entrada de inicio (`MicrosoftEdgeAutoLaunch_*`) se borra en el
   momento: con la sola política, Edge la saca recién la próxima vez que arranca.
 - Chrome: sin modo de fondo.
+- **uBlock Origin Lite en los dos, forzada por política** (`ExtensionInstallForcelist`): en un Atom, lo que traba una
+  página es el JavaScript de los avisos. Chrome la instala desde la Web Store (`ddkjiahejlhfcafbddmgiahcphecmpfh`);
+  Edge, desde su tienda (`cimighlppcgcoapaliogpjjdehbnofhn`, ID según
+  [Lansweeper](https://www.lansweeper.com/blog/pro-tips/ublock-origin-light-swap/), sin verificar en una PC). Si el
+  navegador no está, la política espera. La opción 6 quita la obligación; la extensión queda y se saca desde
+  Extensiones.
+- Pestañas en suspensión de Edge: 5 min con menos de 4 GB, 30 min con 4 GB o más (fábrica: 2 h).
 - Ambos muestran "Administrado por tu organización" (políticas).
 
 ### 10. OneDrive y apps preinstaladas
@@ -268,7 +313,41 @@ netbook de prueba. Si para todas las cuentas no se puede, se quita al menos de l
 También: [clásicos de Windows 7](#clásicos-de-windows-7), características opcionales y Restaurar sistema
 desactivado.
 
-### 11. Características opcionales
+### 11. Inicio de Windows: lo que arranca solo
+
+En las PCs de verdad, lo que más RAM se lleva después de Defender son cosas de 20-30 MB que nadie pidió y que suman:
+actualizadores, bandejas de drivers, "optimizadores", lanzadores, mensajeros y servicios del fabricante. Se desactivan
+como lo hace el Administrador de tareas (`StartupApproved`, valor binario de 12 bytes cuyo primer byte es `03`; `02` es
+activo; los otros 8 son la fecha, según [powershell.org](https://forums.powershell.org/t/enable-disable-startup-programs-in-windows-10/8537)),
+en `Run` y `Run32` (HKLM) y `Run` y `StartupFolder` del usuario. Nada se borra ni se desinstala: el programa abre a
+mano y en *Administrador de tareas > Inicio* se reactiva con un clic. Sin preguntas; la opción 6 lo deshace.
+
+| Sale del inicio | Motivo |
+|---|---|
+| Java (`jusched`), Apple (`iTunesHelper`, `QuickTime Task`, `APSDaemon`), `Logitech Download Assistant`, `KiesTrayAgent`, Wondershare | Actualizadores. |
+| Intel (`igfxtray`, `hkcmd`, `igfxpers`), Realtek (`RTHDVCPL`, `RAVCpl64`, `RtkNGUI`) | Bandejas de drivers; `hkcmd` es el Ctrl+Alt+flecha que da vuelta la pantalla. |
+| CCleaner, IObit, Driver Booster, Advanced SystemCare | "Optimizadores". |
+| uTorrent, BitTorrent | Siembran al arrancar y saturan el disco. |
+| `EPSON Customer Research Participation` | Telemetría de Epson. |
+| Steam, Epic Games, Spotify, Skype, Discord, WhatsApp, Telegram, Zoom | Lanzadores y mensajeros: que arranquen solos no lo pidió nadie. Se abren cuando se usan. |
+| Dropbox, si su carpeta tiene 3 archivos o menos (sin contar su caché; ruta en `info.json`) | Mismo criterio que OneDrive: instalado porque sí. |
+| Google Drive, si no hay cuenta iniciada (ninguna carpeta numérica en `AppData\Local\Google\DriveFS`) | No guarda los archivos en una carpeta que se pueda contar. |
+
+Quedan: acceso remoto, monitores de impresora (niveles de tinta), antivirus, WhatsApp y Telegram no (son mensajeros),
+y las nubes en uso. Las apps de la Store (WhatsApp, Spotify, Telegram) arrancan por una *tarea de inicio* propia:
+`State` en `...\AppModel\SystemAppData\<paquete>\<tarea>` del usuario, 2 = activa, 1 = desactivada por el usuario,
+lo mismo que escribe el Administrador de tareas ([`StartupTaskState`](https://learn.microsoft.com/en-us/uwp/api/Windows.ApplicationModel.StartupTask)).
+
+Servicios de fabricante y de actualizadores que arrancan con Windows pasan a Manual y se detienen: Adobe
+(`AGSService`, `AGMService`, `AdobeUpdateService`), `Bonjour`, HP (`HPSupportSolutionsFrameworkService`,
+`HPTouchpointAnalytics`, `HP*Cap`), Dell (`SupportAssist`, `DellClientManagement`, `DellDigitalDelivery`, `DDV*`),
+Lenovo (`LenovoVantage`, `ImControllerService`), ASUS (`ArmouryCrate`, `ASUSSystemAnalysis`, `ASUSSystemDiagnosis`),
+Intel (`DSAService`), NVIDIA (`NvTelemetryContainer`), Logitech (`LGHUBUpdaterService`), IObit, Wondershare, McAfee
+WebAdvisor. `Apple Mobile Device Service` no: sin él iTunes no ve el iPhone. Los nombres salen de memoria y de guías;
+la opción 7 y el final de la opción 1 listan lo que sigue corriendo fuera de `C:\Windows` con sus MB, para que la
+lista crezca con datos de PCs reales.
+
+### 12. Características opcionales
 
 *Configuración > Aplicaciones > Características opcionales*, vía `Remove-WindowsCapability`:
 
@@ -293,7 +372,7 @@ Conexión a Escritorio remoto (`mstsc`) no es una opcional sino una característ
 (`Microsoft-RemoteDesktopConnection`): sale con `Disable-WindowsOptionalFeature`, en unos 25 s y sin reiniciar. Vuelve
 desde *Panel de control > Programas > Activar o desactivar las características de Windows*.
 
-### 12. Limpieza de temporales
+### 13. Limpieza de temporales
 
 | Carpeta | Contenido |
 |---|---|
@@ -334,7 +413,7 @@ No se tocan: caché de miniaturas, `SoftwareDistribution\Download`, `System32\sp
 borrarlas puede dejar una actualización a medias, y son de `TrustedInstaller`. Las limpia DISM (opción 2). `Windows.old`: *Liberador de espacio en
 disco > Limpiar archivos del sistema*.
 
-### 13. Adobe Reader (si está instalado)
+### 14. Adobe Reader (si está instalado)
 
 | Elemento | Acción |
 |---|---|
@@ -346,7 +425,8 @@ disco > Limpiar archivos del sistema*.
 
 Reader deja de recibir parches: asignar `.pdf` a Edge o Chrome, o desinstalarlo. Solo los formularios XFA lo requieren.
 
-Al final: estado de Defender, programas de inicio y reinicio.
+Al final: estado de Defender, programas de inicio, lo que corre fuera de `C:\Windows` con sus MB, avance de
+BitLocker si se está descifrando, y reinicio.
 
 ## Opción 4: Chrome, WinRAR, VLC y Everything
 
@@ -542,6 +622,12 @@ fija; revisar *Load/Unload Cycle Count* con [CrystalDiskInfo](https://crystalmar
 | Quitar Windows App Runtime | Son bibliotecas de otras apps: Windows no las deja quitar mientras alguna las use, y las reinstala. No corren por sí solas. |
 | Apps de Chrome (Documentos, Drive, Gmail, Hojas de cálculo, Presentaciones, YouTube) | Accesos a páginas web: no corren ni ocupan RAM. Son de cada perfil de Chrome y se quitan en `chrome://apps`. |
 | Idiomas de *Características opcionales* | Pueden romper la configuración regional y Windows los reinstala. |
+| Exclusiones de Defender (caché de Chrome) | Medido en la netbook: Defender no es el cuello al navegar, lo satura Chrome. Su costo es la RAM, y eso no lo arregla una exclusión. |
+| `ClickToRunSvc` (Office) a Manual | En algunas PCs Office no arranca el servicio solo. |
+| `Apple Mobile Device Service` a Manual | iTunes no ve el iPhone sin él. |
+| Smart App Control apagado | Irreversible sin reinstalar. |
+| Quitar el paquete de Widgets (`MicrosoftWindows.Client.WebExperience`) | Con la política `AllowNewsAndInterests=0` el proceso no corre; Windows Update lo reinstala. |
+| Mitigaciones de Spectre con CPU vieja | Cuestan, pero exponen el equipo: decidido. |
 
 ## Límites de software
 
@@ -607,8 +693,13 @@ fija; revisar *Load/Unload Cycle Count* con [CrystalDiskInfo](https://crystalmar
 - **Secciones:** [`pruebas/secciones.py`](pruebas/secciones.py) comprueba que cada `call :ps` tenga su sección de
   PowerShell y que cada marcador aparezca una sola vez: un nombre mal escrito saltearía el paso sin avisar. También
   corre antes de publicar.
+- **Sintaxis:** [`pruebas/sintaxis.ps1`](pruebas/sintaxis.ps1) pasa cada sección y cada PowerShell de una línea por el
+  parser oficial, sin ejecutarlos: `:ps` corre las secciones con `Invoke-Expression`, y una llave de más tira el paso
+  entero sin que el resto se entere. Corre antes de publicar.
 
-Sin probar en Windows real: las opciones 2 y 3.
+Sin probar en Windows real: las opciones 2 y 3, y lo nuevo de octubre de 2026: el inicio de Windows
+(`StartupApproved`, tareas de inicio de la Store, servicios de fabricante), BitLocker, VBS, el menú clásico de
+Windows 11, el ID de uBlock Origin Lite en Edge y `PreventDeviceEncryption` en 24H2.
 
 ## Prueba en VM (UTM)
 
@@ -647,6 +738,14 @@ Sin probar en Windows real: las opciones 2 y 3.
    - [ ] Tras la opción 1, Chrome y Edge siguen con las sesiones abiertas y las contraseñas guardadas.
    - [ ] *Configuración > Sistema > Almacenamiento*: Sensor activado, Papelera a 30 días, Descargas en "Nunca".
    - [ ] Opción 5: Chrome abre sin perfiles, sin pedir iniciar sesión, con uBlock Origin Lite.
+   - [ ] Edge abre con uBlock Origin Lite instalada (`edge://extensions`).
+   - [ ] Con Spotify, Steam o un Dropbox vacío instalados: después de la opción 1 no arrancan; en *Administrador de
+     tareas > Inicio* figuran como Deshabilitado y se reactivan con un clic. Con Dropbox con archivos: sigue.
+   - [ ] WhatsApp de la Store: no arranca con Windows; abierto a mano, funciona.
+   - [ ] Con BitLocker o "cifrado de dispositivo" activo: la opción 1 empieza a descifrar; `manage-bde -status` lo
+     muestra; al terminar, Windows no vuelve a cifrar al entrar con cuenta Microsoft.
+   - [ ] Windows 11 con 2 GB: botón derecho con el menú clásico. Con 4 GB: el nuevo.
+   - [ ] Opción 7: líneas de VBS, BitLocker y ciclos de cabezal con datos.
 6. Opción 6 y verificar la vuelta a fábrica.
 
 ## Fuentes
@@ -719,3 +818,8 @@ Sin probar en Windows real: las opciones 2 y 3.
 ## Licencia
 
 [MIT](LICENSE). Se puede usar, copiar, modificar y redistribuir, también en colegios y talleres, manteniendo el aviso de copyright.
+- **StartupApproved:** [powershell.org](https://forums.powershell.org/t/enable-disable-startup-programs-in-windows-10/8537); tareas de inicio de la Store: [`StartupTaskState`](https://learn.microsoft.com/en-us/uwp/api/Windows.ApplicationModel.StartupTask).
+- **VBS y MBEC:** [requisitos y activación de fábrica](https://learn.microsoft.com/en-us/windows-hardware/design/device-experiences/oem-hvci-enablement), [Restricted User Mode](https://learn.microsoft.com/en-us/windows/security/threat-protection/device-guard/enable-virtualization-based-protection-of-code-integrity), [activación por update desde octubre de 2026](https://pureinfotech.com/windows-11-memory-integrity-default-october-2026/).
+- **BitLocker:** `Win32_EncryptableVolume` y `manage-bde`; `PreventDeviceEncryption` es la clave que usa Rufus para que Windows 11 no cifre solo.
+- **uBlock Origin Lite en Edge:** [ExtensionInstallForcelist](https://learn.microsoft.com/en-us/deployedge/microsoft-edge-policies/extensioninstallforcelist), [ID](https://www.lansweeper.com/blog/pro-tips/ublock-origin-light-swap/).
+- **Ciclos de cabezal:** [`Get-StorageReliabilityCounter`](https://learn.microsoft.com/en-us/powershell/module/storage/get-storagereliabilitycounter).
