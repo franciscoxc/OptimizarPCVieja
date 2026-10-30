@@ -1996,12 +1996,23 @@ if ($env:OPT_RONDA -eq '1' -and (ReinicioPendiente)) { Write-Output '  Hay una a
 # TiWorker quieto y sin reinicio pendiente: vaciarla con una instalacion en curso la
 # rompe, que es justo lo que se quiere arreglar.
 $dl = Join-Path $env:SystemRoot 'SoftwareDistribution\Download'
-$mb = [int]((Get-ChildItem -Path $dl -Recurse -Force | Measure-Object -Property Length -Sum).Sum / 1MB)
 foreach ($s in 'wuauserv', 'BITS') { Stop-Service -Name $s -Force }
-Remove-Item -Path (Join-Path $dl '*') -Recurse -Force
+try { (Get-Service -Name wuauserv).WaitForStatus('Stopped', '00:02:00') } catch { }
+# Se renombra y se borra aparte: medir o borrar miles de archivos en un disco mecanico
+# tarda minutos (3,6 GB de 26H2 en la laptop de prueba: mas de diez), y mientras tanto
+# la busqueda ya puede correr. Windows Update crea Download de nuevo al arrancar.
+$viejo = $dl + '.viejo' + (Get-Date -Format 'HHmmss')
+Rename-Item -Path $dl -NewName (Split-Path -Leaf $viejo)
+if (Test-Path -LiteralPath $viejo) {
+    Write-Output '  Cache de descargas de Windows Update apartada; se borra de fondo.'
+} else {
+    Write-Output '  [AVISO] No se pudo apartar la cache de descargas; se sigue igual.'
+}
+foreach ($v in @(Get-ChildItem -Path (Split-Path -Parent $dl) -Directory -Filter 'Download.viejo*')) {
+    Start-Process -FilePath cmd.exe -ArgumentList ('/c rd /s /q "' + $v.FullName + '"') -WindowStyle Hidden
+}
 Delete-DeliveryOptimizationCache -Force
 Start-Service -Name wuauserv
-Write-Output ('  Cache de descargas de Windows Update vaciada: ' + $mb + ' MB.')
 $ses = New-Object -ComObject Microsoft.Update.Session
 $ses.ClientApplicationID = 'OptimizarPC'
 Write-Output '  Buscando actualizaciones, puede tardar varios minutos...'
