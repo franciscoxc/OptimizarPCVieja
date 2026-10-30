@@ -783,7 +783,12 @@ uBlock Origin Lite en Edge, `PreventDeviceEncryption` en 24H2, la desinstalació
 los avisos de Configuración, y de la
 opción 2 la instalación de actualizaciones con reinicios automáticos. De la opción 2 sí se probó en la laptop i3
 (Windows 11 25H2, HDD): la tarea `onlogon` arranca al iniciar sesión, la caché se aparta, winget actualiza y
-`ResetBase` corre. **Por SSH no se puede probar Windows Update:** en una sesión de OpenSSH Windows niega las COM del
+`ResetBase` corre (1173 MB liberados en 2 horas de disco mecánico); la opción 1 entera corrió por SSH y dejó las
+tareas de terceros, los avisos y las políticas de navegador como se esperaba. **Dos políticas no se pueden escribir
+en Windows 11 25H2 (26200.8894):** `Windows Feeds\EnableFeeds` y `Dsh\AllowNewsAndInterests` responden "Acceso
+denegado" aunque Administradores tenga control total, sin etiqueta de integridad en la clave, e incluso corriendo
+como SYSTEM desde una tarea programada: algo del núcleo las protege. El script avisa "[AVISO] No se pudo escribir" y
+sigue; los Widgets quedan fuera de la barra igual por `TaskbarDa=0`. **Por SSH no se puede probar Windows Update:** en una sesión de OpenSSH Windows niega las COM del
 descargador, el instalador y `SystemInfo` (`E_ACCESSDENIED`), aunque la búsqueda anda; se prueba en la sesión de
 consola, con una tarea programada `/it`.
 
