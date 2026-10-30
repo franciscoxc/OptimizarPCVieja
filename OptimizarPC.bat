@@ -2087,7 +2087,7 @@ if (Test-Path -LiteralPath $viejo) {
 foreach ($v in @(Get-ChildItem -Path (Split-Path -Parent $dl) -Directory -Filter 'Download.viejo*')) {
     Start-Process -FilePath cmd.exe -ArgumentList ('/c rd /s /q "' + $v.FullName + '"') -WindowStyle Hidden
 }
-Delete-DeliveryOptimizationCache -Force
+Delete-DeliveryOptimizationCache -Force *> $null
 Start-Service -Name wuauserv
 $ses = New-Object -ComObject Microsoft.Update.Session
 $ses.ClientApplicationID = 'OptimizarPC'

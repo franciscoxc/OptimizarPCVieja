@@ -777,14 +777,15 @@ fija; revisar *Load/Unload Cycle Count* con [CrystalDiskInfo](https://crystalmar
   parser oficial, sin ejecutarlos: `:ps` corre las secciones con `Invoke-Expression`, y una llave de más tira el paso
   entero sin que el resto se entere. Corre antes de publicar.
 
-Sin probar en Windows real: la opción 3, y lo nuevo de octubre de 2026: el inicio de Windows (`StartupApproved`,
-tareas de inicio de la Store, servicios de fabricante), BitLocker, VBS, el menú clásico de Windows 11, el ID de
-uBlock Origin Lite en Edge, `PreventDeviceEncryption` en 24H2, la desinstalación de Avast, AVG, CCleaner y McAfee,
-los avisos de Configuración, y de la
-opción 2 la instalación de actualizaciones con reinicios automáticos. De la opción 2 sí se probó en la laptop i3
-(Windows 11 25H2, HDD): la tarea `onlogon` arranca al iniciar sesión, la caché se aparta, winget actualiza y
-`ResetBase` corre (1173 MB liberados en 2 horas de disco mecánico); la opción 1 entera corrió por SSH y dejó las
-tareas de terceros, los avisos y las políticas de navegador como se esperaba. **Dos políticas no se pueden escribir
+Sin probar en Windows real: la opción 3, y lo nuevo de octubre de 2026: el inicio de Windows (`StartupApproved` y
+servicios de fabricante), BitLocker, VBS, el menú clásico de Windows 11, el ID de uBlock Origin Lite en Edge,
+`PreventDeviceEncryption` en 24H2, la desinstalación de Avast, AVG, CCleaner y McAfee, y de la opción 2 la cadena de
+reinicios automáticos. De la opción 2 sí se probó en la laptop i3 (Windows 11 25H2, HDD): la tarea `onlogon` arranca
+al iniciar sesión, la caché se aparta, la búsqueda, la descarga y la instalación por COM andan en la sesión de consola
+(un driver Intel de 34 MB con `ForceQuiet`, instalado en un minuto y sin preguntar), winget actualiza y `ResetBase`
+corre (1173 MB liberados en 2 horas de disco mecánico); la opción 1 entera corrió por SSH y dejó las tareas de
+terceros, la tarea de inicio de WhatsApp, los avisos y las políticas de navegador como se esperaba, y la opción 6
+devolvió las 7 tareas anotadas y dejó quieta la de Adobe, que ya estaba desactivada por otro. **Dos políticas no se pueden escribir
 en Windows 11 25H2 (26200.8894):** `Windows Feeds\EnableFeeds` y `Dsh\AllowNewsAndInterests` responden "Acceso
 denegado" aunque Administradores tenga control total, sin etiqueta de integridad en la clave, e incluso corriendo
 como SYSTEM desde una tarea programada: algo del núcleo las protege. El script avisa "[AVISO] No se pudo escribir" y
