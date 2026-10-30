@@ -24,9 +24,9 @@ suspende (ver [Perfiles](#perfiles-según-el-hardware)).
 
 | Tecla | Opción | Modifica |
 |---|---|---|
-| `A` | PC apestada: cierra todos los programas de la sesión y sigue con la `1` sin volver a preguntar. Pide confirmación. | Sí |
+| `A` | PC apestada: cierra todos los programas de la sesión, frena Windows Update y sigue con la `1` sin volver a preguntar. Pide confirmación. | Sí |
 | `1` | Optimizar. Incluye la revisión del script v1. | Sí |
-| `2` | Limpiar WinSxS con DISM `/ResetBase`. Avanzado, irreversible. Hasta 1 h. | Sí |
+| `2` | Actualizar Windows a fondo (todo lo pendiente, con reinicios automáticos), actualizar los programas con winget y limpiar WinSxS con DISM `/ResetBase`. Horas; la limpieza es irreversible. | Sí |
 | `3` | Desfragmentación completa. Horas. | Sí |
 | `4` | Instalar WinRAR, Everything, VLC y Chrome con winget. | Sí |
 | `5` | Chrome de aula: cierra Chrome y borra todos sus perfiles; arranca sin pedir iniciar sesión. Pide confirmación. | Sí |
@@ -42,8 +42,10 @@ Secuencia habitual: `1`, `4`. En una PC trabada: `A` (que sigue sola con la `1`)
 programas abiertos y los que arrancan solos sin que nadie los conozca (impresoras, actualizadores, mensajeros). Primero
 les pide cerrarse, como la X, y a los 10 s fuerza lo que quede; lo no guardado se pierde. Quedan Windows, Explorer
 (la opción 1 lo necesita para reconocer al usuario) y el acceso remoto (AnyDesk, RustDesk, HopToDesk, TeamViewer,
-ScreenConnect, Splashtop). Si lo que traba es Windows Update o Defender, son servicios y no se cierran: ahí sirve más reiniciar y
-correr el script antes de abrir nada.
+ScreenConnect, Splashtop). Windows Update se frena mientras corre el script: si está instalando una actualización
+(`TiWorker.exe` con CPU), espera a que termine, porque cortarla la deja a medias y la rehace entera después, y el
+paso 10 usa DISM, que falla mientras tanto; después detiene `wuauserv`, `UsoSvc`, `BITS` y `DoSvc` hasta el reinicio
+(parados, no deshabilitados). Si lo que traba es Defender, es un servicio y no se cierra.
 
 **Usuario destino.** Los ajustes de usuario se escriben en `HKEY_USERS\<SID>` del dueño del `explorer.exe` de la
 sesión, no en `HKCU`, que al elevar con otra cuenta apunta al administrador. La opción 1 muestra el usuario detectado.
@@ -534,12 +536,28 @@ En SSD solo envía TRIM. Avisa si hay menos de 15% libre. No mueve archivos en u
 para eso, desfragmentación en el arranque con [UltraDefrag](https://en.wikipedia.org/wiki/UltraDefrag) (7.1.4, última
 versión libre).
 
-## Opción 2: limpieza de WinSxS
+## Opción 2: actualizar Windows a fondo y limpiar WinSxS
 
-`Dism.exe /Online /Cleanup-Image /StartComponentCleanup /ResetBase`
-([Microsoft Learn](https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/clean-up-the-winsxs-folder)).
-Arranca sin preguntar, igual que la 3 y la 4: si se eligió por error, se cierra la ventana. Cerrarla con DISM ya
-corriendo deja `DisableResetbase` en `0` en lugar de devolverle su valor (ver abajo).
+El problema que ataca: la gente prende la PC, abre Chrome antes de que termine de iniciar, trabaja y la apaga.
+Windows Update nunca termina; cada acumulativa mensual son 500 MB a 1 GB que CBS desempaqueta a WinSxS con
+lecturas y escrituras chicas, lo peor para un disco mecánico, y apagar en el medio no la cancela: la retoma en el
+próximo arranque, con la persona encima otra vez. Se juntan, y la PC está lenta por eso. Forzarlas hasta el final en
+el taller es lo que la deja bien. Arranca sin preguntar, igual que la 3 y la 4.
+
+1. **Windows Update hasta el final** (sección `ACTUALIZAR`): con la API COM de Windows (`Microsoft.Update.Session`,
+   anda en Home, sin módulos) busca `IsInstalled=0 and IsHidden=0` e instala todo de a una: calidad, drivers,
+   versiones nuevas. Afuera quedan las optativas que no son drivers (las acumulativas *preview* se instalarían dos
+   veces) y las que piden interacción. Si alguna pide reinicio, crea una tarea `onlogon` (`/it /rl highest`) que
+   vuelve a abrir el script con `/actualizar N` y reinicia en 15 s; al iniciar sesión sigue solo con la ronda
+   siguiente, sin pasar por el menú ni pedir permisos. Repite hasta que la búsqueda no devuelva nada, con tope de 5
+   rondas. Sin internet, avisa y sigue con lo demás. Una actualización de versión (24H2) entra igual: horas en HDD,
+   pero es tiempo de taller.
+2. **Programas con winget**: `winget upgrade --all --include-unknown --source winget --silent`. Muestra la lista
+   antes. `--include-unknown` porque los VLC y WinRAR viejos no declaran bien su versión y sin eso winget los
+   saltea. Solo toca lo que está en su catálogo (Chrome, VLC, VC++, .NET); el software de gestión no está ahí.
+3. **Limpieza de WinSxS**: `Dism.exe /Online /Cleanup-Image /StartComponentCleanup /ResetBase`
+   ([Microsoft Learn](https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/clean-up-the-winsxs-folder)).
+   Cerrar la ventana con DISM ya corriendo deja `DisableResetbase` en `0` en lugar de devolverle su valor (ver abajo).
 
 - Borra las versiones reemplazadas de los componentes ya, sin esperar los 30 días de la tarea automática.
 - `/ResetBase`: las actualizaciones instaladas pasan a ser la base y **no se pueden desinstalar**. Las siguientes sí.
@@ -699,7 +717,8 @@ fija; revisar *Load/Unload Cycle Count* con [CrystalDiskInfo](https://crystalmar
 
 Sin probar en Windows real: las opciones 2 y 3, y lo nuevo de octubre de 2026: el inicio de Windows
 (`StartupApproved`, tareas de inicio de la Store, servicios de fabricante), BitLocker, VBS, el menú clásico de
-Windows 11, el ID de uBlock Origin Lite en Edge y `PreventDeviceEncryption` en 24H2.
+Windows 11, el ID de uBlock Origin Lite en Edge, `PreventDeviceEncryption` en 24H2, la espera a `TiWorker` de la
+opción A y la instalación de actualizaciones con reinicios automáticos de la opción 2.
 
 ## Prueba en VM (UTM)
 
@@ -722,7 +741,9 @@ Windows 11, el ID de uBlock Origin Lite en Edge y `PreventDeviceEncryption` en 2
    - [ ] Win+Shift+S funciona.
    - [ ] Ventana visible al arrastrar; carpetas de fotos con íconos.
    - [ ] Adobe Reader: fuera del inicio; *Adobe Acrobat Update Service* deshabilitado.
-   - [ ] Opción 2 arranca sin preguntar, termina y muestra lo liberado; `DisableResetbase` queda como estaba.
+   - [ ] Opción 2 arranca sin preguntar, instala lo pendiente, reinicia sola y sigue al iniciar sesión sin pedir
+     nada; al final no queda nada en Windows Update, winget actualizó, muestra lo liberado y `DisableResetbase`
+     queda como estaba. La tarea «OptimizarPC actualizar» no queda en el Programador de tareas.
    - [ ] Menú de apagado sin *Hibernar*; *Suspender* solo con 4 GB o más.
    - [ ] Opción 7: la línea "Perfil opción 1" coincide con la RAM, el video y el disco de la PC.
    - [ ] Botón de encendido apaga (en UTM: apagado normal de la VM). Tapa: en la netbook real.

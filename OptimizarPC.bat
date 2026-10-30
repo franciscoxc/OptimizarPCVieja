@@ -3,6 +3,10 @@ setlocal EnableExtensions DisableDelayedExpansion
 :: La ruta de este archivo, para PowerShell. Por variable de entorno, y no pegada
 :: en el comando, para que una carpeta con apostrofo o & en el nombre no rompa nada.
 set "OPT_RUTA=%~f0"
+:: "/actualizar N": la opcion 2 se vuelve a abrir sola despues de cada reinicio, en
+:: la ronda N. Se guarda antes de elevar: al elevar, los argumentos hay que pasarlos.
+set "OPT_ARG=%~1"
+set "OPT_RONDA=%~2"
 title Optimizar PC Vieja v2
 :: =========================================================================
 ::  OPTIMIZAR PC VIEJA v2
@@ -11,7 +15,7 @@ title Optimizar PC Vieja v2
 ::  Un solo archivo, con menu:
 ::    A. PC apestada: cierra todos los programas y sigue con la opcion 1.
 ::    1. Optimizar la PC.
-::    2. Limpiar restos de Windows Update (DISM /ResetBase, irreversible).
+::    2. Actualizar Windows a fondo y limpiar restos (DISM /ResetBase, irreversible).
 ::    3. Desfragmentar a fondo.
 ::    4. Instalar Chrome, WinRAR, VLC y Everything (con winget).
 ::    5. Chrome de aula: cerrar sesiones y borrar perfiles.
@@ -27,7 +31,7 @@ title Optimizar PC Vieja v2
 :: Si se lanzo desde un proceso de 32 bits, reabrir con el cmd de 64 bits:
 :: si no, Windows redirige el registro y los cambios caen en otro lugar.
 if not defined PROCESSOR_ARCHITEW6432 goto :arquitectura_ok
-"%SystemRoot%\Sysnative\cmd.exe" /c ""%~f0""
+"%SystemRoot%\Sysnative\cmd.exe" /c ""%~f0" %*"
 exit /b
 :arquitectura_ok
 
@@ -37,7 +41,7 @@ exit /b
 fltmc >nul 2>&1
 if not errorlevel 1 goto :es_admin
 echo Pidiendo permisos de administrador...
-powershell -NoProfile -ExecutionPolicy Bypass -Command "try { Start-Process -FilePath $env:OPT_RUTA -Verb RunAs -ErrorAction Stop; exit 0 } catch { exit 1 }"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "try { if ($env:OPT_ARG) { Start-Process -FilePath $env:OPT_RUTA -ArgumentList ($env:OPT_ARG + ' ' + $env:OPT_RONDA) -Verb RunAs -ErrorAction Stop } else { Start-Process -FilePath $env:OPT_RUTA -Verb RunAs -ErrorAction Stop }; exit 0 } catch { exit 1 }"
 if not errorlevel 1 exit /b
 echo.
 echo  No se obtuvieron permisos de administrador.
@@ -54,6 +58,8 @@ set "REINICIO_PENDIENTE=0"
 :: Tareas de telemetria: el paso 4 las desactiva y la opcion 6 las reactiva. Una
 :: sola lista, asi deshacer no se queda atras cuando se agrega una.
 set "_tareas="\Microsoft\Windows\Application Experience\Microsoft Compatibility Appraiser" "\Microsoft\Windows\Application Experience\ProgramDataUpdater" "\Microsoft\Windows\Autochk\Proxy" "\Microsoft\Windows\Customer Experience Improvement Program\Consolidator" "\Microsoft\Windows\Customer Experience Improvement Program\UsbCeip" "\Microsoft\Windows\DiskDiagnostic\Microsoft-Windows-DiskDiagnosticDataCollector" "\Microsoft\Windows\Feedback\Siuf\DmClient" "\Microsoft\Windows\Feedback\Siuf\DmClientOnScenarioDownload" "\Microsoft\Windows\Maps\MapsUpdateTask" "\Microsoft\Windows\Maps\MapsToastTask" "\Microsoft\Windows\Windows Error Reporting\QueueReporting" "\Microsoft\Windows\Maintenance\WinSAT" "\Microsoft\XblGameSave\XblGameSaveTask""
+:: Vuelta de un reinicio de la opcion 2: sigue con la ronda que toca, sin menu.
+if /i "%OPT_ARG%"=="/actualizar" goto :op_limpiar_wu
 :menu
 title Optimizar PC Vieja v2
 echo.
@@ -64,7 +70,7 @@ if "%REINICIO_PENDIENTE%"=="1" echo   Falta REINICIAR para que se apliquen los c
 echo.
 echo     A. PC apestada: cerrar todo y optimizar
 echo     1. Optimizar la PC
-echo     2. Limpiar restos de Windows Update (avanzado, irreversible, hasta 1 h)
+echo     2. Actualizar Windows a fondo y limpiar restos (horas; la limpieza es irreversible)
 echo     3. Desfragmentar a fondo (de vez en cuando, puede tardar horas)
 echo     4. Instalar Chrome, WinRAR, VLC y Everything
 echo     5. Chrome de aula: cerrar sesiones y borrar perfiles
@@ -116,8 +122,9 @@ echo   PC APESTADA: CERRAR TODO Y OPTIMIZAR
 echo ==========================================================================
 echo.
 echo   Cierra TODOS los programas abiertos, tambien los que corren escondidos:
-echo   impresoras, actualizadores, mensajeros. Despues sigue sola con la opcion 1.
-echo   Windows y los programas de acceso remoto no se tocan.
+echo   impresoras, actualizadores, mensajeros. Frena Windows Update mientras corre
+echo   el script (si esta instalando una actualizacion, espera a que termine) y
+echo   despues sigue sola con la opcion 1. Windows y el acceso remoto no se tocan.
 echo.
 echo   LO QUE NO ESTE GUARDADO SE PIERDE.
 echo.
@@ -780,15 +787,77 @@ goto :menu
 ::  No usa /SPSuperseded: limpia restos de Service Packs, y Windows 10 no tiene.
 :: =========================================================================
 :op_limpiar_wu
-title Optimizar PC Vieja v2 - Limpiar restos de Windows Update
+title Optimizar PC Vieja v2 - Actualizar Windows a fondo y limpiar restos
+if not defined OPT_RONDA set "OPT_RONDA=1"
+:: Vuelta de un reinicio: la tarea que reabrio el script ya cumplio.
+schtasks /delete /tn "OptimizarPC actualizar" /f >nul 2>&1
+set "OPT_ARG="
 echo ==========================================================================
-echo   LIMPIAR RESTOS DE WINDOWS UPDATE
+echo   ACTUALIZAR WINDOWS A FONDO Y LIMPIAR RESTOS
 echo ==========================================================================
 echo.
-echo   DISM /StartComponentCleanup /ResetBase: las actualizaciones instaladas ya
-echo   no se podran desinstalar. Puede tardar mas de una hora: no apagues la PC.
+echo   1. Instala TODO lo pendiente de Windows Update (calidad, drivers, version),
+echo      reinicia las veces que haga falta y sigue sola al iniciar sesion,
+echo      hasta que no quede nada. Horas en un disco mecanico.
+echo   2. Actualiza los programas con winget.
+echo   3. DISM /ResetBase: las actualizaciones instaladas ya no se podran
+echo      desinstalar. Hasta una hora mas. No apagues la PC.
 echo.
 
+:: -------------------------------------------------------------------------
+:: 1. Windows Update hasta el final. La seccion ACTUALIZAR sale con 0 si no queda
+:: nada, 2 si instalo y hay que volver a buscar, 3 si hay que reiniciar, 1 si no
+:: pudo buscar (sin internet): se sigue igual con winget y DISM.
+:: -------------------------------------------------------------------------
+:wu_ronda
+call :titulo "1/3  Windows Update, ronda %OPT_RONDA% de 5"
+call :ps ACTUALIZAR
+set "_wu=%errorlevel%"
+if "%_wu%"=="0" goto :wu_al_dia
+if "%_wu%"=="1" goto :wu_al_dia
+if %OPT_RONDA% GEQ 5 goto :wu_tope
+set /a OPT_RONDA+=1
+if "%_wu%"=="2" goto :wu_ronda
+:: Reinicio: una tarea reabre este script al iniciar sesion, en la ronda que sigue,
+:: con los permisos ya dados y sin volver a pasar por el menu. Sin /ru, corre como
+:: el usuario que esta elevando; si elevo otra cuenta, sigue cuando entre esa.
+schtasks /create /tn "OptimizarPC actualizar" /sc onlogon /it /rl highest /tr "\"%OPT_RUTA%\" /actualizar %OPT_RONDA%" /f >nul 2>&1
+if errorlevel 1 goto :wu_sin_tarea
+echo.
+echo   Hay que reiniciar para seguir. Reinicia en 15 segundos y, al iniciar sesion,
+echo   este script se abre solo y continua con la ronda %OPT_RONDA%.
+shutdown /r /t 15 /c "OptimizarPC: reiniciando para seguir instalando actualizaciones"
+exit /b 0
+:wu_sin_tarea
+set "OPT_RONDA="
+echo.
+echo   [AVISO] No se pudo programar la vuelta automatica. Reinicia la PC y volve a
+echo           elegir la opcion 2.
+echo.
+echo   2 terminado.
+goto :menu
+:wu_tope
+echo   [AVISO] Cinco rondas y Windows Update sigue ofreciendo cosas: se sigue con el resto.
+:wu_al_dia
+set "OPT_RONDA="
+
+:: -------------------------------------------------------------------------
+:: 2. Programas, con winget. --include-unknown: los VLC y WinRAR viejos no
+:: declaran bien su version y sin eso winget los saltea.
+:: -------------------------------------------------------------------------
+call :titulo "2/3  Programas, con winget"
+call :buscar_winget
+if errorlevel 1 goto :wu_sin_winget
+echo   Actualizaciones disponibles:
+%WINGET% upgrade --include-unknown --source winget --accept-source-agreements
+echo.
+%WINGET% upgrade --all --include-unknown --source winget --silent --accept-package-agreements --accept-source-agreements
+echo   [OK] Programas actualizados con winget.
+:wu_sin_winget
+
+:: -------------------------------------------------------------------------
+:: 3. Restos de Windows Update.
+:: -------------------------------------------------------------------------
 :: DISM trabaja con el Instalador de modulos de Windows. Si otra herramienta
 :: lo deshabilito, vuelve a su valor de fabrica: Manual.
 reg query "HKLM\SYSTEM\CurrentControlSet\Services\TrustedInstaller" /v Start 2>nul | find "0x4" >nul
@@ -801,6 +870,8 @@ echo   [REPARADO] El Instalador de modulos de Windows estaba deshabilitado: vuel
 if not exist "%SystemRoot%\WinSxS\pending.xml" goto :wu_sin_pendientes
 echo   [!] Hay cambios de Windows esperando un reinicio: DISM no puede limpiar.
 echo       Reinicia la PC y volve a elegir esta opcion.
+echo.
+echo   2 terminado.
 goto :menu
 :wu_sin_pendientes
 
@@ -823,7 +894,7 @@ net stop trustedinstaller >nul 2>&1
 reg add "%_sxs%" /v DisableResetbase /t REG_DWORD /d 0 /f >nul 2>&1
 reg add "%_sxs%" /v SupersededActions /t REG_DWORD /d %_sa_nuevo% /f >nul 2>&1
 
-call :titulo "1/2  Limpieza de las versiones viejas (WinSxS)"
+call :titulo "3/3  Limpieza de las versiones viejas (WinSxS)"
 call :libre LIBRE_ANTES
 Dism.exe /Online /Cleanup-Image /StartComponentCleanup /ResetBase
 set "DISM_RC=%errorlevel%"
@@ -832,9 +903,9 @@ if defined _sa (reg add "%_sxs%" /v SupersededActions /t REG_DWORD /d %_sa% /f >
 if not "%DISM_RC%"=="0" goto :wu_error
 call :libre LIBRE_DESPUES
 
-call :titulo "2/2  Resultado"
 set /a LIBERADO=LIBRE_DESPUES-LIBRE_ANTES
 if %LIBERADO% LSS 0 set "LIBERADO=0"
+echo.
 echo   Espacio liberado: %LIBERADO% MB.
 echo   La limpieza automatica de Windows sigue activa y se encarga del resto.
 echo   Si vas a desfragmentar (opcion 3), ahora es el momento: hay menos que mover.
@@ -850,6 +921,8 @@ if /i "%_hex%"=="0x800F0806" echo       Hay una actualizacion esperando un reini
 echo       Lo mas comun: una actualizacion a medio instalar. Reinicia la PC, deja
 echo       que Windows Update termine y volve a elegir esta opcion.
 echo       El detalle queda en C:\Windows\Logs\DISM\dism.log.
+echo.
+echo   2 terminado.
 goto :menu
 
 :: =========================================================================
@@ -1451,6 +1524,7 @@ goto :eof
 ::   - LIMPIEZA: vaciado de temporales (paso 11 de la opcion 1).
 ::   - FINAL: estado de Defender e inicio de Windows (final de la opcion 1).
 ::   - ARRANQUE: lo que arranca solo con Windows (paso 10 de la opcion 1 y opcion 6).
+::   - ACTUALIZAR: todo lo pendiente de Windows Update (opcion 2).
 ::   - VERIFICAR: el reporte de la opcion 7.
 ::   - LUZ: luz nocturna del anochecer al amanecer (paso 7 de la opcion 1).
 ::   - AULA: borrado de perfiles de Chrome (opcion 5).
@@ -1844,6 +1918,13 @@ Get-Process | Where-Object { $_.Path -and -not $_.Path.StartsWith($win, [StringC
     $x = ''; if ($_.C -gt 1) { $x = ' (x' + $_.C + ')' }
     Write-Output ('    ' + ([string]$_.MB).PadLeft(5) + ' MB  ' + $_.N + $x)
 }
+# Una actualizacion a medias se termina al reiniciar, y en un disco mecanico tarda:
+# que no apaguen la PC apenas vuelve.
+if ((Test-Path -LiteralPath 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired') -or (Test-Path -LiteralPath 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending')) {
+    Write-Output ''
+    Write-Output '  Windows Update tiene una actualizacion a medias: la termina al reiniciar. Deja'
+    Write-Output '  la PC prendida y enchufada hasta que el disco se calme, aunque tarde media hora.'
+}
 # BitLocker en marcha (3 descifrando, 5 en pausa): que se sepa que sigue solo.
 Get-CimInstance -Namespace root\CIMV2\Security\MicrosoftVolumeEncryption -ClassName Win32_EncryptableVolume | Where-Object { $_.DriveLetter -and $_.ConversionStatus -ne 0 } | ForEach-Object {
     $c = Invoke-CimMethod -InputObject $_ -MethodName GetConversionStatus
@@ -1851,6 +1932,56 @@ Get-CimInstance -Namespace root\CIMV2\Security\MicrosoftVolumeEncryption -ClassN
     else { Write-Output ('  AVISO: BitLocker en ' + $_.DriveLetter + ' sigue cifrado. "manage-bde -status ' + $_.DriveLetter + '" dice por que no se apago.') }
 }
 #FINAL-FIN#
+#ACTUALIZAR-INICIO#
+# Opcion 2, paso 1: todo lo pendiente de Windows Update con la API COM de Windows
+# (anda en Home, sin modulos): calidad, drivers, versiones nuevas. Van de a una, para
+# que se vea avanzar; las de version se instalan solas igual. Quedan afuera las
+# optativas que no son drivers (las acumulativas "preview" se instalarian dos veces)
+# y las que piden interaccion. Sale con 0 si no queda nada, 2 si instalo y hay que
+# volver a buscar, 3 si hay que reiniciar, 1 si no pudo buscar.
+$ErrorActionPreference = 'SilentlyContinue'
+$ses = New-Object -ComObject Microsoft.Update.Session
+$ses.ClientApplicationID = 'OptimizarPC'
+Write-Output '  Buscando actualizaciones, puede tardar varios minutos...'
+$r = $null
+try { $r = $ses.CreateUpdateSearcher().Search('IsInstalled=0 and IsHidden=0') } catch { }
+if (-not $r) { Write-Output '  [AVISO] No se pudo buscar actualizaciones. Hay internet? Se sigue con el resto.'; exit 1 }
+# Type 2 = driver. BrowseOnly = optativa.
+$pend = @($r.Updates | Where-Object { (-not $_.BrowseOnly -or $_.Type -eq 2) -and -not $_.InstallationBehavior.CanRequestUserInput })
+if (-not $pend.Count) { Write-Output '  [OK] Windows esta al dia: no queda nada pendiente.'; exit 0 }
+Write-Output ('  ' + $pend.Count + ' pendientes:')
+foreach ($u in $pend) { Write-Output ('    - ' + $u.Title + ' (' + [math]::Round($u.MaxDownloadSize / 1MB) + ' MB)') }
+$reiniciar = $false; $ok = 0
+foreach ($u in $pend) {
+    if (-not $u.EulaAccepted) { $u.AcceptEula() }
+    $col = New-Object -ComObject Microsoft.Update.UpdateColl
+    [void]$col.Add($u)
+    if (-not $u.IsDownloaded) {
+        Write-Output ('  Descargando ' + $u.Title + '...')
+        $d = $ses.CreateUpdateDownloader(); $d.Updates = $col
+        $dr = $null
+        try { $dr = $d.Download() } catch { }
+        # ResultCode 2 = bien, 3 = bien con errores.
+        if (-not $dr -or $dr.ResultCode -gt 3) { Write-Output '    [AVISO] no se pudo descargar; se saltea.'; continue }
+    }
+    Write-Output ('  Instalando ' + $u.Title + '... (en disco mecanico, una acumulativa tarda mas de media hora)')
+    $i = $ses.CreateUpdateInstaller(); $i.Updates = $col; $i.ForceQuiet = $true; $i.AllowSourcePrompts = $false
+    $ir = $null
+    try { $ir = $i.Install() } catch { }
+    if ($ir -and $ir.ResultCode -le 3) {
+        $ok++
+        if ($ir.RebootRequired) { $reiniciar = $true; Write-Output '    [OK] instalada; pide reiniciar.' } else { Write-Output '    [OK] instalada.' }
+    } else {
+        $hr = ''
+        if ($ir) { $hr = ' (0x' + $ir.HResult.ToString('X8') + ')' }
+        Write-Output ('    [AVISO] no se pudo instalar' + $hr + '; se sigue con la siguiente.')
+    }
+}
+if ($reiniciar) { exit 3 }
+if ($ok) { exit 2 }
+Write-Output '  [AVISO] No se pudo instalar ninguna: se sigue con el resto.'
+exit 1
+#ACTUALIZAR-FIN#
 #ARRANQUE-INICIO#
 # Paso 10 de la opcion 1; con ARRANQUE_MODO=volver, la opcion 6. Lo que arranca con
 # Windows sin que nadie lo pida. Se desactiva igual que en el Administrador de
@@ -1988,6 +2119,28 @@ else {
 # queda: sin eso la sesion se cierra o se cuelga, y ahi estan este cmd, Explorer
 # y PowerShell. El acceso remoto tambien queda, por si alguien ayuda a distancia.
 $ErrorActionPreference = 'SilentlyContinue'
+# Windows instalando una actualizacion (TiWorker con CPU): se espera. Cortarla la
+# deja a medias y la rehace entera despues, y el paso 10 usa DISM, que falla mientras
+# tanto. TiWorker queda unos minutos sin hacer nada al terminar: por eso se mira la
+# CPU y no solo que exista.
+function TiWorkerOcupado {
+    $a = 0; foreach ($p in @(Get-Process -Name TiWorker)) { $a += $p.TotalProcessorTime.TotalSeconds }
+    if ($a -eq 0) { return $false }
+    Start-Sleep -Seconds 10
+    $b = 0; foreach ($p in @(Get-Process -Name TiWorker)) { $b += $p.TotalProcessorTime.TotalSeconds }
+    return ($b -gt 0 -and ($b - $a) -gt 0.5)
+}
+$t0 = Get-Date
+while (TiWorkerOcupado) {
+    $min = [int]((Get-Date) - $t0).TotalMinutes
+    if ($min -eq 0) { Write-Output '  Windows esta instalando una actualizacion. Se espera a que termine: cortarla' ; Write-Output '  la deja a medias y la rehace entera despues.' }
+    Write-Output ('    ... ' + $min + ' min')
+    Start-Sleep -Seconds 50
+}
+# Windows Update, descargas y el orquestador, parados mientras corre el script. Solo
+# parados: al reiniciar vuelven solos, y el paso 1 solo repara lo deshabilitado.
+foreach ($s in 'wuauserv', 'UsoSvc', 'BITS', 'DoSvc') { Stop-Service -Name $s -Force }
+Write-Output '  [OK] Windows Update frenado hasta el reinicio.'
 $antes = [int64](Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory
 $sesion = (Get-Process -Id $PID).SessionId
 $win = $env:SystemRoot.TrimEnd('\') + '\'
@@ -2300,6 +2453,16 @@ foreach ($n in $espera.Keys) {
 L '  (* = distinto de lo que deja la v2. Antes de correrla, es normal que haya varios.)'
 
 # --- Tareas programadas ---------------------------------------------------------
+Titulo 'Windows Update'
+$au = $null
+try { $au = (New-Object -ComObject Microsoft.Update.AutoUpdate).Results } catch { }
+if ($au) {
+    L ('Ultima busqueda / ultima instalacion: ' + $au.LastSearchSuccessDate + ' / ' + $au.LastInstallationSuccessDate + '  (hora UTC)')
+}
+$rp = (Test-Path -LiteralPath 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired') -or (Test-Path -LiteralPath 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending')
+L ('Reinicio pendiente de una actualizacion: ' + $rp)
+L ('Instalador de modulos (TiWorker) corriendo ahora: ' + [bool](Get-Process -Name TiWorker))
+
 Titulo 'Tareas programadas'
 $tareas = @(
     '\Microsoft\Windows\Defrag\ScheduledDefrag',
