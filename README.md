@@ -207,6 +207,16 @@ Sin exclusiones.
 | Precarga de apps (`ApplicationPreLaunch`) | Apagada. |
 | WPBT y apps acompañantes de dispositivos | Apagado (WinUtil). |
 
+**Avisos de Configuración.** "Haz una copia de seguridad de tu PC en una cuenta de Microsoft" y parecidos salen
+por tres lados y se apagan por tres lados: `EnableAccountNotifications=0` en
+`SystemSettings\AccountNotifications` del usuario (la casilla "Mostrar notificaciones relacionadas con la cuenta"
+de Configuración), `Start_AccountNotifications=0` (el menú Inicio, 24H2) y la política documentada
+`DisableAccountNotifications=1` ([Policy CSP](https://learn.microsoft.com/en-us/windows/client-management/mdm/policy-csp-notifications)).
+Las notificaciones de *Recordatorio de copia de seguridad*, *Sugerencias* y *Consejos de Windows* se apagan como
+en Configuración > Notificaciones (`Notifications\Settings\Windows.SystemToast.<nombre>\Enabled=0`). Y desde 23H2
+se esconde la página de inicio de Configuración, donde viven esas tarjetas: `SettingsPageVisibility=hide:home`,
+y Configuración abre en Sistema. La opción 6 borra todo eso.
+
 ### 7. Interfaz y Explorador
 
 - Efectos visuales en "mejor rendimiento", excepto: contenido de ventana al arrastrar; suavizado de fuentes;
@@ -294,6 +304,11 @@ Sin él, *Apagar* es un apagado completo.
 - Pestañas en suspensión de Edge: 5 min con menos de 4 GB, 30 min con 4 GB o más (fábrica: 2 h).
 - Ambos muestran "Administrado por tu organización" (políticas).
 
+Chrome y Edge tampoco piden ser el navegador predeterminado (`DefaultBrowserSettingEnabled=0`, que además saca
+el botón de Chrome para hacerse predeterminado: eso se elige en Configuración > Aplicaciones predeterminadas), y
+Chrome no abre pestañas de bienvenida tras cada actualización (`PromotionalTabsEnabled=0`) ni pregunta por Privacy
+Sandbox (`PrivacySandboxPromptEnabled=0`). Antes esas tres estaban solo en la opción 5.
+
 ### 10. OneDrive y apps preinstaladas
 
 Sin preguntas. OneDrive se da por usado si tiene una cuenta iniciada con más de 3 archivos en su carpeta (sin
@@ -328,6 +343,10 @@ programada *Overseer* (`\Avast Software\Overseer`), que cada 3 horas y media se 
 "remedia" los productos Avast (su `overseer.def` lista `forced_update`, `ui_not_running`), y su exe. En la laptop de
 prueba (TEDGE NBi3, imagen OEM de 2023) estaba de fábrica en `C:\Windows\OEM\CustomizationFiles`, sin ningún Avast
 instalado, firmado por Gen Digital y con fecha de septiembre de 2026. Sin probar la desinstalación de los productos.
+McAfee también: *Security Scan Plus* (viene con Adobe) y *WebAdvisor* en silencio con `/S`; las suites (LiveSafe,
+Total Protection, la de fábrica) no tienen desinstalación silenciosa, hasta la herramienta oficial MCPR pide un
+captcha, así que el script abre su desinstalador y sigue: el técnico toca *Quitar*. Defender se activa solo cuando
+McAfee se va.
 
 ### 11. Inicio de Windows: lo que arranca solo
 
@@ -755,7 +774,8 @@ fija; revisar *Load/Unload Cycle Count* con [CrystalDiskInfo](https://crystalmar
 
 Sin probar en Windows real: la opción 3, y lo nuevo de octubre de 2026: el inicio de Windows (`StartupApproved`,
 tareas de inicio de la Store, servicios de fabricante), BitLocker, VBS, el menú clásico de Windows 11, el ID de
-uBlock Origin Lite en Edge, `PreventDeviceEncryption` en 24H2, la desinstalación de Avast, AVG y CCleaner, y de la
+uBlock Origin Lite en Edge, `PreventDeviceEncryption` en 24H2, la desinstalación de Avast, AVG, CCleaner y McAfee,
+los avisos de Configuración, y de la
 opción 2 la instalación de actualizaciones con reinicios automáticos. De la opción 2 sí se probó en la laptop i3
 (Windows 11 25H2, HDD): la tarea `onlogon` arranca al iniciar sesión, la caché se aparta, winget actualiza y
 `ResetBase` corre. **Por SSH no se puede probar Windows Update:** en una sesión de OpenSSH Windows niega las COM del

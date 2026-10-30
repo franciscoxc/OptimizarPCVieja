@@ -430,6 +430,14 @@ call :dword "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\UserProfileEngage
 call :dword "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\AdvertisingInfo" Enabled 0
 call :dword "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Privacy" TailoredExperiencesWithDiagnosticDataEnabled 0
 call :dword "%UHIVE%\Software\Microsoft\Siuf\Rules" NumberOfSIUFInPeriod 0
+:: Los avisos de "haz una copia de seguridad en tu cuenta de Microsoft" y parecidos:
+:: en Configuracion, en el menu Inicio (24H2) y como notificacion. Y la pagina de
+:: inicio de Configuracion (desde 23H2), donde viven esas tarjetas: se abre en Sistema.
+call :dword "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\SystemSettings\AccountNotifications" EnableAccountNotifications 0
+call :dword "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" Start_AccountNotifications 0
+call :dword "HKLM\SOFTWARE\Policies\Microsoft\Windows\CurrentVersion\AccountNotifications" DisableAccountNotifications 1
+for %%v in (BackupReminder Suggested WindowsTip) do call :dword "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Notifications\Settings\Windows.SystemToast.%%v" Enabled 0
+if %BUILD% GEQ 22631 call :sz "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer" SettingsPageVisibility hide:home
 call :dword "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Search" BingSearchEnabled 0
 call :dword "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Search" CortanaConsent 0
 call :dword "%UHIVE%\Software\Policies\Microsoft\Windows\Explorer" DisableSearchBoxSuggestions 1
@@ -634,7 +642,7 @@ if "%PERFIL_4GB%"=="1" (echo   [OK] Menu de apagado: Suspender queda, Hibernar n
 call :titulo "9/11  Navegadores"
 :: =========================================================================
 set "_edge=HKLM\SOFTWARE\Policies\Microsoft\Edge"
-for %%v in (StartupBoostEnabled BackgroundModeEnabled HubsSidebarEnabled WebWidgetAllowed ShowRecommendationsEnabled EdgeShoppingAssistantEnabled ShowMicrosoftRewards PersonalizationReportingEnabled DiagnosticData UserFeedbackAllowed) do call :dword "%_edge%" %%v 0
+for %%v in (StartupBoostEnabled BackgroundModeEnabled HubsSidebarEnabled WebWidgetAllowed ShowRecommendationsEnabled EdgeShoppingAssistantEnabled ShowMicrosoftRewards PersonalizationReportingEnabled DiagnosticData UserFeedbackAllowed DefaultBrowserSettingEnabled) do call :dword "%_edge%" %%v 0
 call :dword "%_edge%" HideFirstRunExperience 1
 call :dword "%_edge%\Recommended" SleepingTabsEnabled 1
 :: Pestanas en suspension: a los 5 minutos con menos de 4 GB; con 4 GB o mas, a la
@@ -644,6 +652,10 @@ if "%PERFIL_4GB%"=="1" set "_tabs=1800"
 call :dword "%_edge%\Recommended" SleepingTabsTimeout %_tabs%
 call :dword "HKLM\SOFTWARE\Policies\Microsoft\EdgeUpdate" CreateDesktopShortcutDefault 0
 call :dword "HKLM\SOFTWARE\Policies\Google\Chrome" BackgroundModeEnabled 0
+:: Sin pestanas de bienvenida tras cada actualizacion, sin el aviso de Privacy Sandbox y
+:: sin pedir ser el navegador predeterminado: eso se elige en Configuracion, Aplicaciones
+:: predeterminadas. Edge, lo mismo (DefaultBrowserSettingEnabled, en su lista).
+for %%v in (PromotionalTabsEnabled PrivacySandboxPromptEnabled DefaultBrowserSettingEnabled) do call :dword "HKLM\SOFTWARE\Policies\Google\Chrome" %%v 0
 :: Con StartupBoostEnabled en 0, Edge se saca solo del inicio, pero recien la proxima
 :: vez que arranca: el script terminaba mostrandolo todavia en el inicio.
 for /f %%v in ('reg query "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Run" 2^>nul ^| findstr /i /c:"MicrosoftEdgeAutoLaunch_"') do reg delete "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Run" /v %%v /f >nul 2>&1
@@ -1100,6 +1112,11 @@ call :borrar "%_adv%" LaunchTo
 :: Sin estos valores, Windows vuelve a su barra de fabrica.
 call :borrar "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Search" SearchboxTaskbarMode
 for %%v in (ShowCortanaButton ShowCopilotButton ShowTaskViewButton TaskbarGlomLevel IsEnabled) do call :borrar "%_adv%" %%v
+call :borrar "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\SystemSettings\AccountNotifications" EnableAccountNotifications
+call :borrar "%_adv%" Start_AccountNotifications
+call :borrar "HKLM\SOFTWARE\Policies\Microsoft\Windows\CurrentVersion\AccountNotifications" DisableAccountNotifications
+for %%v in (BackupReminder Suggested WindowsTip) do call :borrar "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Notifications\Settings\Windows.SystemToast.%%v" Enabled
+call :borrar "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer" SettingsPageVisibility
 call :dword "%UHIVE%\Software\Microsoft\Windows\DWM" EnableAeroPeek 1
 call :dword "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" EnableTransparency 1
 call :borrar "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Explorer" AltTabSettings
@@ -1139,7 +1156,7 @@ echo        Los puntos de restauracion borrados no vuelven: empiezan de cero.
 
 call :titulo "Navegadores"
 set "_edge=HKLM\SOFTWARE\Policies\Microsoft\Edge"
-for %%v in (StartupBoostEnabled BackgroundModeEnabled HubsSidebarEnabled WebWidgetAllowed ShowRecommendationsEnabled EdgeShoppingAssistantEnabled ShowMicrosoftRewards PersonalizationReportingEnabled DiagnosticData UserFeedbackAllowed HideFirstRunExperience) do call :borrar "%_edge%" %%v
+for %%v in (StartupBoostEnabled BackgroundModeEnabled HubsSidebarEnabled WebWidgetAllowed ShowRecommendationsEnabled EdgeShoppingAssistantEnabled ShowMicrosoftRewards PersonalizationReportingEnabled DiagnosticData UserFeedbackAllowed HideFirstRunExperience DefaultBrowserSettingEnabled) do call :borrar "%_edge%" %%v
 call :borrar "%_edge%\Recommended" SleepingTabsEnabled
 call :borrar "%_edge%\Recommended" SleepingTabsTimeout
 call :borrar "HKLM\SOFTWARE\Policies\Microsoft\EdgeUpdate" CreateDesktopShortcutDefault
@@ -1895,8 +1912,10 @@ if ((Get-WindowsOptionalFeature -Online -FeatureName Microsoft-RemoteDesktopConn
 # uno: Instup.exe (Avast y AVG) con /instop:uninstall /silent, uninst.exe (CCleaner,
 # NSIS) con /S. Puede pedir reiniciar.
 $u = 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*', 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*'
-$patronAv = '^Avast (Free |Premium )?(Antivirus|Security|One)|^AVG (AntiVirus|Internet Security)|^CCleaner'
-foreach ($p in @(Get-ItemProperty -Path $u -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -match $patronAv -and $_.UninstallString -match '^"?([A-Za-z]:\\[^"]+?\.exe)' })) {
+$patronAv = '^Avast (Free |Premium )?(Antivirus|Security|One)|^AVG (AntiVirus|Internet Security)|^CCleaner|^McAfee (Security Scan|WebAdvisor)'
+foreach ($p in @(Get-ItemProperty -Path $u -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -match $patronAv })) {
+    # El -match va adentro del bucle: $Matches guarda solo el ultimo del Where-Object.
+    if ($p.UninstallString -notmatch '^"?([A-Za-z]:\\[^"]+?\.exe)') { continue }
     $exe = $Matches[1]
     if ($exe -match 'Instup\.exe$') { $arg = '/instop:uninstall /silent' } else { $arg = '/S' }
     if (-not (Test-Path -LiteralPath $exe)) { continue }
@@ -1904,6 +1923,15 @@ foreach ($p in @(Get-ItemProperty -Path $u -ErrorAction SilentlyContinue | Where
     $pr = Start-Process -FilePath $exe -ArgumentList $arg -PassThru -WindowStyle Hidden
     if ($pr -and $pr.WaitForExit(600000)) { Write-Output ('  [OK] ' + $p.DisplayName + ' desinstalado.') }
     else { Write-Output ('  [AVISO] ' + $p.DisplayName + ': el desinstalador no termino; desinstalalo desde Configuracion.') }
+}
+# McAfee (LiveSafe, Total Protection, el de fabrica): redundante con Defender y pide
+# plata. Su desinstalador no se puede correr en silencio (hasta MCPR pide un captcha):
+# se abre y el script sigue; el tecnico toca Quitar. Defender se activa solo al irse.
+foreach ($p in @(Get-ItemProperty -Path $u -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -match '^McAfee' -and $_.DisplayName -notmatch '^McAfee (Security Scan|WebAdvisor)' })) {
+    if ($p.UninstallString -notmatch '^"?([A-Za-z]:\\[^"]+?\.exe)"?\s*(.*)$') { continue }
+    if (-not (Test-Path -LiteralPath $Matches[1])) { continue }
+    if ($Matches[2]) { Start-Process -FilePath $Matches[1] -ArgumentList $Matches[2] } else { Start-Process -FilePath $Matches[1] }
+    Write-Output ('  [AVISO] ' + $p.DisplayName + ': se abrio su desinstalador, que no sabe correr en silencio. Toca Quitar; el script sigue.')
 }
 # Lo que dejan atras, con producto o sin el: la tarea Overseer, que cada 3 horas y
 # media se actualiza sola y puede volver a instalar Avast. En la laptop de prueba
@@ -2624,6 +2652,7 @@ $pol = 'HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows'
 $lista = @(
     @(($pol + '\DataCollection'), 'AllowTelemetry'),
     @(($pol + '\Windows Feeds'), 'EnableFeeds'),
+    @('HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer', 'SettingsPageVisibility'),
     @(($pol + '\Windows Search'), 'AllowCortana'),
     @(($pol + '\Windows Search'), 'EnableDynamicContentInWSB'),
     @(($pol + '\GameDVR'), 'AllowGameDVR'),
@@ -2648,6 +2677,8 @@ foreach ($par in $lista) { L ($par[1].PadRight(32) + (Leer $par[0] $par[1]).PadR
 Titulo 'Ajustes del usuario de la sesion'
 $lista = @(
     @(($U + '\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager'), 'SilentInstalledAppsEnabled'),
+    @(($U + '\Software\Microsoft\Windows\CurrentVersion\SystemSettings\AccountNotifications'), 'EnableAccountNotifications'),
+    @(($U + '\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'), 'Start_AccountNotifications'),
     @(($U + '\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager'), 'SubscribedContent-338389Enabled'),
     @(($U + '\Software\Microsoft\Windows\CurrentVersion\AdvertisingInfo'), 'Enabled'),
     @(($U + '\Software\Policies\Microsoft\Windows\Explorer'), 'DisableSearchBoxSuggestions'),
