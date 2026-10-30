@@ -2039,10 +2039,11 @@ foreach ($u in $pend) {
     # y con los archivos ya ahi la descarga vuelve enseguida.
     Write-Output ('  Descargando ' + $u.Title + '...')
     $d = $ses.CreateUpdateDownloader(); $d.Updates = $col
-    $dr = $null
-    try { $dr = $d.Download() } catch { }
+    $dr = $null; $hr = ''
+    try { $dr = $d.Download() } catch { $hr = ' (' + $_.Exception.Message + ')' }
     # ResultCode 2 = bien, 3 = bien con errores.
-    if (-not $dr -or $dr.ResultCode -gt 3) { Write-Output '    [AVISO] no se pudo descargar; se saltea.'; continue }
+    if ($dr -and $dr.ResultCode -gt 3) { $hr = ' (0x' + $dr.HResult.ToString('X8') + ')' }
+    if (-not $dr -or $dr.ResultCode -gt 3) { Write-Output ('    [AVISO] no se pudo descargar' + $hr + '; se saltea.'); continue }
     Write-Output ('  Instalando ' + $u.Title + '... (en disco mecanico, una acumulativa tarda mas de media hora)')
     # ForceQuiet: las que declaran que podrian preguntar algo (los drivers, casi siempre)
     # se instalan calladas igual; si una falla por eso, se sigue con la siguiente.
