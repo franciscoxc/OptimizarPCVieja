@@ -293,6 +293,13 @@ el botón de Chrome para hacerse predeterminado: eso se elige en Configuración 
 Chrome no abre pestañas de bienvenida tras cada actualización (`PromotionalTabsEnabled=0`) ni pregunta por Privacy
 Sandbox (`PrivacySandboxPromptEnabled=0`). Antes esas tres estaban solo en la opción 5.
 
+Privacy Sandbox queda apagado, no solo su aviso: es el sistema de publicidad de Google dentro de Chrome, que
+reemplaza las cookies de terceros con el navegador mismo clasificando intereses por el historial (Topics),
+guardando los sitios visitados para que los anunciantes sigan al usuario (Protected Audience) y midiendo avisos
+(Attribution Reporting). uBlock bloquea a quien lo consulta, pero Chrome lo sigue juntando:
+`PrivacySandboxAdTopicsEnabled=0`, `PrivacySandboxSiteEnabledAdsEnabled=0` y `PrivacySandboxAdMeasurementEnabled=0`
+lo cortan en la fuente. Edge no participa, y Brave quitó esas API de su compilación: no hay nada que apagar.
+
 ### 9. OneDrive y apps preinstaladas
 
 Sin preguntas. OneDrive se da por usado si tiene una cuenta iniciada con más de 3 archivos en su carpeta (sin
@@ -499,6 +506,7 @@ Para PCs compartidas (colegio), donde quedan cuentas y sesiones abiertas. Pide c
 | `BrowserAddPersonEnabled` | `0` | No se pueden crear perfiles nuevos. |
 | `PromotionalTabsEnabled` | `0` | Sin pestañas de bienvenida ni promociones. |
 | `PrivacySandboxPromptEnabled` | `0` | Sin el aviso de privacidad de anuncios. |
+| `PrivacySandboxAdTopicsEnabled`, `PrivacySandboxSiteEnabledAdsEnabled`, `PrivacySandboxAdMeasurementEnabled` | `0` | Privacy Sandbox apagado (ver paso 8 de la opción 1). |
 | `DefaultBrowserSettingEnabled` | `0` | No pregunta si es el navegador predeterminado. |
 | `ExtensionInstallForcelist` | uBlock Origin Lite | Se instala sola al abrir Chrome (con internet). |
 

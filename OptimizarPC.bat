@@ -648,12 +648,16 @@ call :dword "HKLM\SOFTWARE\Policies\Google\Chrome" BackgroundModeEnabled 0
 :: Sin pestanas de bienvenida tras cada actualizacion, sin el aviso de Privacy Sandbox y
 :: sin pedir ser el navegador predeterminado: eso se elige en Configuracion, Aplicaciones
 :: predeterminadas. Edge, lo mismo (DefaultBrowserSettingEnabled, en su lista).
-for %%v in (PromotionalTabsEnabled PrivacySandboxPromptEnabled DefaultBrowserSettingEnabled) do call :dword "HKLM\SOFTWARE\Policies\Google\Chrome" %%v 0
+:: Privacy Sandbox apagado, no solo su aviso: es la publicidad de Google adentro de Chrome
+:: (temas por el historial, sitios visitados para los anunciantes, medicion de avisos).
+:: uBlock bloquea a quien lo lee, pero Chrome lo sigue juntando. Edge y Brave no lo traen.
+for %%v in (PromotionalTabsEnabled PrivacySandboxPromptEnabled DefaultBrowserSettingEnabled PrivacySandboxAdTopicsEnabled PrivacySandboxSiteEnabledAdsEnabled PrivacySandboxAdMeasurementEnabled) do call :dword "HKLM\SOFTWARE\Policies\Google\Chrome" %%v 0
 :: Con StartupBoostEnabled en 0, Edge se saca solo del inicio, pero recien la proxima
 :: vez que arranca: el script terminaba mostrandolo todavia en el inicio.
 for /f %%v in ('reg query "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Run" 2^>nul ^| findstr /i /c:"MicrosoftEdgeAutoLaunch_"') do reg delete "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Run" /v %%v /f >nul 2>&1
 echo   [OK] Edge: sin precarga, sin quedar de fondo, sin barra lateral; pestanas en
-echo        suspension a los 5 minutos (media hora con 4 GB o mas). Chrome: sin quedar de fondo.
+echo        suspension a los 5 minutos (media hora con 4 GB o mas). Chrome: sin quedar de fondo
+echo        y sin Privacy Sandbox (la publicidad de Google adentro del navegador).
 echo        Van a decir "Administrado por tu organizacion": es normal.
 :: uBlock Origin Lite en Chrome y en Edge, forzada por politica: en un Atom, lo que
 :: traba una pagina es el JavaScript de los avisos. Si el navegador no esta, la
@@ -1153,7 +1157,7 @@ call :borrar "%_edge%\Recommended" SleepingTabsEnabled
 call :borrar "%_edge%\Recommended" SleepingTabsTimeout
 call :borrar "HKLM\SOFTWARE\Policies\Microsoft\EdgeUpdate" CreateDesktopShortcutDefault
 call :borrar "HKLM\SOFTWARE\Policies\Google\Chrome" BackgroundModeEnabled
-for %%v in (BrowserSignin BrowserAddPersonEnabled PromotionalTabsEnabled PrivacySandboxPromptEnabled DefaultBrowserSettingEnabled) do call :borrar "HKLM\SOFTWARE\Policies\Google\Chrome" %%v
+for %%v in (BrowserSignin BrowserAddPersonEnabled PromotionalTabsEnabled PrivacySandboxPromptEnabled DefaultBrowserSettingEnabled PrivacySandboxAdTopicsEnabled PrivacySandboxSiteEnabledAdsEnabled PrivacySandboxAdMeasurementEnabled) do call :borrar "HKLM\SOFTWARE\Policies\Google\Chrome" %%v
 :: uBlock Origin Lite deja de ser obligatoria: queda instalada y cada uno la quita.
 powershell -NoProfile -ExecutionPolicy Bypass -Command "foreach ($p in @(@('HKLM:\SOFTWARE\Policies\Google\Chrome\ExtensionInstallForcelist','ddkjiahejlhfcafbddmgiahcphecmpfh'), @('HKLM:\SOFTWARE\Policies\Microsoft\Edge\ExtensionInstallForcelist','cimighlppcgcoapaliogpjjdehbnofhn'))) { $i=Get-Item -LiteralPath $p[0] -ErrorAction SilentlyContinue; if ($i) { foreach ($v in $i.Property) { if ([string]$i.GetValue($v) -like ($p[1] + '*')) { Remove-ItemProperty -LiteralPath $p[0] -Name $v -ErrorAction SilentlyContinue } } } }" >nul 2>&1
 echo   [OK] Politicas de Edge y Chrome quitadas, incluidas las de Chrome de aula y la que
@@ -1254,7 +1258,7 @@ set "_chr=HKLM\SOFTWARE\Policies\Google\Chrome"
 call :dword "%_chr%" BrowserSignin 0
 call :dword "%_chr%" BrowserAddPersonEnabled 0
 call :dword "%_chr%" PromotionalTabsEnabled 0
-call :dword "%_chr%" PrivacySandboxPromptEnabled 0
+for %%v in (PrivacySandboxPromptEnabled PrivacySandboxAdTopicsEnabled PrivacySandboxSiteEnabledAdsEnabled PrivacySandboxAdMeasurementEnabled) do call :dword "%_chr%" %%v 0
 call :dword "%_chr%" DefaultBrowserSettingEnabled 0
 echo   [OK] Chrome ya no pide iniciar sesion ni muestra pantallas de bienvenida.
 call :politica_ublock
