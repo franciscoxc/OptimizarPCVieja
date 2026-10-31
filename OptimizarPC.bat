@@ -3,10 +3,6 @@ setlocal EnableExtensions DisableDelayedExpansion
 :: La ruta de este archivo, para PowerShell. Por variable de entorno, y no pegada
 :: en el comando, para que una carpeta con apostrofo o & en el nombre no rompa nada.
 set "OPT_RUTA=%~f0"
-:: "/actualizar N": la opcion 2 se vuelve a abrir sola despues de cada reinicio, en
-:: la ronda N. Se guarda antes de elevar: al elevar, los argumentos hay que pasarlos.
-set "OPT_ARG=%~1"
-set "OPT_RONDA=%~2"
 :: Al publicar en GitHub, "local" se reemplaza por el numero de version y la fecha.
 set "OPT_VERSION=local"
 :: Barra de titulo: el nombre y el numero de version ("v52"); cada opcion agrega la suya.
@@ -49,7 +45,7 @@ exit /b
 fltmc >nul 2>&1
 if not errorlevel 1 goto :es_admin
 echo Pidiendo permisos de administrador...
-powershell -NoProfile -ExecutionPolicy Bypass -Command "try { if ($env:OPT_ARG) { Start-Process -FilePath $env:OPT_RUTA -ArgumentList ($env:OPT_ARG + ' ' + $env:OPT_RONDA) -Verb RunAs -ErrorAction Stop } else { Start-Process -FilePath $env:OPT_RUTA -Verb RunAs -ErrorAction Stop }; exit 0 } catch { exit 1 }"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "try { Start-Process -FilePath $env:OPT_RUTA -Verb RunAs -ErrorAction Stop; exit 0 } catch { exit 1 }"
 if not errorlevel 1 exit /b
 echo.
 echo  No se obtuvieron permisos de administrador.
@@ -72,8 +68,6 @@ set "REINICIO_PENDIENTE=0"
 :: RUXIM\PLUGScheduler (los avisos de "pasate a Windows 11") no esta: es de
 :: TrustedInstaller y schtasks responde "Acceso denegado" aun como administrador.
 set "_tareas="\Microsoft\Windows\Application Experience\Microsoft Compatibility Appraiser" "\Microsoft\Windows\Application Experience\ProgramDataUpdater" "\Microsoft\Windows\Autochk\Proxy" "\Microsoft\Windows\Customer Experience Improvement Program\Consolidator" "\Microsoft\Windows\Customer Experience Improvement Program\UsbCeip" "\Microsoft\Windows\DiskDiagnostic\Microsoft-Windows-DiskDiagnosticDataCollector" "\Microsoft\Windows\Feedback\Siuf\DmClient" "\Microsoft\Windows\Feedback\Siuf\DmClientOnScenarioDownload" "\Microsoft\Windows\Maps\MapsUpdateTask" "\Microsoft\Windows\Maps\MapsToastTask" "\Microsoft\Windows\Windows Error Reporting\QueueReporting" "\Microsoft\Windows\Maintenance\WinSAT" "\Microsoft\XblGameSave\XblGameSaveTask" "\Microsoft\Windows\Device Information\Device" "\Microsoft\Windows\Device Information\Device User" "\Microsoft\Windows\PushToInstall\LoginCheck" "\Microsoft\Windows\PushToInstall\Registration" "\Microsoft\Windows\Speech\SpeechModelDownloadTask" "\Microsoft\Windows\Application Experience\StartupAppTask" "\Microsoft\Windows\Application Experience\MareBackup" "\Microsoft\Windows\PI\Sqm-Tasks" "\Microsoft\Windows\Diagnosis\RecommendedTroubleshootingScanner" "\Microsoft\Windows\NetTrace\GatherNetworkInfo" "\Microsoft\Windows\Customer Experience Improvement Program\KernelCeipTask" "\Microsoft\Windows\Customer Experience Improvement Program\BthSQM" "\Microsoft\Office\OfficeTelemetryAgentLogOn2016" "\Microsoft\Office\OfficeTelemetryAgentFallBack2016""
-:: Vuelta de un reinicio de la opcion 2: sigue con la ronda que toca, sin menu.
-if /i "%OPT_ARG%"=="/actualizar" goto :op_limpiar_wu
 :menu
 :: Las opciones vuelven aca. La pantalla no se borra, queda como registro de lo
 :: que se hizo: unas lineas en blanco separan su salida del menu.
@@ -812,58 +806,49 @@ goto :menu
 :: =========================================================================
 :op_limpiar_wu
 title %OPT_TITULO% - Actualizar Windows a fondo y limpiar restos
-if not defined OPT_RONDA set "OPT_RONDA=1"
-:: Vuelta de un reinicio: la tarea que reabrio el script ya cumplio.
-schtasks /delete /tn "OptimizarPC actualizar" /f >nul 2>&1
-set "OPT_ARG="
 echo ==========================================================================
 echo   ACTUALIZAR WINDOWS A FONDO Y LIMPIAR RESTOS
 echo ==========================================================================
 echo.
 echo   1. Vacia la cache de descargas de Windows Update e instala TODO lo
-echo      pendiente (calidad, drivers, version), reinicia las veces que haga
-echo      falta y sigue sola al iniciar sesion, hasta que no quede nada.
-echo      Horas en un disco mecanico.
+echo      pendiente (calidad, drivers, version). Si algo pide reiniciar, avisa:
+echo      reinicia y volve a elegir esta opcion. Horas en un disco mecanico.
 echo   2. Actualiza los programas con winget.
 echo   3. DISM /ResetBase: las actualizaciones instaladas ya no se podran
 echo      desinstalar. Hasta una hora mas. No apagues la PC.
 
 :: -------------------------------------------------------------------------
 :: 1. Windows Update hasta el final. La seccion ACTUALIZAR sale con 0 si no queda
-:: nada, 2 si instalo y hay que volver a buscar, 3 si hay que reiniciar, 1 si no
-:: pudo buscar (sin internet): se sigue igual con winget y DISM.
+:: nada, 2 si instalo y hay que volver a buscar (despues de instalar suele ofrecer
+:: mas), 3 si hay que reiniciar, 1 si no pudo buscar (sin internet): se sigue igual
+:: con winget y DISM. Si pide reiniciar, el usuario reinicia y vuelve a elegir la
+:: opcion: una tarea que seguia sola al iniciar sesion andaba, pero era mas pieza
+:: que lo que ahorraba.
 :: -------------------------------------------------------------------------
-:wu_ronda
-call :titulo "1/3  Windows Update, ronda %OPT_RONDA% de 5"
+call :titulo "1/3  Windows Update"
+:: Tope de busquedas: alguna actualizacion dice "instalada" y Windows Update la
+:: vuelve a ofrecer; sin tope, esto no terminaria nunca.
+set "_wu_busquedas=0"
+:wu_buscar
+set /a _wu_busquedas+=1
 call :ps ACTUALIZAR
 set "_wu=%errorlevel%"
-if "%_wu%"=="0" goto :wu_al_dia
-if "%_wu%"=="1" goto :wu_al_dia
-if %OPT_RONDA% GEQ 5 goto :wu_tope
-set /a OPT_RONDA+=1
-if "%_wu%"=="2" goto :wu_ronda
-:: Reinicio: una tarea reabre este script al iniciar sesion, en la ronda que sigue,
-:: con los permisos ya dados y sin volver a pasar por el menu. Sin /ru, corre como
-:: el usuario que esta elevando; si elevo otra cuenta, sigue cuando entre esa.
-schtasks /create /tn "OptimizarPC actualizar" /sc onlogon /it /rl highest /tr "\"%OPT_RUTA%\" /actualizar %OPT_RONDA%" /f >nul 2>&1
-if errorlevel 1 goto :wu_sin_tarea
+if "%_wu%"=="3" goto :wu_reiniciar
+if not "%_wu%"=="2" goto :wu_al_dia
+if %_wu_busquedas% GEQ 5 goto :wu_tope
+echo   Se busca de nuevo: despues de instalar suele aparecer mas.
+goto :wu_buscar
+:wu_tope
+echo   [AVISO] Cinco busquedas y Windows Update sigue ofreciendo cosas: se sigue con el resto.
+goto :wu_al_dia
+:wu_reiniciar
 echo.
-echo   Hay que reiniciar para seguir. Reinicia en 15 segundos y, al iniciar sesion,
-echo   este script se abre solo y continua con la ronda %OPT_RONDA%.
-shutdown /r /t 15 /c "OptimizarPC: reiniciando para seguir instalando actualizaciones"
-exit /b 0
-:wu_sin_tarea
-set "OPT_RONDA="
-echo.
-echo   [AVISO] No se pudo programar la vuelta automatica. Reinicia la PC y volve a
-echo           elegir la opcion 2.
+echo   Hay que REINICIAR para que Windows termine de instalar. Despues, volve a
+echo   elegir esta opcion: sigue con lo que falte.
 echo.
 echo   Opcion 2 terminada.
-goto :menu
-:wu_tope
-echo   [AVISO] Cinco rondas y Windows Update sigue ofreciendo cosas: se sigue con el resto.
+goto :fin_con_reinicio
 :wu_al_dia
-set "OPT_RONDA="
 
 :: -------------------------------------------------------------------------
 :: 2. Programas, con winget. --include-unknown: los VLC y WinRAR viejos no
@@ -2078,9 +2063,8 @@ Get-CimInstance -Namespace root\CIMV2\Security\MicrosoftVolumeEncryption -ClassN
 # reiniciar, 1 si no pudo buscar.
 $ErrorActionPreference = 'SilentlyContinue'
 EsperarTiWorker
-# Con un reinicio pendiente las instalaciones nuevas fallan: primero se reinicia. Solo
-# en la ronda 1: si despues del reinicio sigue marcado, es una marca vieja y se sigue.
-if ($env:OPT_RONDA -eq '1' -and (ReinicioPendiente)) { Write-Output '  Hay una actualizacion a medias que se termina al reiniciar.'; exit 3 }
+# Con un reinicio pendiente las instalaciones nuevas fallan: primero se reinicia.
+if (ReinicioPendiente) { Write-Output '  Hay una actualizacion a medias que se termina al reiniciar.'; exit 3 }
 # Descarga rota (0x80240034, 0x8024200D): Windows la reintenta cada dia, una hora con
 # el disco al 100%, y vuelve a fallar; la laptop de prueba llevaba siete intentos.
 # Vaciar la carpeta de descargas es el remedio exacto, y lo pendiente se baja de

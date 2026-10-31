@@ -28,7 +28,7 @@ suspende (ver [Perfiles](#perfiles-según-el-hardware)).
 |---|---|---|
 | `A` | PC apestada: cierra todos los programas de la sesión, frena Windows Update y sigue con la `1` sin volver a preguntar. Pide confirmación. | Sí |
 | `1` | Optimizar. | Sí |
-| `2` | Actualizar Windows a fondo (todo lo pendiente, con reinicios automáticos), actualizar los programas con winget y limpiar WinSxS con DISM `/ResetBase`. Horas; la limpieza es irreversible. | Sí |
+| `2` | Actualizar Windows a fondo (todo lo pendiente; si algo pide reiniciar, avisa y se vuelve a elegir), actualizar los programas con winget y limpiar WinSxS con DISM `/ResetBase`. Horas; la limpieza es irreversible. | Sí |
 | `3` | Desfragmentación completa. Horas. | Sí |
 | `4` | Instalar WinRAR, Everything, VLC y Chrome con winget. | Sí |
 | `5` | Chrome de aula: cierra Chrome y borra todos sus perfiles; arranca sin pedir iniciar sesión. Pide confirmación. | Sí |
@@ -587,8 +587,8 @@ el taller es lo que la deja bien. Arranca sin preguntar, igual que la 3 y la 4.
    instalando. Le pregunta a Windows Update (`IsBusy` del instalador) y, si esa COM no responde, mide CPU **y bytes
    de disco** de `TiWorker` cada 10 s: preparando 26H2 en la laptop de prueba, `TiWorker` usaba 0,36 s de CPU cada
    10 s y un umbral de solo CPU lo dio por ocioso; el reinicio canceló la instalación al 52 % (`Cancel was
-   requested` en `UpdateAgent.log`). Si hay un reinicio pendiente de antes reinicia antes de buscar (solo en la
-   ronda 1: si después del reinicio sigue marcado, es una marca vieja). Después aparta
+   requested` en `UpdateAgent.log`). Con un reinicio pendiente de antes, avisa, ofrece reiniciar y termina: después hay
+   que volver a elegir la opción. Si no, aparta
    `SoftwareDistribution\Download` renombrándola y la borra de fondo (borrar sus miles de archivos en un disco
    mecánico tardaba más de diez minutos) y vacía la caché de Delivery Optimization: una descarga rota
    (`0x80240034`, `0x8024200D`) Windows la reintenta cada día, una hora con el disco al 100 %, y vuelve a fallar;
@@ -600,13 +600,14 @@ el taller es lo que la deja bien. Arranca sin preguntar, igual que la 3 y la 4.
    a una: calidad, drivers, versiones nuevas. Afuera quedan solo las optativas que no son drivers (las acumulativas
    *preview* se instalarían dos veces); las que declaran que podrían preguntar algo (los drivers, casi siempre) se
    instalan con `ForceQuiet`. Siempre descarga antes de instalar: con la caché recién vaciada `IsDownloaded` puede
-   seguir en `True`. Si alguna pide reinicio, crea una tarea `onlogon` (`/it /rl highest`) que vuelve a abrir el
-   script con `/actualizar N` y reinicia en 15 s; al iniciar sesión sigue solo con la ronda siguiente, sin pasar
-   por el menú ni pedir permisos. Repite hasta que la búsqueda no devuelva nada, con tope de 5 rondas. Sin
-   internet, avisa y sigue con lo demás. Una actualización de versión (24H2, 26H2) entra igual: horas en HDD,
+   seguir en `True`. Si alguna pide reinicio, avisa, ofrece reiniciar y termina: después de reiniciar
+   hay que volver a elegir la opción, que sigue con lo que falte. Si instaló algo y nada pide reinicio, busca de
+   nuevo (Windows Update suele ofrecer más después de instalar), con tope de 5 búsquedas. Hasta la versión 54 una
+   tarea `onlogon` reabría el script sola después de cada reinicio; anduvo (laptop i3, 31/10/2026) y se quitó
+   igual: era más pieza que lo que ahorraba. Sin internet, avisa y sigue con lo demás. Una actualización de versión (24H2, 26H2) entra igual: horas en HDD,
    pero es tiempo de taller.
-2. **Programas con winget**: `winget upgrade --all --include-unknown --source winget --silent`. Muestra la lista
-   antes. `--include-unknown` porque los VLC y WinRAR viejos no declaran bien su versión y sin eso winget los
+2. **Programas con winget**: `winget upgrade --all --include-unknown --source winget --silent` (lista lo que va
+   a actualizar y lo instala). `--include-unknown` porque los VLC y WinRAR viejos no declaran bien su versión y sin eso winget los
    saltea. Solo toca lo que está en su catálogo (Chrome, VLC, VC++, .NET); el software de gestión no está ahí.
 3. **Limpieza de WinSxS**: `Dism.exe /Online /Cleanup-Image /StartComponentCleanup /ResetBase`
    ([Microsoft Learn](https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/clean-up-the-winsxs-folder)).
@@ -769,9 +770,9 @@ fija; revisar *Load/Unload Cycle Count* con [CrystalDiskInfo](https://crystalmar
 
 Sin probar en Windows real: la opción 3, y lo nuevo de octubre de 2026: el inicio de Windows (`StartupApproved` y
 servicios de fabricante), BitLocker, VBS, el menú clásico de Windows 11, el ID de uBlock Origin Lite en Edge,
-`PreventDeviceEncryption` en 24H2, la desinstalación de Avast, AVG, CCleaner y McAfee, y de la opción 2 la cadena de
-reinicios automáticos. De la opción 2 sí se probó en la laptop i3 (Windows 11 25H2, HDD): la tarea `onlogon` arranca
-al iniciar sesión, la caché se aparta, la búsqueda, la descarga y la instalación por COM andan en la sesión de consola
+`PreventDeviceEncryption` en 24H2 y la desinstalación de Avast, AVG, CCleaner y McAfee. De la opción 2 sí se probó en
+la laptop i3 (Windows 11 25H2, HDD; después 26H2 con SSD): la caché se aparta, la búsqueda, la descarga y la
+instalación por COM andan en la sesión de consola
 (un driver Intel de 34 MB con `ForceQuiet`, instalado en un minuto y sin preguntar), winget actualiza y `ResetBase`
 corre (1173 MB liberados en 2 horas de disco mecánico); la opción 1 entera corrió por SSH y dejó las tareas de
 terceros, la tarea de inicio de WhatsApp, los avisos y las políticas de navegador como se esperaba, y la opción 6
@@ -803,9 +804,9 @@ consola, con una tarea programada `/it`.
    - [ ] Win+Shift+S funciona.
    - [ ] Ventana visible al arrastrar; carpetas de fotos con íconos.
    - [ ] Adobe Reader: fuera del inicio; *Adobe Acrobat Update Service* deshabilitado.
-   - [ ] Opción 2 arranca sin preguntar, instala lo pendiente, reinicia sola y sigue al iniciar sesión sin pedir
-     nada; al final no queda nada en Windows Update, winget actualizó, muestra lo liberado y `DisableResetbase`
-     queda como estaba. La tarea «OptimizarPC actualizar» no queda en el Programador de tareas.
+   - [ ] Opción 2 arranca sin preguntar e instala lo pendiente; si algo pide reiniciar, avisa y ofrece reiniciar, y
+     elegida de nuevo sigue con lo que falte. Al final no queda nada en Windows Update, winget actualizó, muestra lo
+     liberado y `DisableResetbase` queda como estaba.
    - [ ] Menú de apagado sin *Hibernar*; *Suspender* solo con 4 GB o más.
    - [ ] Opción 7: la línea "Perfil opción 1" coincide con la RAM, el video y el disco de la PC.
    - [ ] Botón de encendido apaga (en UTM: apagado normal de la VM). Tapa: en la netbook real.
