@@ -13,6 +13,9 @@ set "OPT_VERSION=local"
 set "OPT_TITULO=Optimizar PC Vieja"
 if not "%OPT_VERSION%"=="local" for /f %%n in ("%OPT_VERSION%") do set "OPT_TITULO=Optimizar PC Vieja v%%n"
 title %OPT_TITULO%
+:: Un retroceso (caracter 8) para :preguntar. Lo da el prompt $H de un cmd hijo:
+:: es instantaneo, y no hay otra forma de escribir ese caracter en un .bat ASCII.
+for /f %%a in ('"prompt $H & for %%b in (1) do rem"') do set "BS=%%a"
 :: =========================================================================
 ::  OPTIMIZAR PC VIEJA
 ::  Para Windows 10 con disco mecanico (HDD) y 2 GB de RAM.
@@ -1286,11 +1289,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command "foreach ($p in @(@('HKLM
 goto :eof
 
 :: Pregunta con una sola tecla, sin Enter; cualquier otra se ignora. El errorlevel
-:: queda en la posicion de la tecla (1 para la primera). choice recorta los espacios
-:: del principio del mensaje: se imprime aparte, asi la pregunta queda alineada.
-:: Uso: call :preguntar "mensaje" teclas
+:: queda en la posicion de la tecla (1 para la primera).
+:: ponytail-keep: choice /m y set /p recortan los espacios del principio del mensaje
+:: y la pregunta queda pegada al borde, desalineada del resto (probado con los dos).
+:: El retroceso de adelante no es espacio y los conserva; en pantalla no se ve, en un
+:: registro queda como un byte 08. Uso: call :preguntar "mensaje" teclas
 :preguntar
-<nul set /p "=  %~1"
+<nul set /p "=%BS%  %~1"
 choice /c %~2 /n
 goto :eof
 
