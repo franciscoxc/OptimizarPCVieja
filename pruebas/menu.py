@@ -36,12 +36,12 @@ def plano(texto):
 
 errores = []
 
-teclas = re.search(r'^choice /c (\w+) /n /m "  Toca un numero', BAT, re.M).group(1)
+teclas = re.search(r'^call :preguntar "Toca un numero o la A: " (\w+)$', BAT, re.M).group(1)
 despacho = {}
 for nivel, etiqueta in re.findall(r"^if errorlevel (\d) goto (:\w+)", BAT[BAT.index(":menu"):BAT.index(":fin_con_reinicio")], re.M):
     despacho[teclas[int(nivel) - 1]] = etiqueta
 
-menu = dict(re.findall(r"^echo {5}(\w)\. (.+)$", BAT[BAT.index(":menu"):BAT.index("choice /c " + teclas)], re.M))
+menu = dict(re.findall(r"^echo {5}(\w)\. (.+)$", BAT[BAT.index(":menu"):BAT.index('call :preguntar "Toca')], re.M))
 cabecera = dict(re.findall(r"^:: {4}(\w)\. (.+)$", BAT[:BAT.index(":arquitectura_ok")], re.M))
 tabla = dict(re.findall(r"^\| `(\w)` \| ([^|]+) \|", README, re.M))
 

@@ -9,9 +9,12 @@ set "OPT_ARG=%~1"
 set "OPT_RONDA=%~2"
 :: Al publicar en GitHub, "local" se reemplaza por el numero de version y la fecha.
 set "OPT_VERSION=local"
-title Optimizar PC Vieja v2
+:: Barra de titulo: el nombre y el numero de version ("v52"); cada opcion agrega la suya.
+set "OPT_TITULO=Optimizar PC Vieja"
+if not "%OPT_VERSION%"=="local" for /f %%n in ("%OPT_VERSION%") do set "OPT_TITULO=Optimizar PC Vieja v%%n"
+title %OPT_TITULO%
 :: =========================================================================
-::  OPTIMIZAR PC VIEJA v2
+::  OPTIMIZAR PC VIEJA
 ::  Para Windows 10 con disco mecanico (HDD) y 2 GB de RAM.
 ::
 ::  Un solo archivo, con menu:
@@ -69,11 +72,18 @@ set "_tareas="\Microsoft\Windows\Application Experience\Microsoft Compatibility 
 :: Vuelta de un reinicio de la opcion 2: sigue con la ronda que toca, sin menu.
 if /i "%OPT_ARG%"=="/actualizar" goto :op_limpiar_wu
 :menu
-title Optimizar PC Vieja v2
+:: Las opciones vuelven aca. La pantalla no se borra, queda como registro de lo
+:: que se hizo: unas lineas en blanco separan su salida del menu.
 echo.
+echo.
+:: El encabezado muestra el equipo (seccion EQUIPO); se detecta una sola vez.
+call :detectar
+echo.
+title %OPT_TITULO%
 echo ==========================================================================
-echo   OPTIMIZAR PC VIEJA v2 - Windows 10, disco mecanico, 2 GB de RAM
-echo   Version %OPT_VERSION%
+echo   OPTIMIZAR PC VIEJA, version %OPT_VERSION%
+if defined EQUIPO_HW echo   %EQUIPO_HW%
+if defined EQUIPO_SO echo   %EQUIPO_SO%
 echo ==========================================================================
 if "%REINICIO_PENDIENTE%"=="1" echo   Falta REINICIAR para que se apliquen los cambios.
 echo.
@@ -87,8 +97,8 @@ echo     6. Revertir la optimizacion (deshace la opcion 1)
 echo     7. Verificar el estado (solo mira, no cambia nada)
 echo     0. Salir
 echo.
-:: choice responde a una sola tecla, sin Enter, e ignora cualquier otra.
-choice /c A12345670 /n /m "  Toca un numero o la A: "
+call :preguntar "Toca un numero o la A: " A12345670
+echo.
 if errorlevel 9 goto :salir
 if errorlevel 8 goto :op_verificar
 if errorlevel 7 goto :op_revertir
@@ -104,7 +114,7 @@ goto :menu
 :: se vuelve al menu y se recuerda que falta reiniciar.
 :fin_con_reinicio
 set "REINICIO_PENDIENTE=1"
-choice /c SN /n /m "  Reiniciar ahora? [S/N]: "
+call :preguntar "Reiniciar ahora? [S/N]: " SN
 if errorlevel 2 goto :menu
 shutdown /r /t 10 /c "Reiniciando para aplicar los cambios de OptimizarPC"
 exit /b 0
@@ -113,7 +123,7 @@ exit /b 0
 if not "%REINICIO_PENDIENTE%"=="1" exit /b 0
 echo.
 echo   Hay cambios que recien se aplican al reiniciar.
-choice /c SN /n /m "  Reiniciar ahora? [S/N]: "
+call :preguntar "Reiniciar ahora? [S/N]: " SN
 if errorlevel 2 exit /b 0
 shutdown /r /t 10 /c "Reiniciando para aplicar los cambios de OptimizarPC"
 exit /b 0
@@ -125,7 +135,7 @@ exit /b 0
 ::  preguntar. Lo hace solo si se toca la A: quien la toca sabe lo que hace.
 :: =========================================================================
 :op_apestada
-title Optimizar PC Vieja v2 - PC apestada
+title %OPT_TITULO% - PC apestada
 echo ==========================================================================
 echo   PC APESTADA: CERRAR TODO Y OPTIMIZAR
 echo ==========================================================================
@@ -137,14 +147,15 @@ echo   despues sigue sola con la opcion 1. Windows y el acceso remoto no se toca
 echo.
 echo   LO QUE NO ESTE GUARDADO SE PIERDE.
 echo.
-choice /c SN /n /m "  CERRAR TODO Y OPTIMIZAR? [S/N]: "
+call :preguntar "CERRAR TODO Y OPTIMIZAR? [S/N]: " SN
 if errorlevel 2 goto :menu
 :: Antes de cerrar nada: :detectar reconoce al usuario de la sesion por su Explorer.
 call :detectar
 echo.
 call :ps CERRAR
 echo.
-echo   A terminado.
+echo   Opcion A terminada.
+echo.
 set "SIN_CONFIRMAR=1"
 goto :op_optimizar
 
@@ -152,7 +163,7 @@ goto :op_optimizar
 ::  1. OPTIMIZAR
 :: =========================================================================
 :op_optimizar
-title Optimizar PC Vieja v2 - Optimizar
+title %OPT_TITULO% - Optimizar
 :: Usuario de la sesion, version de Windows y hardware (seccion EQUIPO).
 call :detectar
 :: Perfiles segun el hardware (los fija :detectar, y la opcion 7 los muestra):
@@ -166,17 +177,14 @@ call :detectar
 :: Presentacion
 :: -------------------------------------------------------------------------
 echo ==========================================================================
-echo   OPTIMIZAR PC VIEJA v2 - Windows 10, disco mecanico, 2 GB de RAM
-echo   Version %OPT_VERSION%
+echo   OPTIMIZAR LA PC
 echo ==========================================================================
 echo.
 echo   Usuario al que se le aplican los ajustes: "%UNAME%"
 if not defined USID echo   AVISO: no se detecto la sesion abierta; se usa la cuenta que ejecuta el script.
-echo   Compilacion de Windows: %BUILD%
 if %BUILD% GEQ 22000 echo   AVISO: esto parece Windows 11. El script esta pensado para Windows 10.
 if %BUILD% LSS 19041 echo   AVISO: Windows 10 muy viejo. Conviene actualizar a 22H2 primero.
-echo   Procesador: %CPU_NOMBRE%
-if not "%RAM_MB%"=="9999" echo   RAM: %RAM_MB% MB visibles, %RAM_INST% MB instalados. Disco del sistema: %DISCO_TIPO%.
+if not "%RAM_MB%"=="9999" echo   RAM: %RAM_MB% MB visibles de %RAM_INST% MB instalados.
 if "%PERFIL_4GB%"=="1" echo   Perfil 4 GB o mas: suspende a la hora y con la tapa, Bluetooth en Manual.
 if "%EFECTOS%"=="1" echo   Video con driver: efectos visuales en "mejor apariencia".
 if "%BUSQUEDA%"=="1" echo   SSD y 4 GB o mas: indexador de busqueda como de fabrica.
@@ -211,7 +219,7 @@ echo   - Al terminar hay que REINICIAR la PC.
 echo.
 :: La A ya pregunto una vez: no se pregunta de nuevo.
 if "%SIN_CONFIRMAR%"=="1" goto :confirmado
-choice /c SN /n /m "  Continuar? [S/N]: "
+call :preguntar "Continuar? [S/N]: " SN
 if errorlevel 2 goto :menu
 :confirmado
 set "SIN_CONFIRMAR="
@@ -776,7 +784,7 @@ echo   actualiza solo, si no lo usas para nada conviene desinstalarlo.
 :final_sin_adobe
 echo ==========================================================================
 echo.
-echo   1 terminado.
+echo   Opcion 1 terminada.
 goto :fin_con_reinicio
 
 :: =========================================================================
@@ -784,11 +792,11 @@ goto :fin_con_reinicio
 ::  seccion VERIFICAR al final de este archivo, y se guarda en un .txt al lado.
 :: =========================================================================
 :op_verificar
-title Optimizar PC Vieja v2 - Verificar estado
+title %OPT_TITULO% - Verificar estado
 call :detectar
 call :ps VERIFICAR
 echo.
-echo   7 terminado.
+echo   Opcion 7 terminada.
 goto :menu
 
 :: =========================================================================
@@ -800,7 +808,7 @@ goto :menu
 ::  No usa /SPSuperseded: limpia restos de Service Packs, y Windows 10 no tiene.
 :: =========================================================================
 :op_limpiar_wu
-title Optimizar PC Vieja v2 - Actualizar Windows a fondo y limpiar restos
+title %OPT_TITULO% - Actualizar Windows a fondo y limpiar restos
 if not defined OPT_RONDA set "OPT_RONDA=1"
 :: Vuelta de un reinicio: la tarea que reabrio el script ya cumplio.
 schtasks /delete /tn "OptimizarPC actualizar" /f >nul 2>&1
@@ -816,7 +824,6 @@ echo      Horas en un disco mecanico.
 echo   2. Actualiza los programas con winget.
 echo   3. DISM /ResetBase: las actualizaciones instaladas ya no se podran
 echo      desinstalar. Hasta una hora mas. No apagues la PC.
-echo.
 
 :: -------------------------------------------------------------------------
 :: 1. Windows Update hasta el final. La seccion ACTUALIZAR sale con 0 si no queda
@@ -848,7 +855,7 @@ echo.
 echo   [AVISO] No se pudo programar la vuelta automatica. Reinicia la PC y volve a
 echo           elegir la opcion 2.
 echo.
-echo   2 terminado.
+echo   Opcion 2 terminada.
 goto :menu
 :wu_tope
 echo   [AVISO] Cinco rondas y Windows Update sigue ofreciendo cosas: se sigue con el resto.
@@ -862,9 +869,6 @@ set "OPT_RONDA="
 call :titulo "2/3  Programas, con winget"
 call :buscar_winget
 if errorlevel 1 goto :wu_sin_winget
-echo   Actualizaciones disponibles:
-%WINGET% upgrade --include-unknown --source winget --accept-source-agreements
-echo.
 %WINGET% upgrade --all --include-unknown --source winget --silent --accept-package-agreements --accept-source-agreements
 echo   [OK] Programas actualizados con winget.
 :wu_sin_winget
@@ -885,7 +889,7 @@ if not exist "%SystemRoot%\WinSxS\pending.xml" goto :wu_sin_pendientes
 echo   [!] Hay cambios de Windows esperando un reinicio: DISM no puede limpiar.
 echo       Reinicia la PC y volve a elegir esta opcion.
 echo.
-echo   2 terminado.
+echo   Opcion 2 terminada.
 goto :menu
 :wu_sin_pendientes
 
@@ -924,7 +928,7 @@ echo   Espacio liberado: %LIBERADO% MB.
 echo   La limpieza automatica de Windows sigue activa y se encarga del resto.
 echo   Si vas a desfragmentar (opcion 3), ahora es el momento: hay menos que mover.
 echo.
-echo   2 terminado.
+echo   Opcion 2 terminada.
 goto :menu
 
 :wu_error
@@ -936,7 +940,7 @@ echo       Lo mas comun: una actualizacion a medio instalar. Reinicia la PC, dej
 echo       que Windows Update termine y volve a elegir esta opcion.
 echo       El detalle queda en C:\Windows\Logs\DISM\dism.log.
 echo.
-echo   2 terminado.
+echo   Opcion 2 terminada.
 goto :menu
 
 :: =========================================================================
@@ -948,7 +952,7 @@ goto :menu
 ::  y analisis final. En un SSD no desfragmenta: solo manda TRIM (/L).
 :: =========================================================================
 :op_desfragmentar
-title Optimizar PC Vieja v2 - Desfragmentar a fondo
+title %OPT_TITULO% - Desfragmentar a fondo
 set "DISCO=%SystemDrive%"
 set "MEDIO=desconocido"
 for /f "usebackq delims=" %%m in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "$n=(Get-Partition -DriveLetter $env:SystemDrive.Substring(0,1)).DiskNumber; $d=Get-PhysicalDisk | Where-Object { $_.DeviceId -eq [string]$n } | Select-Object -First 1; if ($d) { [string]$d.MediaType } else { 'desconocido' }"`) do set "MEDIO=%%m"
@@ -1008,7 +1012,7 @@ echo   LISTO. Compara el porcentaje de fragmentacion del analisis inicial y del
 echo   final. La optimizacion semanal automatica de Windows sigue activa.
 echo ==========================================================================
 echo.
-echo   3 terminado.
+echo   Opcion 3 terminada.
 goto :menu
 
 :desfrag_ssd
@@ -1017,7 +1021,7 @@ echo   Es un SSD: desfragmentarlo no lo acelera y le gasta escrituras.
 echo   Lo que necesita es TRIM, que avisa al disco que bloques estan libres.
 defrag %DISCO% /L /U /V
 echo.
-echo   3 terminado.
+echo   Opcion 3 terminada.
 goto :menu
 
 :: =========================================================================
@@ -1027,7 +1031,7 @@ goto :menu
 ::  telemetria apagada ni las apps quitadas (se reinstalan desde la Store).
 :: =========================================================================
 :op_revertir
-title Optimizar PC Vieja v2 - Revertir
+title %OPT_TITULO% - Revertir
 call :detectar
 echo ==========================================================================
 echo   REVERTIR LA OPTIMIZACION
@@ -1040,7 +1044,7 @@ echo   Explorador, energia, navegadores, recortes de Defender, tareas, cache de
 echo   escritura del disco y el actualizador de Adobe Reader.
 echo   NO apaga la seguridad, no enciende la telemetria ni vuelve a cifrar con BitLocker.
 echo.
-choice /c SN /n /m "  Continuar? [S/N]: "
+call :preguntar "Continuar? [S/N]: " SN
 if errorlevel 2 goto :menu
 
 call :titulo "Servicios: valores de fabrica de Windows 10"
@@ -1194,7 +1198,7 @@ echo ==========================================================================
 echo   LISTO. Hay que REINICIAR la PC. Usa "Reiniciar", no "Apagar".
 echo ==========================================================================
 echo.
-echo   6 terminado.
+echo   Opcion 6 terminada.
 goto :fin_con_reinicio
 
 :: =========================================================================
@@ -1206,7 +1210,7 @@ goto :fin_con_reinicio
 ::  forzada (ExtensionInstallForcelist): Chrome la baja sola de la Web Store.
 :: =========================================================================
 :op_instalar
-title Optimizar PC Vieja v2 - Instalar Chrome, WinRAR, VLC y Everything
+title %OPT_TITULO% - Instalar Chrome, WinRAR, VLC y Everything
 echo ==========================================================================
 echo   INSTALAR WINRAR, EVERYTHING, VLC Y CHROME
 echo ==========================================================================
@@ -1227,7 +1231,7 @@ echo   LISTO. uBlock Origin Lite aparece en Chrome al minuto de abrirlo por prim
 echo   vez. Queda fija: desde Chrome no se puede quitar, por eso Chrome muestra
 echo   que lo administra tu organizacion.
 echo.
-echo   4 terminado.
+echo   Opcion 4 terminada.
 goto :menu
 
 :: =========================================================================
@@ -1239,7 +1243,7 @@ goto :menu
 ::  Origin Lite. La seccion AULA, al final del archivo, hace el borrado.
 :: =========================================================================
 :op_chrome_aula
-title Optimizar PC Vieja v2 - Chrome de aula
+title %OPT_TITULO% - Chrome de aula
 echo ==========================================================================
 echo   CHROME DE AULA: CERRAR SESIONES Y BORRAR PERFILES
 echo ==========================================================================
@@ -1248,7 +1252,7 @@ echo   Cierra Chrome y borra TODOS sus perfiles, en todos los usuarios de Window
 echo   cuentas, sesiones abiertas, contrasenas, historial y favoritos. Chrome
 echo   vuelve a arrancar limpio, sin pedir iniciar sesion y con uBlock Origin Lite.
 echo.
-choice /c SN /n /m "  Borrar todo? [S/N]: "
+call :preguntar "Borrar todo? [S/N]: " SN
 if errorlevel 2 goto :menu
 echo.
 :: Sin iniciar sesion en Chrome (en las paginas web si se puede), sin agregar
@@ -1267,7 +1271,7 @@ echo.
 echo   LISTO. Al abrir Chrome va directo al navegador; uBlock Origin Lite aparece
 echo   al minuto (hace falta internet).
 echo.
-echo   5 terminado.
+echo   Opcion 5 terminada.
 goto :menu
 
 :: =========================================================================
@@ -1279,6 +1283,15 @@ goto :menu
 :: con su ID en la tienda de Edge y sin URL). Si ya esta en la lista, no la repite.
 :politica_ublock
 powershell -NoProfile -ExecutionPolicy Bypass -Command "foreach ($p in @(@('HKLM:\SOFTWARE\Policies\Google\Chrome\ExtensionInstallForcelist','ddkjiahejlhfcafbddmgiahcphecmpfh;https://clients2.google.com/service/update2/crx'), @('HKLM:\SOFTWARE\Policies\Microsoft\Edge\ExtensionInstallForcelist','cimighlppcgcoapaliogpjjdehbnofhn'))) { $k=$p[0]; $id=$p[1].Split(';')[0]; if (-not (Test-Path -LiteralPath $k)) { New-Item -Path $k -Force | Out-Null }; $ya=$false; $n=1; foreach ($v in (Get-ItemProperty -LiteralPath $k).PSObject.Properties) { if ($v.Name -match '^[0-9]+$') { if ([string]$v.Value -like ($id + '*')) { $ya=$true }; if ([int]$v.Name -ge $n) { $n=[int]$v.Name + 1 } } }; if (-not $ya) { New-ItemProperty -LiteralPath $k -Name ([string]$n) -Value $p[1] -PropertyType String -Force | Out-Null } }; Write-Output '  [OK] uBlock Origin Lite: Chrome y Edge la instalan solos desde sus tiendas.'"
+goto :eof
+
+:: Pregunta con una sola tecla, sin Enter; cualquier otra se ignora. El errorlevel
+:: queda en la posicion de la tecla (1 para la primera). choice recorta los espacios
+:: del principio del mensaje: se imprime aparte, asi la pregunta queda alineada.
+:: Uso: call :preguntar "mensaje" teclas
+:preguntar
+<nul set /p "=  %~1"
+choice /c %~2 /n
 goto :eof
 
 :titulo
@@ -1441,7 +1454,6 @@ set "GPU_BASICA=0"
 set "ANTIRROBO=0"
 set "DISCO_TIPO=desconocido"
 set "DISCO_PNP="
-set "CPU_NOMBRE=desconocido"
 set "ONEDRIVE=S"
 set "OUTLOOK=S"
 set "VBS=0"
@@ -1640,7 +1652,8 @@ if ([IO.Directory]::Exists($olk)) {
 }
 'OUTLOOK=' + $ol
 # Solo si hay dato: cmd compara BUILD con GEQ, y vacio seria un error de sintaxis.
-$b = (Get-ItemProperty -LiteralPath 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion').CurrentBuildNumber
+$cv = Get-ItemProperty -LiteralPath 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion'
+$b = $cv.CurrentBuildNumber
 if ($b) { 'BUILD=' + $b }
 $cs = Get-CimInstance Win32_ComputerSystem
 'RAM_MB=' + [math]::Round($cs.TotalPhysicalMemory / 1MB)
@@ -1664,14 +1677,25 @@ foreach ($k in 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run', 'HKLM:\SOF
 }
 'ANTIRROBO=' + $a
 # Disco del sistema: tipo (SSD o HDD) e identificador, para la cache de escritura.
+$tipo = ''
 $n = (Get-Partition -DriveLetter $env:SystemDrive[0]).DiskNumber
 if ($null -ne $n) {
     $d = Get-PhysicalDisk | Where-Object { $_.DeviceId -eq [string]$n } | Select-Object -First 1
-    if ([string]$d.MediaType -eq 'SSD' -or [string]$d.MediaType -eq 'HDD') { 'DISCO_TIPO=' + [string]$d.MediaType }
+    if ([string]$d.MediaType -eq 'SSD' -or [string]$d.MediaType -eq 'HDD') { $tipo = [string]$d.MediaType; 'DISCO_TIPO=' + $tipo }
     $w = Get-CimInstance Win32_DiskDrive | Where-Object { $_.Index -eq $n } | Select-Object -First 1
     if ($w.PNPDeviceID) { 'DISCO_PNP=' + $w.PNPDeviceID }
 }
-'CPU_NOMBRE=' + ((Get-CimInstance Win32_Processor | Select-Object -First 1).Name -replace '\s+', ' ').Trim()
+# Encabezado del menu, en dos lineas: el equipo y Windows. El procesador sin (R),
+# (TM), "CPU" ni la frecuencia, que no dicen nada; el disco solo si se supo el tipo.
+$cpu = (Get-CimInstance Win32_Processor | Select-Object -First 1).Name -replace '\(R\)|\(TM\)| CPU| Processor| APU', '' -replace ' @.*| with .*|,.*', '' -replace '\s+', ' '
+'EQUIPO_HW=' + $cpu.Trim() + ', ' + ('{0:0.#}' -f ($ri / 1024)) + ' GB de RAM' + @{ HDD = ', disco mecanico'; SSD = ', SSD' }[$tipo]
+$win = 'Windows 10'
+if ([int]$b -ge 22000) { $win = 'Windows 11' }
+$ver = $cv.DisplayVersion
+if (-not $ver) { $ver = $cv.ReleaseId }
+$bits = '32'
+if ([Environment]::Is64BitOperatingSystem) { $bits = '64' }
+'EQUIPO_SO=' + $win + ' ' + $ver + ' de ' + $bits + ' bits'
 # VBS e integridad de memoria (HVCI): si corren, si el procesador tiene MBEC (7 en
 # las propiedades disponibles; es lo que las hace baratas) y si UEFI las bloquea.
 $vbs = 0; $hvci = 0; $mbec = 0; $lock = 0
@@ -2459,11 +2483,11 @@ $masViejo = [IO.Directory]::GetFiles($prefetch, '*.pf') | Where-Object { [IO.Pat
 if ($masViejo -and $masViejo -lt (Get-Date).AddDays(-7)) {
     Vaciar 'Prefetch: entradas de programas' $prefetch '*.pf' 'NTOSBOOT-*'
 } elseif ($masViejo) {
-    Write-Output ('    ' + 'Prefetch: vaciado hace menos de una semana'.PadRight(44) + '   se deja')
+    Write-Output ('    ' + 'Prefetch: vaciado hace menos de una semana'.PadRight(44) + 'se deja'.PadLeft(11))
 }
 if (Get-Command Delete-DeliveryOptimizationCache -ErrorAction SilentlyContinue) {
-    Delete-DeliveryOptimizationCache -Force -ErrorAction SilentlyContinue | Out-Null
-    Write-Output ('    ' + 'Cache de Delivery Optimization'.PadRight(44) + '   vaciada')
+    Delete-DeliveryOptimizationCache -Force *> $null
+    Write-Output ('    ' + 'Cache de Delivery Optimization'.PadRight(44) + 'vaciada'.PadLeft(11))
 }
 $fin = '  TOTAL liberado: ' + [Math]::Round($totalBytes / 1MB, 1) + ' MB. Salteados por estar en uso: ' + $totalSalteados + '.'
 if ($totalSinPermiso) { $fin += ' Sin permiso: ' + $totalSinPermiso + '.' }
@@ -2575,7 +2599,7 @@ $wu = 'HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate'
 L ('Politica WU NoAutoUpdate / DisableWindowsUpdateAccess: ' + (Leer ($wu + '\AU') 'NoAutoUpdate') + ' / ' + (Leer $wu 'DisableWindowsUpdateAccess'))
 L ('Reproduccion automatica NoDriveTypeAutoRun: ' + (Leer 'HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer' 'NoDriveTypeAutoRun'))
 L ('VBS / integridad de memoria / MBEC en el procesador / bloqueo UEFI: ' + ($env:VBS -eq '1') + ' / ' + ($env:HVCI -eq '1') + ' / ' + ($env:MBEC -eq '1') + ' / ' + ($env:VBS_LOCK -eq '1'))
-L '  (la v2 apaga VBS si corre sin MBEC, con menos de 8 GB o con disco mecanico)'
+L '  (la opcion 1 apaga VBS si corre sin MBEC, con menos de 8 GB o con disco mecanico)'
 
 # --- Memoria ------------------------------------------------------------------
 Titulo 'Memoria'
@@ -2585,11 +2609,11 @@ L ('Proceso de compresion activo:   ' + [bool](Get-Process -Name 'Memory Compres
 foreach ($v in 'DisablePagingExecutive', 'IOPageLockLimit', 'DontVerifyRandomDrivers', 'LargeSystemCache') { L ($v + ': ' + (Leer $mm $v)) }
 L ('Precarga EnablePrefetcher / EnableSuperfetch: ' + (Leer ($mm + '\PrefetchParameters') 'EnablePrefetcher') + ' / ' + (Leer ($mm + '\PrefetchParameters') 'EnableSuperfetch') + '   (3 = arranque y programas, el de fabrica)')
 L ('Paginacion administrada por Windows: ' + $cs.AutomaticManagedPagefile)
-Get-CimInstance Win32_PageFileSetting | ForEach-Object { L ('Paginacion configurada:         ' + $_.Name + ' - inicial ' + $_.InitialSize + ' MB, maximo ' + $_.MaximumSize + ' MB   (la v2: fijo en el doble de la RAM)') }
+Get-CimInstance Win32_PageFileSetting | ForEach-Object { L ('Paginacion configurada:         ' + $_.Name + ' - inicial ' + $_.InitialSize + ' MB, maximo ' + $_.MaximumSize + ' MB   (la opcion 1: fijo en el doble de la RAM)') }
 Get-CimInstance Win32_PageFileUsage | ForEach-Object { L ('Archivo de paginacion:          ' + $_.Name + ' - ' + $_.AllocatedBaseSize + ' MB (en uso ' + $_.CurrentUsage + ' MB, pico ' + $_.PeakUsage + ' MB)') }
 
 # --- Servicios ----------------------------------------------------------------
-Titulo 'Servicios (inicio / estado / lo que espera la v2)'
+Titulo 'Servicios (inicio / estado / lo que espera la opcion 1)'
 $espera = [ordered]@{
     'SysMain' = 'Automatico'; 'TabletInputService' = 'Manual'; 'DoSvc' = 'Auto retrasado'
     'DiagTrack' = 'DESHABILITADO'; 'dmwappushservice' = 'DESHABILITADO'; 'WSearch' = 'segun disco y RAM'; 'RemoteRegistry' = 'DESHABILITADO'
@@ -2614,7 +2638,7 @@ foreach ($n in $espera.Keys) {
     $marca = if ($espera[$n] -eq 'segun respuesta' -or $espera[$n] -eq $ini) { ' ' } else { '*' }
     L ($marca + ' ' + $n.PadRight(22) + $ini.PadRight(16) + $est.PadRight(10) + $espera[$n])
 }
-L '  (* = distinto de lo que deja la v2. Antes de correrla, es normal que haya varios.)'
+L '  (* = distinto de lo que deja la opcion 1. Antes de correrla, es normal que haya varios.)'
 
 # --- Tareas programadas ---------------------------------------------------------
 Titulo 'Windows Update'
@@ -2646,7 +2670,7 @@ foreach ($t in $tareas) {
     $estado = if ($st) { [string]$st.State } else { 'no existe' }
     L ($estado.PadRight(10) + $t)
 }
-L 'Fuera de \Microsoft (la v2 desactiva todas salvo actualizadores de navegadores, Office, OneDrive y Dropbox):'
+L 'Fuera de \Microsoft (la opcion 1 desactiva todas salvo actualizadores de navegadores, Office, OneDrive y Dropbox):'
 foreach ($st in @(Get-ScheduledTask | Where-Object { $_.TaskPath -notlike '\Microsoft\*' } | Sort-Object TaskPath, TaskName)) {
     L (([string]$st.State).PadRight(10) + $st.TaskPath + $st.TaskName)
 }
@@ -2710,7 +2734,7 @@ $apagadas = @($bg | Where-Object { (Get-ItemProperty -LiteralPath $_.PSPath).Dis
 L ('Apps en segundo plano apagadas: ' + $apagadas + ' de ' + @($bg).Count + '  (interruptor general GlobalUserDisabled: ' + (Leer ($U + '\Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications') 'GlobalUserDisabled') + ')')
 $cls = if ($U -eq 'HKEY_CURRENT_USER') { 'HKEY_CURRENT_USER\Software\Classes' } else { $U + '_Classes' }
 L ('Tipo de carpeta generico:       ' + (Leer ($cls + '\Local Settings\Software\Microsoft\Windows\Shell\Bags\AllFolders\Shell') 'FolderType'))
-L ('Menu del boton derecho clasico (Windows 11): ' + (Test-Path -LiteralPath ('Registry::' + $cls + '\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32')) + '   (la v2 lo pone solo con 2 GB)')
+L ('Menu del boton derecho clasico (Windows 11): ' + (Test-Path -LiteralPath ('Registry::' + $cls + '\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32')) + '   (la opcion 1 lo pone solo con 2 GB)')
 L ('OneDrive al inicio:             ' + (Leer ($U + '\Software\Microsoft\Windows\CurrentVersion\Run') 'OneDrive'))
 $cam = '\Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\location'
 L ('Ubicacion (equipo / usuario):   ' + (Leer ('HKEY_LOCAL_MACHINE' + $cam) 'Value') + ' / ' + (Leer ($U + $cam) 'Value'))
@@ -2735,7 +2759,7 @@ $nd = (Get-Partition -DriveLetter $env:SystemDrive.Substring(0, 1)).DiskNumber
 $dd = Get-PhysicalDisk | Where-Object { $_.DeviceId -eq [string]$nd } | Select-Object -First 1
 $ca = $null
 if ($dd) { $ca = $dd | Get-StorageAdvancedProperty }
-if ($ca) { L ('Cache de escritura del disco:   ' + $ca.IsDeviceCacheEnabled + '   (vaciado de bufer desactivado: ' + $ca.IsPowerProtected + '; la v2 lo deja en True si el disco es mecanico)') } else { L 'Cache de escritura del disco:   Windows no informa su estado' }
+if ($ca) { L ('Cache de escritura del disco:   ' + $ca.IsDeviceCacheEnabled + '   (vaciado de bufer desactivado: ' + $ca.IsPowerProtected + '; la opcion 1 lo deja en True si el disco es mecanico)') } else { L 'Cache de escritura del disco:   Windows no informa su estado' }
 $rb = @(Get-PSDrive -PSProvider FileSystem | ForEach-Object { Join-Path $_.Root 'ReadyBoost.sfcache' } | Where-Object { Test-Path -LiteralPath $_ })
 $rbTexto = 'no'
 if ($rb.Count) { $rbTexto = $rb -join ', ' }
@@ -2756,7 +2780,7 @@ if ($bl.Count) {
         $est = @{0 = 'descifrado'; 1 = 'CIFRADO'; 2 = 'cifrando'; 3 = 'descifrando'; 4 = 'cifrado en pausa'; 5 = 'descifrado en pausa'}[[int]$v.ConversionStatus]
         $pct = ''
         if ($conv -and $v.ConversionStatus -ge 2) { $pct = ', ' + $conv.EncryptionPercentage + ' % cifrado' }
-        L ('BitLocker en ' + $v.DriveLetter + ':                 ' + $est + $pct + '  (proteccion ' + @{0 = 'apagada'; 1 = 'ACTIVA'; 2 = '?'}[[int]$v.ProtectionStatus] + '; la v2 descifra todo)')
+        L ('BitLocker en ' + $v.DriveLetter + ':                 ' + $est + $pct + '  (proteccion ' + @{0 = 'apagada'; 1 = 'ACTIVA'; 2 = '?'}[[int]$v.ProtectionStatus] + '; la opcion 1 descifra todo)')
     }
 } else { L 'BitLocker:                      sin discos cifrables, o Windows no lo informa' }
 L ('Cifrado automatico (PreventDeviceEncryption): ' + (Leer 'HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\BitLocker' 'PreventDeviceEncryption') + '   (1 = Windows no cifra solo)')
@@ -2842,11 +2866,11 @@ $u = 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uni
 $r = Get-ItemProperty -Path $u | Where-Object { $_.DisplayName -match 'Acrobat|Adobe Reader' } | Select-Object -First 1
 if ($r) {
     L ('Instalado:                      ' + $r.DisplayName + ' ' + $r.DisplayVersion)
-    L ('Servicio de actualizacion:      ' + (InicioServicio 'AdobeARMservice') + '   (la v2 lo deja DESHABILITADO)')
+    L ('Servicio de actualizacion:      ' + (InicioServicio 'AdobeARMservice') + '   (la opcion 1 lo deja DESHABILITADO)')
     $ta = @(Get-ScheduledTask -TaskName 'Adobe Acrobat Update Task*')
     $estadoTarea = 'no existe'
     if ($ta.Count) { $estadoTarea = [string]$ta[0].State }
-    L ('Tarea de actualizacion:         ' + $estadoTarea + '   (la v2 la deja Disabled)')
+    L ('Tarea de actualizacion:         ' + $estadoTarea + '   (la opcion 1 la deja Disabled)')
 } else { L 'No esta instalado.' }
 L ('Programa predeterminado para .pdf: ' + (Leer ($U + '\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.pdf\UserChoice') 'ProgId'))
 
@@ -2869,7 +2893,7 @@ L ('uBlock Origin Lite (politica):  ' + ($ub -join ' | '))
 L ('Chrome de aula (BrowserSignin): ' + (Leer 'HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Google\Chrome' 'BrowserSignin') + '  (0 = sin iniciar sesion en Chrome)')
 
 # --- Apps preinstaladas -------------------------------------------------------
-Titulo 'Apps preinstaladas que la v2 puede quitar (presentes)'
+Titulo 'Apps preinstaladas que la opcion 1 puede quitar (presentes)'
 $apps = 'Microsoft.549981C3F5F10', 'Microsoft.BingNews', 'Microsoft.Copilot', 'Microsoft.GetHelp', 'Microsoft.Getstarted', 'Microsoft.MicrosoftOfficeHub', 'Microsoft.MicrosoftSolitaireCollection', 'Microsoft.MicrosoftStickyNotes', 'Microsoft.Office.OneNote', 'Microsoft.OutlookForWindows', 'Microsoft.People', 'Microsoft.SkypeApp', 'Microsoft.WindowsAlarms', 'Microsoft.WindowsMaps', 'microsoft.windowscommunicationsapps', 'Microsoft.YourPhone', 'Microsoft.ZuneMusic', 'Microsoft.ZuneVideo', 'Microsoft.XboxApp', 'Microsoft.XboxGamingOverlay', 'king.com.*', 'MSTeams', 'Microsoft.Windows.DevHome', 'MicrosoftCorporationII.MicrosoftFamily', 'MicrosoftCorporationII.QuickAssist', 'Microsoft.Edge.GameAssist'
 $hay = foreach ($a in $apps) { Get-AppxPackage -AllUsers -Name $a | Select-Object -ExpandProperty Name -Unique }
 if ($hay) { L (($hay | Sort-Object -Unique) -join ', ') } else { L '(ninguna)' }
@@ -2884,7 +2908,7 @@ L ('Conexion a Escritorio remoto:   ' + (Get-WindowsOptionalFeature -Online -Fea
 
 # --- Inicio de Windows --------------------------------------------------------
 Titulo 'Programas que arrancan con Windows'
-# Lo desactivado en el Administrador de tareas (o por la v2) empieza con 03 en StartupApproved.
+# Lo desactivado en el Administrador de tareas (o por la opcion 1) empieza con 03 en StartupApproved.
 $apr = '\Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\'
 foreach ($par in @(@(($U + '\Software\Microsoft\Windows\CurrentVersion\Run'), ($U + $apr + 'Run')), @('HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Run', ('HKEY_LOCAL_MACHINE' + $apr + 'Run')), @('HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Run', ('HKEY_LOCAL_MACHINE' + $apr + 'Run32')))) {
     $i = Get-Item -LiteralPath ('Registry::' + $par[0])

@@ -15,8 +15,9 @@ UAC, SmartScreen, Windows Update).
 4. Reiniciar.
 
 Descarga: el navegador puede pedir confirmación para un `.bat`, y SmartScreen avisa al ejecutarlo (*Más información >
-Ejecutar de todas formas*). *Propiedades > Desbloquear* quita la marca de internet. El menú y el reporte de la
-opción 7 muestran la versión: el número de cambios publicados del script y la fecha del último.
+Ejecutar de todas formas*). *Propiedades > Desbloquear* quita la marca de internet. El menú muestra el equipo detectado
+(procesador, RAM, tipo de disco y versión de Windows) y, junto con el reporte de la opción 7, la versión del script: el
+número de cambios publicados y la fecha del último.
 
 Después de la opción 1, el botón de encendido apaga el equipo. La tapa también, salvo con 4 GB o más de RAM: ahí
 suspende (ver [Perfiles](#perfiles-según-el-hardware)).
@@ -35,7 +36,7 @@ suspende (ver [Perfiles](#perfiles-según-el-hardware)).
 | `7` | Verificar: hardware, antirrobo CI, estado de cada ajuste, BitLocker, VBS, ciclos del disco y lo que corre fuera de Windows. Reporte `.txt` junto al script. | No |
 | `0` | Salir. | |
 
-Nada borra la pantalla: queda el registro de todo lo hecho, y cada opción termina con «`N` terminado». Cada
+Nada borra la pantalla: queda el registro de todo lo hecho, y cada opción termina con «Opción `N` terminada». Cada
 opción vuelve al menú. `1` y `6` ofrecen reiniciar; si se pospone, el menú lo recuerda y lo ofrece al salir.
 Secuencia habitual: `1`, `4`. En una PC trabada: `A` (que sigue sola con la `1`) y después `4`.
 
