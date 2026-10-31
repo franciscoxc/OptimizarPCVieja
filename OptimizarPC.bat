@@ -810,22 +810,34 @@ echo ==========================================================================
 echo   ACTUALIZAR WINDOWS A FONDO Y LIMPIAR RESTOS
 echo ==========================================================================
 echo.
-echo   1. Vacia la cache de descargas de Windows Update e instala TODO lo
+echo   1. Actualiza los programas con winget.
+echo   2. Vacia la cache de descargas de Windows Update e instala TODO lo
 echo      pendiente (calidad, drivers, version). Si algo pide reiniciar, avisa:
 echo      reinicia y volve a elegir esta opcion. Horas en un disco mecanico.
-echo   2. Actualiza los programas con winget.
 echo   3. DISM /ResetBase: las actualizaciones instaladas ya no se podran
 echo      desinstalar. Hasta una hora mas. No apagues la PC.
 
 :: -------------------------------------------------------------------------
-:: 1. Windows Update hasta el final. La seccion ACTUALIZAR sale con 0 si no queda
+:: 1. Programas, con winget: lo rapido primero (minutos; Windows Update, horas).
+:: --include-unknown: los VLC y WinRAR viejos no declaran bien su version y sin
+:: eso winget los saltea.
+:: -------------------------------------------------------------------------
+call :titulo "1/3  Programas, con winget"
+call :buscar_winget
+if errorlevel 1 goto :wu_sin_winget
+%WINGET% upgrade --all --include-unknown --source winget --silent --accept-package-agreements --accept-source-agreements
+echo   [OK] Programas actualizados con winget.
+:wu_sin_winget
+
+:: -------------------------------------------------------------------------
+:: 2. Windows Update hasta el final. La seccion ACTUALIZAR sale con 0 si no queda
 :: nada, 2 si instalo y hay que volver a buscar (despues de instalar suele ofrecer
 :: mas), 3 si hay que reiniciar, 1 si no pudo buscar (sin internet): se sigue igual
-:: con winget y DISM. Si pide reiniciar, el usuario reinicia y vuelve a elegir la
+:: con DISM. Si pide reiniciar, el usuario reinicia y vuelve a elegir la
 :: opcion: una tarea que seguia sola al iniciar sesion andaba, pero era mas pieza
 :: que lo que ahorraba.
 :: -------------------------------------------------------------------------
-call :titulo "1/3  Windows Update"
+call :titulo "2/3  Windows Update"
 :: Tope de busquedas: alguna actualizacion dice "instalada" y Windows Update la
 :: vuelve a ofrecer; sin tope, esto no terminaria nunca.
 set "_wu_busquedas=0"
@@ -849,17 +861,6 @@ echo.
 echo   Opcion 2 terminada.
 goto :fin_con_reinicio
 :wu_al_dia
-
-:: -------------------------------------------------------------------------
-:: 2. Programas, con winget. --include-unknown: los VLC y WinRAR viejos no
-:: declaran bien su version y sin eso winget los saltea.
-:: -------------------------------------------------------------------------
-call :titulo "2/3  Programas, con winget"
-call :buscar_winget
-if errorlevel 1 goto :wu_sin_winget
-%WINGET% upgrade --all --include-unknown --source winget --silent --accept-package-agreements --accept-source-agreements
-echo   [OK] Programas actualizados con winget.
-:wu_sin_winget
 
 :: -------------------------------------------------------------------------
 :: 3. Restos de Windows Update.

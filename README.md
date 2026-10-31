@@ -28,7 +28,7 @@ suspende (ver [Perfiles](#perfiles-según-el-hardware)).
 |---|---|---|
 | `A` | PC apestada: cierra todos los programas de la sesión, frena Windows Update y sigue con la `1` sin volver a preguntar. Pide confirmación. | Sí |
 | `1` | Optimizar. | Sí |
-| `2` | Actualizar Windows a fondo (todo lo pendiente; si algo pide reiniciar, avisa y se vuelve a elegir), actualizar los programas con winget y limpiar WinSxS con DISM `/ResetBase`. Horas; la limpieza es irreversible. | Sí |
+| `2` | Actualizar los programas con winget, Windows a fondo (todo lo pendiente; si algo pide reiniciar, avisa y se vuelve a elegir) y limpiar WinSxS con DISM `/ResetBase`. Horas; la limpieza es irreversible. | Sí |
 | `3` | Desfragmentación completa. Horas. | Sí |
 | `4` | Instalar WinRAR, Everything, VLC y Chrome con winget. | Sí |
 | `5` | Chrome de aula: cierra Chrome y borra todos sus perfiles; arranca sin pedir iniciar sesión. Pide confirmación. | Sí |
@@ -583,7 +583,10 @@ lecturas y escrituras chicas, lo peor para un disco mecánico, y apagar en el me
 próximo arranque, con la persona encima otra vez. Se juntan, y la PC está lenta por eso. Forzarlas hasta el final en
 el taller es lo que la deja bien. Arranca sin preguntar, igual que la 3 y la 4.
 
-1. **Windows Update hasta el final** (sección `ACTUALIZAR`): primero espera a que Windows termine lo que esté
+1. **Programas con winget**, lo rápido primero (minutos): `winget upgrade --all --include-unknown --source winget --silent` (lista lo que va
+   a actualizar y lo instala). `--include-unknown` porque los VLC y WinRAR viejos no declaran bien su versión y sin eso winget los
+   saltea. Solo toca lo que está en su catálogo (Chrome, VLC, VC++, .NET); el software de gestión no está ahí.
+2. **Windows Update hasta el final** (sección `ACTUALIZAR`): primero espera a que Windows termine lo que esté
    instalando. Le pregunta a Windows Update (`IsBusy` del instalador) y, si esa COM no responde, mide CPU **y bytes
    de disco** de `TiWorker` cada 10 s: preparando 26H2 en la laptop de prueba, `TiWorker` usaba 0,36 s de CPU cada
    10 s y un umbral de solo CPU lo dio por ocioso; el reinicio canceló la instalación al 52 % (`Cancel was
@@ -606,9 +609,6 @@ el taller es lo que la deja bien. Arranca sin preguntar, igual que la 3 y la 4.
    tarea `onlogon` reabría el script sola después de cada reinicio; anduvo (laptop i3, 31/10/2026) y se quitó
    igual: era más pieza que lo que ahorraba. Sin internet, avisa y sigue con lo demás. Una actualización de versión (24H2, 26H2) entra igual: horas en HDD,
    pero es tiempo de taller.
-2. **Programas con winget**: `winget upgrade --all --include-unknown --source winget --silent` (lista lo que va
-   a actualizar y lo instala). `--include-unknown` porque los VLC y WinRAR viejos no declaran bien su versión y sin eso winget los
-   saltea. Solo toca lo que está en su catálogo (Chrome, VLC, VC++, .NET); el software de gestión no está ahí.
 3. **Limpieza de WinSxS**: `Dism.exe /Online /Cleanup-Image /StartComponentCleanup /ResetBase`
    ([Microsoft Learn](https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/clean-up-the-winsxs-folder)).
    Cerrar la ventana con DISM ya corriendo deja `DisableResetbase` en `0` en lugar de devolverle su valor (ver abajo).
