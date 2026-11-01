@@ -624,6 +624,10 @@ echo   [OK] La pantalla se apaga a los 15 minutos sin uso.
 if "%PERFIL_4GB%"=="1" (echo   [OK] Suspension a la hora sin uso.) else (echo   [OK] Suspension a las 4 horas sin uso: da tiempo al mantenimiento de Windows.)
 if "%PERFIL_4GB%"=="1" (echo   [OK] Tapa: suspende. Boton de encendido: apagado completo. Boton de suspension: nada.) else (echo   [OK] Boton de encendido y tapa: apagado completo. Boton de suspension: nada.)
 echo   [OK] Bateria critica: apagado completo.
+:: Sin esta casilla, suspendida se pierde el mantenimiento de las 2:00: es lo
+:: que mantiene rapida una PC lenta (desfragmentacion, limpieza, Defender).
+call :dword "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Schedule\Maintenance" WakeUp 1
+echo   [OK] El mantenimiento de las 2:00 despierta la PC si esta con cargador; a bateria no.
 :: Sin hibernacion ni inicio rapido: cada apagado es completo, cada arranque es
 :: limpio y se borra hiberfil.sys: el 40% de la RAM, unos 800 MB con 2 GB.
 powercfg /hibernate off >nul 2>&1
@@ -1134,6 +1138,7 @@ powercfg /hibernate on >nul 2>&1
 call :dword "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Power" HiberbootEnabled 1
 call :borrar "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\FlyoutMenuSettings" ShowSleepOption
 call :borrar "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\FlyoutMenuSettings" ShowHibernateOption
+call :borrar "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Schedule\Maintenance" WakeUp
 echo   [OK] Planes de energia de fabrica: Equilibrado, botones, tapa y suspension.
 echo   [OK] Hibernacion e inicio rapido activados; Suspender vuelve al menu de apagado.
 
@@ -1411,6 +1416,10 @@ powercfg /setdcvalueindex %1 SUB_BUTTONS LIDACTION %_tapa% >nul 2>&1
 powercfg /setacvalueindex %1 SUB_BUTTONS SBUTTONACTION 0 >nul 2>&1
 powercfg /setdcvalueindex %1 SUB_BUTTONS SBUTTONACTION 0 >nul 2>&1
 powercfg /setdcvalueindex %1 SUB_BATTERY BATACTIONCRIT 3 >nul 2>&1
+:: Temporizadores de activacion: con cargador si, para que el mantenimiento de
+:: las 2:00 la despierte; a bateria no, para que no se vacie de noche.
+powercfg /setacvalueindex %1 SUB_SLEEP RTCWAKE 1 >nul 2>&1
+powercfg /setdcvalueindex %1 SUB_SLEEP RTCWAKE 0 >nul 2>&1
 goto :eof
 
 :: Igual que :asegurar, pero recibe "servicio:tipo".
@@ -2795,6 +2804,8 @@ L ('Boton de suspension:            ' + (Energia SUB_BUTTONS SBUTTONACTION))
 L ('Bateria critica:                ' + (Energia SUB_BATTERY BATACTIONCRIT))
 L ('Suspender tras (seg, 14400 = 4 h, 3600 = 1 h): ' + (Energia SUB_SLEEP STANDBYIDLE))
 L ('Hibernar tras (seg, 0 nunca):   ' + (Energia SUB_SLEEP HIBERNATEIDLE))
+L ('Temporizadores de activacion (1 si, 0 no): ' + (Energia SUB_SLEEP RTCWAKE))
+L ('Mantenimiento despierta la PC (1 si): ' + (Leer 'HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Schedule\Maintenance' 'WakeUp'))
 L ('Apagar disco tras (seg, 0 nunca): ' + (Energia SUB_DISK DISKIDLE))
 L ('Apagar pantalla tras (seg, 900 = 15 min): ' + (Energia SUB_VIDEO VIDEOIDLE))
 $fm = 'HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\FlyoutMenuSettings'

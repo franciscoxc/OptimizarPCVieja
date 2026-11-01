@@ -267,6 +267,7 @@ Energía, aplicada a Equilibrado, Alto rendimiento, Economizador y al plan activ
 | Tapa | Apagar (suspender con 4 GB o más) | |
 | Botón de suspensión | Nada | Panel de control no ofrece "Apagar" para ese botón. |
 | Batería crítica | Apagar | Sin hibernación, apagar es la salida limpia. |
+| Temporizadores de activación | Con cargador sí, con batería no | El mantenimiento de las 2:00 (desfragmentación, limpieza, Defender) despierta la PC suspendida; a batería no la vacía de noche. |
 | Hibernación e inicio rápido | Desactivados | Borra `hiberfil.sys` (40% de la RAM). |
 | Menú de apagado | Sin *Hibernar*; sin *Suspender* salvo con 4 GB o más | Se reactivan en *Opciones de energía > Elegir el comportamiento de los botones*. |
 
