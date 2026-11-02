@@ -1,4 +1,4 @@
-# Optimizar PC Vieja
+# Optimizar PC Lenta
 
 [![Descargar OptimizarPC.bat](https://img.shields.io/badge/Descargar-OptimizarPC.bat-2ea44f?style=for-the-badge)](https://github.com/franciscoxc/OptimizarPCVieja/releases/latest/download/OptimizarPC.bat)
 

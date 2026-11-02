@@ -6,14 +6,14 @@ set "OPT_RUTA=%~f0"
 :: Al publicar en GitHub, "local" se reemplaza por el numero de version y la fecha.
 set "OPT_VERSION=local"
 :: Barra de titulo: el nombre y el numero de version ("v52"); cada opcion agrega la suya.
-set "OPT_TITULO=Optimizar PC Vieja"
-if not "%OPT_VERSION%"=="local" for /f %%n in ("%OPT_VERSION%") do set "OPT_TITULO=Optimizar PC Vieja v%%n"
+set "OPT_TITULO=Optimizar PC Lenta"
+if not "%OPT_VERSION%"=="local" for /f %%n in ("%OPT_VERSION%") do set "OPT_TITULO=Optimizar PC Lenta v%%n"
 title %OPT_TITULO%
 :: Un retroceso (caracter 8) para :preguntar. Lo da el prompt $H de un cmd hijo:
 :: es instantaneo, y no hay otra forma de escribir ese caracter en un .bat ASCII.
 for /f %%a in ('"prompt $H & for %%b in (1) do rem"') do set "BS=%%a"
 :: =========================================================================
-::  OPTIMIZAR PC VIEJA
+::  OPTIMIZAR PC LENTA
 ::  Para Windows 10 con disco mecanico (HDD) y 2 GB de RAM.
 ::
 ::  Un solo archivo, con menu:
@@ -78,7 +78,7 @@ call :detectar
 echo.
 title %OPT_TITULO%
 echo ==========================================================================
-echo   OPTIMIZAR PC VIEJA, version %OPT_VERSION%
+echo   OPTIMIZAR PC LENTA, version %OPT_VERSION%
 if defined EQUIPO_HW echo   %EQUIPO_HW%
 if defined EQUIPO_SO echo   %EQUIPO_SO%
 echo ==========================================================================
