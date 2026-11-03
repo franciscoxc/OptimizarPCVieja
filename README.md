@@ -2,6 +2,8 @@
 
 [![Descargar OptimizarPC.bat](https://img.shields.io/badge/Descargar-OptimizarPC.bat-2ea44f?style=for-the-badge)](https://github.com/franciscoxc/OptimizarPCVieja/releases/latest/download/OptimizarPC.bat)
 
+Página con la explicación completa y ayuda: [franxc.com/optimizar-pc](https://franxc.com/optimizar-pc/)
+
 Script batch para Windows 10 22H2 (32 y 64 bits) en equipos con HDD y 2 GB de RAM, incluidas las netbooks Conectar
 Igualdad con Atom. Objetivo: máxima velocidad y mínimo uso de RAM sin desactivar la protección (Defender, Firewall,
 UAC, SmartScreen, Windows Update).
