@@ -4,7 +4,7 @@
 
 Página con la explicación completa y ayuda: [franxc.com/optimizar-pc](https://franxc.com/optimizar-pc/)
 
-Script batch para Windows 10 22H2 (32 y 64 bits) en equipos con HDD y 2 GB de RAM, incluidas las netbooks Conectar
+Script batch para Windows (32 y 64 bits) en equipos con HDD y 2 GB de RAM, incluidas las netbooks Conectar
 Igualdad con Atom. Objetivo: máxima velocidad y mínimo uso de RAM sin desactivar la protección (Defender, Firewall,
 UAC, SmartScreen, Windows Update).
 

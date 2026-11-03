@@ -14,7 +14,7 @@ title %OPT_TITULO%
 for /f %%a in ('"prompt $H & for %%b in (1) do rem"') do set "BS=%%a"
 :: =========================================================================
 ::  OPTIMIZAR PC LENTA
-::  Para Windows 10 con disco mecanico (HDD) y 2 GB de RAM.
+::  Para Windows con disco mecanico (HDD) y 2 GB de RAM.
 ::
 ::  Un solo archivo, con menu:
 ::    A. PC apestada: cierra todos los programas y sigue con la opcion 1.
@@ -179,7 +179,6 @@ echo ==========================================================================
 echo.
 echo   Usuario al que se le aplican los ajustes: "%UNAME%"
 if not defined USID echo   AVISO: no se detecto la sesion abierta; se usa la cuenta que ejecuta el script.
-if %BUILD% GEQ 22000 echo   AVISO: esto parece Windows 11. El script esta pensado para Windows 10.
 if %BUILD% LSS 19041 echo   AVISO: Windows 10 muy viejo. Conviene actualizar a 22H2 primero.
 if not "%RAM_MB%"=="9999" echo   RAM: %RAM_MB% MB visibles de %RAM_INST% MB instalados.
 if "%PERFIL_4GB%"=="1" echo   Perfil 4 GB o mas: suspende a la hora y con la tapa, Bluetooth en Manual.
@@ -770,9 +769,12 @@ echo.
 if "%PERFIL_4GB%"=="1" (echo   Energia: el boton de encendido ahora APAGA la PC; cerrar la tapa la suspende.) else (echo   Energia: cerrar la tapa o apretar el boton de encendido ahora APAGA la PC,)
 if not "%PERFIL_4GB%"=="1" echo   sin suspender. Guarda lo que estes haciendo antes.
 echo.
+:: El ESU es de Windows 10: en Windows 11 no hace falta inscribirse.
+if %BUILD% GEQ 22000 goto :fin_esu_listo
 echo   Seguridad: Windows 10 recibe parches gratis hasta el 12/10/2027 si la PC
 echo   esta inscripta en ESU. Revisalo en Configuracion, Windows Update.
 echo.
+:fin_esu_listo
 echo   Fotos: despues de reiniciar, en Configuracion, Aplicaciones, Aplicaciones
 echo   predeterminadas, Visor de fotos, elegi "Visualizador de fotos de Windows".
 echo   O abri una foto y, cuando pregunte con que, elegilo y marca "Usar siempre".
@@ -1040,7 +1042,7 @@ echo.
 call :preguntar "Continuar? [S/N]: " SN
 if errorlevel 2 goto :menu
 
-call :titulo "Servicios: valores de fabrica de Windows 10"
+call :titulo "Servicios: valores de fabrica"
 for %%s in (DiagTrack PcaSvc TrkWks iphlpsvc DPS WpnService Spooler LanmanServer SysMain) do call :servicio %%s auto
 for %%s in (WSearch CDPSvc MapsBroker edgeupdate BITS DoSvc) do call :servicio %%s delayed-auto
 for %%s in (dmwappushservice XblAuthManager XblGameSave XboxNetApiSvc XboxGipSvc xbgm bthserv BTAGService BthAvctpSvc lfsvc WbioSrvc RetailDemo TabletInputService) do call :servicio %%s demand
