@@ -456,9 +456,11 @@ if "%EFECTOS%"=="1" goto :visual_apariencia
 :: Efectos visuales en "mejor rendimiento", salvo:
 ::  - el suavizado de fuentes: no es un efecto, es lo que hace legible el texto;
 ::  - mostrar el contenido de la ventana mientras se arrastra;
+::  - la sombra debajo de las ventanas: en Windows 10 son blancas y sin sombra
+::    parecen pegadas unas a otras; no se nota en el rendimiento;
 ::  - la animacion al minimizar y maximizar, solo si la placa de video tiene
 ::    driver: con el adaptador basico la dibuja el procesador y va a los saltos.
-reg add "%_desk%" /v UserPreferencesMask /t REG_BINARY /d 9012038010000000 /f >nul 2>&1
+reg add "%_desk%" /v UserPreferencesMask /t REG_BINARY /d 9012078010000000 /f >nul 2>&1
 set "_minanim=1"
 if "%GPU_BASICA%"=="1" set "_minanim=0"
 call :sz "%_desk%\WindowMetrics" MinAnimate %_minanim%
@@ -471,8 +473,8 @@ call :dword "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Themes\Personaliz
 :: Sin el desenfoque "acrilico" de la pantalla de inicio de sesion: otro efecto de
 :: transparencia, y sin aceleracion de video lo calcula el procesador.
 call :dword "HKLM\SOFTWARE\Policies\Microsoft\Windows\System" DisableAcrylicBackgroundOnLogon 1
-echo   [OK] Efectos visuales al minimo. Quedan el suavizado de fuentes y el contenido
-echo        de la ventana al arrastrar.
+echo   [OK] Efectos visuales al minimo. Quedan el suavizado de fuentes, la sombra
+echo        de las ventanas y su contenido al arrastrarlas.
 if "%_minanim%"=="1" echo   [OK] Animacion al minimizar y maximizar: activada, el video tiene driver.
 if "%_minanim%"=="0" echo   [OK] Animacion al minimizar y maximizar: apagada, el video no tiene driver.
 echo   [OK] Menus mas rapidos, sin transparencias, animaciones ni desenfoque al iniciar sesion.
