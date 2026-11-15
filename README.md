@@ -47,9 +47,13 @@ programas abiertos y los que arrancan solos sin que nadie los conozca (impresora
 les pide cerrarse, como la X, y a los 10 s fuerza lo que quede; lo no guardado se pierde. Quedan Windows, Explorer
 (la opción 1 lo necesita para reconocer al usuario) y el acceso remoto (AnyDesk, RustDesk, HopToDesk, TeamViewer,
 ScreenConnect, Splashtop). Windows Update se frena mientras corre el script: si está instalando una actualización
-(`TiWorker.exe` con CPU), espera a que termine, porque cortarla la deja a medias y la rehace entera después, y el
-paso 9 usa DISM, que falla mientras tanto; después detiene `wuauserv`, `UsoSvc`, `BITS` y `DoSvc` hasta el reinicio
-(parados, no deshabilitados). Si lo que traba es Defender, es un servicio y no se cierra.
+(`TiWorker.exe` con CPU o disco), no la espera ni la corta: cortarla tira lo avanzado, y en una PC lenta es lo que
+la deja actualizando para siempre. La deja seguir con la prioridad de procesador y de disco al mínimo (la de disco con
+`NtSetInformationProcess`, `ProcessIoPriority` en 0) y frena solo las descargas (`BITS`, `DoSvc`); si no está
+instalando, frena también `wuauserv` y `UsoSvc`. A todos se les pide parar sin esperarlos, hasta el reinicio (parados,
+no deshabilitados). Los programas se cierran primero: no tocan la actualización, y la RAM que liberan la ayuda a
+terminar. Antes la opción A esperaba a que la actualización terminara, y en una PC apestada nunca termina. Si lo que
+traba es Defender, es un servicio y no se cierra.
 
 **Usuario destino.** Los ajustes de usuario se escriben en `HKEY_USERS\<SID>` del dueño del `explorer.exe` de la
 sesión, no en `HKCU`, que al elevar con otra cuenta apunta al administrador. La opción 1 muestra el usuario detectado.
@@ -180,7 +184,7 @@ Sin exclusiones.
 | Contenido sugerido, instalaciones silenciosas, consejos, "terminá de configurar tu PC" | Apagado. |
 | Noticias e intereses (`EnableFeeds`) y los Widgets de Windows 11 (`AllowNewsAndInterests=0`) | Apagado. |
 | Cortana, Bing y destacados en la búsqueda | Apagado. |
-| Copilot y la IA de Windows | Apagados por política: `TurnOffWindowsCopilot` (equipo y usuario) y, en las PCs con Windows 11 que los tienen, Recall (`DisableAIDataAnalysis=1`, `AllowRecallEnablement=0`) y Click to Do (`DisableClickToDo=1`). La app de Copilot y el programa, que instala el actualizador de Edge, se quitan siempre (paso 9). La política de EdgeUpdate `Install{C50565E9-CCCF-44B4-BA15-5AC5C6569197}=0` debería impedirle reinstalarlo; sin comprobar, porque no se encontró cómo pedirle que lo reinstale. |
+| Copilot y la IA de Windows | Apagados por política: `TurnOffWindowsCopilot` (equipo y usuario) y, en las PCs con Windows 11 que los tienen, Recall (`DisableAIDataAnalysis=1`, `AllowRecallEnablement=0`) y Click to Do (`DisableClickToDo=1`). La app de Copilot y el programa, que instala el actualizador de Edge, se quitan siempre (paso 9). La política de EdgeUpdate `Install{C50565E9-CCCF-44B4-BA15-5AC5C6569197}=0` solo rige en PCs de empresa: en las demás su registro dice *Machine is not Enterprise Managed* y no lee ninguna. Lo que los trae de vuelta es una migración de una sola vez: el actualizador pasa la Copilot vieja a la nueva y suma la app de Microsoft 365 (*unify over-install*), y al terminar anota `CopilotUnifyCheck=1` en `HKLM\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate`. Desde ahí su registro dice *Skip Copilot due to CopilotUnifyCheck*. El script anota ese valor antes de quitarlos. |
 | Barra de juegos y Game DVR | Apagado. |
 | Historial de actividad | No se publica ni se sube. |
 | Informe de errores (WER) | Apagado. |
@@ -217,6 +221,7 @@ y Configuración abre en Sistema. La opción 6 borra todo eso.
   cada ventana: los botones se agrupan recién cuando la barra se llena (`TaskbarGlomLevel=1`). En Windows 11, sin
   Widgets (la política del paso 5) ni el botón de *Reanudar* (`IsEnabled=0` en `Explorer\Advanced`, según
   [elevenforum](https://www.elevenforum.com/t/turn-on-or-off-resume-app-button-on-taskbar-in-windows-11.40288/)).
+  En Windows 10, sin la camarita de *Reunirse ahora* de Skype en la bandeja (política `HideSCAMeetNow=1`).
 - Sin detección automática del tipo de carpeta (WinUtil). Efecto secundario: se reinician las vistas guardadas.
 - Windows 11 con 2 GB o menos: menú del botón derecho clásico, sin *Mostrar más opciones* (ver
   [Perfiles](#perfiles-según-el-hardware)). Con más RAM queda el nuevo.
@@ -240,7 +245,10 @@ y Configuración abre en Sistema. La opción 6 borra todo eso.
 - Caché de escritura activada y vaciado del búfer desactivado (`UserWriteCacheSetting=1`,
   `CacheIsPowerProtected=1`), salvo en SSD. Riesgo asumido: pérdida de datos ante un corte de luz.
 - NTFS: `DisableLastAccess`, `Disable8dot3`.
-- Restaurar sistema desactivado; se borran todos los puntos.
+- Restaurar sistema desactivado; se borran todos los puntos. `Disable-ComputerRestore` solo lo apaga y deja los
+  puntos que ya había (7 GB en la HP de prueba): los borra `vssadmin delete shadows /all`, como hace Windows al
+  apagarlo a mano. El instalador de HP Orbit lo vuelve a prender para crear su punto antes de desinstalarse
+  (eventos 8195 y 8196 de *System Restore*), así que el paso 9 lo apaga de nuevo si corrió algún paquete así.
 - VBS e integridad de memoria: apagadas si corren en una PC sin MBEC, con menos de 8 GB o con HDD (ver
   [Perfiles](#perfiles-según-el-hardware)).
 - **BitLocker siempre apagado.** Windows 11 lo enciende solo al entrar con cuenta Microsoft y nadie guarda la clave de
@@ -321,7 +329,9 @@ realidad mixta, Centro de comentarios, To Do, Cortana, Dev Home, Clipchamp, Powe
 Microsoft Family, Asistencia rápida, Edge para Game Bar y Experiencias de Inicio. Con Teams se van el complemento de
 Teams para Office y el instalador de Teams para todas las cuentas (MSI, `msiexec /x /qn`). Quedan: Store,
 Calculadora, Cámara, Grabadora de sonidos, Clima, Recortes y anotación. Se reinstalan desde la Store. Copilot, la
-app y el programa, también se va.
+app y el programa, también se va. Y las de terceros que traen los fabricantes: Netflix, los juegos de Gameloft
+(`A278AB0D.*`: March of Empires, Disney Magic Kingdoms), Simple Solitaire, Plex, Autodesk SketchBook, Keeper,
+3D Builder, la Xbox Companion vieja, HP JumpStart y HP Support Assistant (que viene anclado en el menú Inicio).
 
 Cada app sale primero de los paquetes provisionados y después de las cuentas. Al revés, en un Windows 10 recién
 instalado `Remove-AppxPackage -AllUsers` falla con `0x80070002` y la app queda instalada: pasó con 28 apps en la
@@ -346,6 +356,57 @@ apagado y la PC quedaría sin ninguno, y su autoprotección no deja parar los se
 se esconde: su bandeja queda, porque escondido se olvida que corre. Sus tareas programadas (firmas, análisis)
 quedan mientras sea el antivirus, y el final de la opción 1 avisa si sigue instalado.
 
+**ESET, si está vencido o apagado.** Si *Seguridad de Windows* no lo da por el antivirus activo (bit `0x1000` de
+`productState` en `root/SecurityCenter2`), se desinstala con su MSI (`msiexec /x /qn REBOOT=ReallySuppress`) y queda
+Defender. Si es el activo, queda. Si no se puede leer quién protege, también queda: podría ser el único. Va al final del
+paso y de fondo, porque tarda minutos; el final de la opción 1 avisa si quedó. En la HP de prueba estaba ESET Internet
+Security 15 con la licencia desactivada desde julio de 2023 y las firmas de diciembre de 2021, sin registrarse como
+antivirus, y su servicio `ekrn` seguía ocupando 200 MB.
+
+**Programas de fábrica y de las impresoras.** Se desinstala lo que traen la PC y las impresoras sin hacer falta para
+imprimir ni escanear:
+
+| Fabricante | Se desinstala |
+|---|---|
+| HP | JumpStart, Orbit, Support Solutions Framework, Sure Connect, Documentation, ePrint, Audio Switch, la compra de insumos (`HPSSupply`) y su encuesta (`MarketResearch`). |
+| WildTangent | Los juegos de prueba y su tienda. |
+| Dropbox | La promo *Dropbox 25 GB*, y su ayudante de actualización si el programa de Dropbox no está instalado. |
+| Epson | La encuesta (*Customer Research Participation*), el actualizador, *Connect Printer Setup*, *Easy Photo Print* (con su barra en el Explorador), *Easy Photo Scan*, *EpsonNet Print* y el manual. |
+| Brother | El aviso de actualizaciones, las herramientas de soporte y de reparación, la guía y el monitor de estado. |
+| Lavasoft | *Web Companion*, adware. |
+
+Quedan los drivers, Epson Scan 2, ControlCenter4 y Event Manager (el botón *Escanear* de la impresora), *HP System
+Event* (las teclas de función) y *HP Recovery Manager*. Cada programa se reconoce por editor y nombre a la vez:
+`StatusMonitor` o `HowToGuide` a secas solo cuentan si los firma Brother. Cada uno sale con lo que acepta: los MSI con
+`msiexec /x /qn`; los que traen desinstalación silenciosa propia (HP Orbit, HP ePrint, el manual de Epson), con ella;
+los NSIS (la tienda de WildTangent y sus categorías del Explorador de juegos) con `/S`; los de InstallScript (Easy
+Photo Print, HP Sure Connect), con un archivo de respuestas; y Web Companion, que no deja desinstalador, borrando su
+carpeta. Los juegos de WildTangent tampoco: su desinstalador general pide tildarlos uno por uno, y cada juego y la
+marca de HP preguntan aunque se les pase `/S`. Como son juegos de prueba que no instalan nada en el sistema, se borran
+sus carpetas, accesos y entradas.
+
+Después, la barra *HP Support Assistant Quick Access* de la barra de tareas (*Barras de herramientas*), que queda
+registrada aunque HP Support Assistant ya no esté, se da de baja con `regsvr32 /u` (en la HP de prueba era el resto de
+una versión vieja que ya no figuraba en Programas). Y se borran los accesos del menú Inicio que apuntan a un programa
+que ya no está en *Archivos de programa* o *ProgramData*, con su mosaico: el de McAfee LiveSafe dejaba uno vacío. Los
+mosaicos de promoción de Windows (Disney, Spotify, Candy Crush) no se pueden desanclar desde un programa sin rehacer el
+menú Inicio entero: se desanclan con clic derecho.
+
+**Sin esperas.** Primero van los MSI, que se esperan porque Windows Installer corre de a uno (tardan segundos;
+`MSIFASTINSTALL=1` saltea el punto de restauración, que en disco mecánico es lo que más tarda). Después los que traen
+desinstalación silenciosa propia, y al final los que se adivinan (`/S`, archivo de respuestas), que no se esperan: si
+alguno pide un clic, la ventana queda para el técnico y el script sigue. El final de la opción 1 lista lo que siguió
+instalado; correrla otra vez lo vuelve a intentar.
+
+Probado en una HP 15-bs0xx con Windows 10 Home 22H2 y disco mecánico (14/11/2026), con decenas de programas que los
+dueños no habían instalado. Salieron en silencio 34 entradas de HP, Epson, Brother, la promo de Dropbox y Web
+Companion, y 14 apps de la Store. *Easy Photo Print* terminó de irse dos minutos después de que su desinstalador
+devolviera el control, y *HP Sure Connect* salió con el archivo de respuestas. WildTangent se borró a mano (11
+entradas) y ESET tardó 5 minutos. *Epson Customer Research* falló la primera vez (1603) con su servicio corriendo y
+salió al repetir: ahora el paso 9 de inicio lo frena antes. No sale *HP Support Solutions Framework*: su MSI falla
+siempre, también desde Configuración, porque busca `ACLMInstaller.exe` y HP ya no lo deja; queda con su servicio en
+Manual.
+
 ### 10. Inicio de Windows: lo que arranca solo
 
 En las PCs de verdad, lo que más RAM se lleva después de Defender son cosas de 20-30 MB que nadie pidió y que suman:
@@ -362,11 +423,13 @@ mano y en *Administrador de tareas > Inicio* se reactiva con un clic. Sin pregun
 | CCleaner, IObit, Driver Booster, Advanced SystemCare | "Optimizadores". |
 | uTorrent, BitTorrent | Siembran al arrancar y saturan el disco. |
 | `EPSON Customer Research Participation` | Telemetría de Epson. |
-| Steam, Epic Games, Spotify, Skype, Discord, WhatsApp, Telegram, Zoom | Lanzadores y mensajeros: que arranquen solos no lo pidió nadie. Se abren cuando se usan. |
+| Monitores de impresora: Brother (`BrStMonW`, `BrIndicator`), Pantum, Canon (`Status Window`); el uso de la impresora de HP (`hppusg`) y el actualizador de Epson (`EPSDNMON`) | Para imprimir no hace falta el monitor: solo avisa de la tinta y los atascos. |
+| Steam, Epic Games, Spotify, Skype, Discord, WhatsApp, Telegram, Zoom, Webex | Lanzadores y mensajeros: que arranquen solos no lo pidió nadie. Se abren cuando se usan. |
 | Dropbox, si su carpeta tiene 3 archivos o menos (sin contar su caché; ruta en `info.json`) | Mismo criterio que OneDrive: instalado porque sí. |
 | Google Drive, si no hay cuenta iniciada (ninguna carpeta numérica en `AppData\Local\Google\DriveFS`) | No guarda los archivos en una carpeta que se pueda contar. |
 
-Quedan: acceso remoto, monitores de impresora (niveles de tinta), antivirus, WhatsApp y Telegram no (son mensajeros),
+Quedan: acceso remoto, lo que atiende el botón *Escanear* de la impresora (ControlCenter4 y `TwDsUiLaunch` de
+Brother, Event Manager de Epson), antivirus, WhatsApp y Telegram no (son mensajeros),
 y las nubes en uso. Las apps de la Store (WhatsApp, Spotify, Telegram) arrancan por una *tarea de inicio* propia:
 `State` en `...\AppModel\SystemAppData\<paquete>\<tarea>` del usuario, 2 = activa, 1 = desactivada por el usuario,
 lo mismo que escribe el Administrador de tareas ([`StartupTaskState`](https://learn.microsoft.com/en-us/uwp/api/Windows.ApplicationModel.StartupTask)).
@@ -376,14 +439,17 @@ Servicios de fabricante y de actualizadores que arrancan con Windows pasan a Man
 `HPTouchpointAnalytics`, `HP*Cap`), Dell (`SupportAssist`, `DellClientManagement`, `DellDigitalDelivery`, `DDV*`),
 Lenovo (`LenovoVantage`, `ImControllerService`), ASUS (`ArmouryCrate`, `ASUSSystemAnalysis`, `ASUSSystemDiagnosis`),
 Intel (`DSAService`), NVIDIA (`NvTelemetryContainer`), Logitech (`LGHUBUpdaterService`), IObit, Wondershare, McAfee
-WebAdvisor. `Apple Mobile Device Service` no: sin él iTunes no ve el iPhone. Los nombres salen de memoria y de guías;
+WebAdvisor, la encuesta de Epson (`EpsonCustomerResearchParticipation`), HP Comm Recovery, HP Orbit, HP JumpStart
+Bridge, WildTangent (`GamesAppIntegrationService`) y, si el programa de Dropbox no está, su actualizador (`dbupdate`,
+`DropboxUpdater*`). `Apple Mobile Device Service` no: sin él iTunes no ve el iPhone. Los nombres salen de memoria y de guías;
 la opción 7 y el final de la opción 1 listan lo que sigue corriendo fuera de `C:\Windows` con sus MB, para que la
 lista crezca con datos de PCs reales.
 
 **Tareas programadas fuera de `\Microsoft`:** actualizadores, telemetría y "asistentes" de fabricantes (HP, Dell,
 Lenovo, NVIDIA, Avast, *Google Platform Experience Helper*, *SoftLanding*). Se desactivan todas salvo los
 actualizadores de navegadores (`GoogleUpdate*`, `GoogleSystem`, `MicrosoftEdgeUpdate*`, Brave, Opera, Vivaldi), Office,
-OneDrive, Dropbox y `CreateExplorerShellUnelevatedTask`, que son seguridad o los necesita Windows. Dentro de
+OneDrive, Dropbox (si su programa está instalado; la promo de fábrica deja el actualizador solo) y
+`CreateExplorerShellUnelevatedTask`, que son seguridad o los necesita Windows. Dentro de
 `\Microsoft\Windows` no se toca nada más que la lista del paso 3: la mayoría son disparadores dormidos y varias
 benefician (desfragmentación, Defender, hora, `StartComponentCleanup`, Windows Update, la compilación de .NET, la
 copia del registro). Lo que se desactivó queda anotado en `%ProgramData%\OptimizarPC\tareas-desactivadas.txt`, y la

@@ -139,8 +139,9 @@ echo ==========================================================================
 echo.
 echo   Cierra TODOS los programas abiertos, tambien los que corren escondidos:
 echo   impresoras, actualizadores, mensajeros. Frena Windows Update mientras corre
-echo   el script (si esta instalando una actualizacion, espera a que termine) y
-echo   despues sigue sola con la opcion 1. Windows y el acceso remoto no se tocan.
+echo   el script (si esta instalando una actualizacion, la deja seguir con lo que
+echo   sobra) y despues sigue sola con la opcion 1. Windows y el acceso remoto no
+echo   se tocan.
 echo.
 echo   LO QUE NO ESTE GUARDADO SE PIERDE.
 echo.
@@ -379,8 +380,16 @@ call :dword "HKLM\SYSTEM\Maps" AutoUpdateEnabled 0
 call :dword "%_pol%\WindowsCopilot" TurnOffWindowsCopilot 1
 call :dword "%UHIVE%\Software\Policies\Microsoft\Windows\WindowsCopilot" TurnOffWindowsCopilot 1
 :: El programa de Copilot lo maneja el actualizador de Edge, y esta es su politica para
-:: no instalar una app. Sin comprobar: no se encontro como pedirle que lo reinstale.
+:: no instalar una app. Solo rige en PCs de empresa: en las demas, su registro dice
+:: "Machine is not Enterprise Managed" y no lee ninguna politica.
 call :dword "HKLM\SOFTWARE\Policies\Microsoft\EdgeUpdate" Install{C50565E9-CCCF-44B4-BA15-5AC5C6569197} 0
+:: ponytail-keep: el actualizador de Edge pasa una vez la Copilot vieja a la nueva y de paso
+:: instala la app de Microsoft 365 ("unify over-install"), sin mirar la politica. En una HP
+:: con Windows 10 Home volvieron las dos media hora despues del script (14/11/2026). Al
+:: terminar anota CopilotUnifyCheck=1, y desde ahi su registro dice "Skip Copilot due to
+:: CopilotUnifyCheck": anotado antes, no hay migracion que las traiga. Probado en la HP:
+:: con la marca y las dos quitadas, el actualizador forzado ya no las reinstalo.
+reg add "HKLM\SOFTWARE\Microsoft\EdgeUpdate" /v CopilotUnifyCheck /t REG_DWORD /d 1 /f /reg:32 >nul 2>&1
 call :dword "%_pol%\WindowsAI" DisableAIDataAnalysis 1
 call :dword "%_pol%\WindowsAI" AllowRecallEnablement 0
 call :dword "%_pol%\WindowsAI" DisableClickToDo 1
@@ -515,8 +524,11 @@ call :dword "%_adv%" TaskbarGlomLevel 1
 :: celular). El nombre del valor es generico, pero es este: lo documenta Shawn Brink
 :: en elevenforum.
 call :dword "%_adv%" IsEnabled 0
-echo   [OK] Barra de tareas: sin busqueda, Cortana, Copilot, Vista de tareas ni Reanudar;
-echo        muestra el nombre de cada ventana hasta que se llena.
+:: Windows 10: sin la camarita de "Reunirse ahora" (Skype) en la bandeja. Es la politica
+:: "Quitar el icono Reunirse ahora".
+call :dword "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer" HideSCAMeetNow 1
+echo   [OK] Barra de tareas: sin busqueda, Cortana, Copilot, Vista de tareas, Reanudar
+echo        ni Reunirse ahora; muestra el nombre de cada ventana hasta que se llena.
 :: Windows 11 con 2 GB: el menu del boton derecho nuevo lo dibuja XAML y tarda en
 :: aparecer; vuelve el clasico, completo. Con mas RAM queda el nuevo.
 if %BUILD% LSS 22000 goto :menu_clasico_listo
@@ -1109,6 +1121,7 @@ call :borrar "%_adv%" LaunchTo
 :: Sin estos valores, Windows vuelve a su barra de fabrica.
 call :borrar "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\Search" SearchboxTaskbarMode
 for %%v in (ShowCortanaButton ShowCopilotButton ShowTaskViewButton TaskbarGlomLevel IsEnabled) do call :borrar "%_adv%" %%v
+call :borrar "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer" HideSCAMeetNow
 call :borrar "%UHIVE%\Software\Microsoft\Windows\CurrentVersion\SystemSettings\AccountNotifications" EnableAccountNotifications
 call :borrar "%_adv%" Start_AccountNotifications
 call :borrar "HKLM\SOFTWARE\Policies\Microsoft\Windows\CurrentVersion\AccountNotifications" DisableAccountNotifications
@@ -1601,6 +1614,48 @@ function EsperarTiWorker {
         Start-Sleep -Seconds 50
     }
 }
+# El programa de Dropbox, no la promo de fabrica (Dropbox 25 GB) ni el actualizador que deja.
+function DropboxInstalado {
+    return ((Test-Path -Path ("${env:ProgramFiles(x86)}\Dropbox\Client\Dropbox.exe")) -or (Test-Path -Path ($env:ProgramFiles + '\Dropbox\Client\Dropbox.exe')) -or (Test-Path -Path ($env:SystemDrive + '\Users\*\AppData\Roaming\Dropbox\bin\Dropbox.exe')))
+}
+# Lo que traen de fabrica la PC y las impresoras sin hacer falta para imprimir ni
+# escanear: asistentes y soporte, encuestas y telemetria, compra de insumos,
+# manuales, impresion por internet, actualizadores y apps de fotos. Tambien los
+# juegos de prueba de WildTangent, la promo Dropbox 25 GB y Web Companion (adware de
+# Lavasoft). Quedan los drivers, Epson Scan 2, ControlCenter4 y Event Manager (el
+# boton Escanear de la impresora), HP System Event (las teclas de funcion) y HP
+# Recovery Manager. Va por editor y nombre: StatusMonitor o HowToGuide a secas solo
+# son de la impresora si los firma su fabricante. Los desinstala el paso 9 de la
+# opcion 1, y su final avisa lo que quedo.
+$fabrica = @(
+    @('^(HP|Hewlett)', '^(HP JumpStart (Bridge|Launch)|HP Orbit( Service)?|HP Support Solutions Framework|HP Sure Connect|HP Documentation|HP ePrint SW|HP Audio Switch|HPSSupply|MarketResearch)$'),
+    @('^WildTangent', ''),
+    @('^Dropbox', '^Dropbox \d+ GB$'),
+    @('^(Seiko|SEIKO) Epson', '^(Epson Customer Research Participation|Epson Software Updater|Epson Connect Printer Setup|Epson Easy Photo Print.*|Easy Photo Scan|EpsonNet Print)$'),
+    @('', '^Manual Epson '),
+    @('^Brother', '^(SoftwareUpdateNotification|BrSupportTools|HowToGuide|NetworkRepairTool|UsbRepairTool|StatusMonitor)$'),
+    @('^Lavasoft', '^Web Companion$')
+)
+function DeFabrica($p) {
+    foreach ($f in $fabrica) { if ([string]$p.Publisher -match $f[0] -and [string]$p.DisplayName -match $f[1]) { return $true } }
+    # Sin el programa de Dropbox, su ayudante de actualizacion no tiene que actualizar.
+    return ([string]$p.Publisher -match '^Dropbox' -and [string]$p.DisplayName -eq 'Dropbox Update Helper' -and -not (DropboxInstalado))
+}
+# ESET vencido o apagado: instalado, pero Seguridad de Windows no lo da por el antivirus
+# activo (bit 0x1000 de productState, la proteccion en tiempo real). Si no se puede leer
+# quien protege, no devuelve nada: ESET podria ser el unico antivirus.
+function EsetVencido {
+    $av = @(Get-CimInstance -Namespace root/SecurityCenter2 -ClassName AntivirusProduct -ErrorAction SilentlyContinue)
+    if (-not $av.Count -or @($av | Where-Object { $_.displayName -match '^ESET' -and ($_.productState -band 0x1000) }).Count) { return }
+    Get-ItemProperty -Path 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*', 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*' -ErrorAction SilentlyContinue | Where-Object { $_.Publisher -match '^ESET' -and $_.DisplayName -match '^ESET (Security|NOD32|Internet Security|Smart Security)' }
+}
+# Restaurar sistema apagado y sin puntos. Disable-ComputerRestore solo lo apaga: los
+# puntos que ya habia quedan (7 GB en la HP de prueba). Los borra vssadmin, como hace
+# Windows cuando se lo apaga a mano.
+function ApagarRestaurar {
+    Disable-ComputerRestore -Drive ($env:SystemDrive + '\') -ErrorAction Stop
+    vssadmin.exe delete shadows /for=$env:SystemDrive /all /quiet 2>&1 | Out-Null
+}
 # Windows Update o el servicio de componentes dejaron algo que se termina al reiniciar.
 function ReinicioPendiente {
     return ((Test-Path -LiteralPath 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired') -or (Test-Path -LiteralPath 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending'))
@@ -1795,10 +1850,9 @@ if (-not $comprimido) {
     Write-Output '  [OK] Sistema descomprimido.'
 }
 # Restaurar sistema: desactivado. Cada punto cuesta escrituras de fondo y espacio
-# en el disco, y en la practica se reinstala. La herramienta oficial borra sus
-# puntos y libera el espacio. La vuelta atras es la opcion 6 del menu.
+# en el disco, y en la practica se reinstala. La vuelta atras es la opcion 6 del menu.
 try {
-    Disable-ComputerRestore -Drive ($env:SystemDrive + '\') -ErrorAction Stop
+    ApagarRestaurar
     schtasks.exe /change /tn '\Microsoft\Windows\SystemRestore\SR' /disable 2>&1 | Out-Null
     Write-Output '  [OK] Restaurar sistema desactivado: se borraron sus puntos y se libero su espacio.'
 } catch {
@@ -1865,7 +1919,9 @@ function QuitarApp([string]$Nombre) {
     }
 }
 Write-Output '  Quitando apps preinstaladas para todos los usuarios, puede tardar...'
-$apps = 'Microsoft.549981C3F5F10','Microsoft.BingNews','Microsoft.BingSearch','Microsoft.GetHelp','Microsoft.Getstarted','Microsoft.Messaging','Microsoft.Microsoft3DViewer','Microsoft.MicrosoftOfficeHub','Microsoft.MicrosoftSolitaireCollection','Microsoft.MicrosoftStickyNotes','Microsoft.MixedReality.Portal','Microsoft.MSPaint','Microsoft.Office.OneNote','Microsoft.OneConnect','Microsoft.OutlookForWindows','Microsoft.People','Microsoft.PowerAutomateDesktop','Microsoft.Print3D','Microsoft.SkypeApp','Microsoft.Todos','Microsoft.Wallet','Microsoft.WindowsAlarms','Microsoft.WindowsFeedbackHub','Microsoft.WindowsMaps','microsoft.windowscommunicationsapps','Microsoft.YourPhone','Microsoft.ZuneMusic','Microsoft.ZuneVideo','Microsoft.GamingApp','Microsoft.XboxApp','Microsoft.Xbox.TCUI','Microsoft.XboxGameOverlay','Microsoft.XboxGamingOverlay','Microsoft.XboxIdentityProvider','Microsoft.XboxSpeechToTextOverlay','Clipchamp.Clipchamp','MicrosoftTeams','MSTeams','king.com.*','Microsoft.Windows.DevHome','MicrosoftCorporationII.MicrosoftFamily','MicrosoftCorporationII.QuickAssist','Microsoft.Edge.GameAssist','*StartExperiencesApp'
+# Las de terceros vienen de fabrica: Netflix, los juegos de Gameloft (A278AB0D: March of
+# Empires, Disney Magic Kingdoms), Simple Solitaire, Plex, SketchBook, Keeper y las de HP.
+$apps = 'Microsoft.549981C3F5F10','Microsoft.BingNews','Microsoft.BingSearch','Microsoft.GetHelp','Microsoft.Getstarted','Microsoft.Messaging','Microsoft.Microsoft3DViewer','Microsoft.MicrosoftOfficeHub','Microsoft.MicrosoftSolitaireCollection','Microsoft.MicrosoftStickyNotes','Microsoft.MixedReality.Portal','Microsoft.MSPaint','Microsoft.Office.OneNote','Microsoft.OneConnect','Microsoft.OutlookForWindows','Microsoft.People','Microsoft.PowerAutomateDesktop','Microsoft.Print3D','Microsoft.SkypeApp','Microsoft.Todos','Microsoft.Wallet','Microsoft.WindowsAlarms','Microsoft.WindowsFeedbackHub','Microsoft.WindowsMaps','microsoft.windowscommunicationsapps','Microsoft.YourPhone','Microsoft.ZuneMusic','Microsoft.ZuneVideo','Microsoft.GamingApp','Microsoft.XboxApp','Microsoft.Xbox.TCUI','Microsoft.XboxGameOverlay','Microsoft.XboxGamingOverlay','Microsoft.XboxIdentityProvider','Microsoft.XboxSpeechToTextOverlay','Clipchamp.Clipchamp','MicrosoftTeams','MSTeams','king.com.*','Microsoft.Windows.DevHome','MicrosoftCorporationII.MicrosoftFamily','MicrosoftCorporationII.QuickAssist','Microsoft.Edge.GameAssist','*StartExperiencesApp','Microsoft.3DBuilder','Microsoft.XboxCompanion','4DF9E0F8.Netflix','A278AB0D.*','26720RandomSaladGamesLLC.SimpleSolitaire','CAF9E577.Plex','89006A2E.AutodeskSketchBook','KeeperSecurityInc.Keeper','AD2F1837.HPJumpStart','AD2F1837.HPSupportAssistant'
 foreach ($a in $apps) {
     if ($a -eq 'Microsoft.OutlookForWindows' -and $env:OUTLOOK -eq 'S') { Write-Output '    (Outlook nuevo queda: se uso en el ultimo ano)'; continue }
     QuitarApp $a | ForEach-Object { Write-Output ('    - ' + $_) }
@@ -1970,6 +2026,148 @@ if (-not @(Get-ItemProperty -Path $u -ErrorAction SilentlyContinue | Where-Objec
         Write-Output ('  [OK] Resto de Avast quitado: tarea ' + $st.TaskPath + $st.TaskName)
     }
 }
+# Programas de fabrica y de impresoras: la lista ($fabrica) esta en COMUN.
+# El codigo de producto de un MSI: en su texto para desinstalar o, como en MarketResearch
+# de HP, que no trae texto, en el nombre de la entrada.
+function CodigoMsi($p) {
+    $s = [string]$p.UninstallString
+    if ($s -match '(?i)msiexec' -and $s -match '\{[0-9A-Fa-f-]{36}\}') { return $Matches[0] }
+    if (-not $s -and $p.PSChildName -match '^\{[0-9A-Fa-f-]{36}\}$') { return $p.PSChildName }
+    return ''
+}
+# ponytail-keep: primero los MSI, despues los que traen desinstalacion silenciosa propia
+# y al final los que se adivinan (/S, archivo de respuestas), que pueden quedarse
+# esperando un clic: que no frenen a los demas. Los paquetes de HP (Orbit, ePrint)
+# crean un punto de restauracion antes de tocar nada: con Windows instalando algo a la
+# vez quedo 8 minutos esperando, y el de ePrint se cerro con -1 sin hacer nada; sin sus
+# MSI, solo borran su entrada (2 s).
+function Turno($p) {
+    if (CodigoMsi $p) { return 0 }
+    if ($p.QuietUninstallString -or [string]$p.UninstallString -match '^(?i)cmd /c') { return 1 }
+    return 2
+}
+$lista = @(Get-ItemProperty -Path $u -ErrorAction SilentlyContinue | Where-Object { DeFabrica $_ } | Sort-Object { Turno $_ }, DisplayName)
+if ($lista.Count) { Write-Output '  Desinstalando programas de fabrica y de impresoras que no hacen falta...' }
+$n = 0; $fondo = 0; $paquetes = 0; $wild = @()
+foreach ($p in $lista) {
+    if (-not (Test-Path -LiteralPath $p.PSPath)) { continue }
+    $nombre = [string]$p.DisplayName
+    if (-not $nombre) { $nombre = $p.PSChildName }
+    $s = [string]$p.UninstallString; $q = [string]$p.QuietUninstallString
+    $exe = ''; $arg = ''; $msi = $false; $adivinado = $false
+    # WildTangent: el desinstalador general pide tildar juego por juego, y cada juego y la
+    # marca del fabricante (Touchpoints) preguntan aunque se les pase /S. Son juegos de
+    # prueba que no instalan nada en el sistema: al final se borran sus carpetas, accesos
+    # y entradas. La tienda (App) y las categorias del Explorador de juegos si salen con /S.
+    if ($p.Publisher -match '^WildTangent' -and $s -match '\\(WildGames|Touchpoints)\\') { $wild += $p; continue }
+    if ($p.Publisher -match '^Lavasoft' -and [string]$p.DisplayIcon -match '^(.+\\Lavasoft\\Web Companion)\\') {
+        # Web Companion no deja desinstalador: se borra su carpeta y su entrada.
+        $dir = $Matches[1]
+        Get-Process | Where-Object { $_.Path -and $_.Path.StartsWith($dir + '\', [StringComparison]::OrdinalIgnoreCase) } | Stop-Process -Force
+        Remove-Item -LiteralPath $dir -Recurse -Force
+        if (-not (Test-Path -LiteralPath $dir)) { Remove-Item -LiteralPath $p.PSPath -Recurse -Force; Write-Output ('    - ' + $nombre); $n++ }
+        continue
+    }
+    $g = CodigoMsi $p
+    # MSIFASTINSTALL=1: sin punto de restauracion, que para sacar esto no hace falta y en
+    # disco mecanico es lo que mas tarda.
+    if ($g) { $exe = 'msiexec.exe'; $arg = '/x ' + $g + ' /qn /norestart MSIFASTINSTALL=1'; $msi = $true }
+    elseif ($q -match '^"([^"]+)"\s*(.*)$') { $exe = $Matches[1]; $arg = $Matches[2] }
+    elseif ($s -match '^(?i)cmd /c "([^"]+\.cmd)"\s*$') { $exe = $env:ComSpec; $arg = '/c "' + $Matches[1] + '"' }
+    elseif ($s -match '^"?([A-Za-z]:\\[^"]+?\.exe)"?\s*(.*)$') {
+        $exe = $Matches[1]; $arg = $Matches[2]
+        if ($arg -match '-removeonly') {
+            # InstallScript (Epson Easy Photo Print, HP Sure Connect): en silencio solo
+            # con un archivo de respuestas. Trae las respuestas de los dialogos de
+            # desinstalar mas comunes; si pide otro, sale sin tocar nada.
+            $g = $p.PSChildName
+            $iss = Join-Path $env:TEMP ('opt' + $g + '.iss')
+            $r = '[InstallShield Silent]', 'Version=v7.00', 'File=Response File', '[File Transfer]', 'OverwrittenReadOnly=NoToAll', ('[' + $g + '-DlgOrder]'), ('Dlg0=' + $g + '-MessageBox-0'), 'Count=2', ('Dlg1=' + $g + '-SdFinish-0')
+            $r += ('[' + $g + '-SdWelcomeMaint-0]'), 'Result=303', ('[' + $g + '-MessageBox-0]'), 'Result=6', ('[' + $g + '-AskYesNo-0]'), 'Result=1', ('[' + $g + '-SdFinish-0]'), 'Result=1', 'bOpt1=0', 'bOpt2=0', ('[' + $g + '-SdFinishReboot-0]'), 'Result=1', 'BootOption=0'
+            Set-Content -LiteralPath $iss -Value $r -Encoding Ascii
+            $arg += ' -s -f1"' + $iss + '" -f2"' + (Join-Path $env:TEMP ('opt' + $g + '.log')) + '"'; $adivinado = $true
+        } else {
+            # NSIS, como la tienda de WildTangent y sus categorias de juegos.
+            $arg = '/S'; $adivinado = $true
+        }
+    }
+    if (-not $exe -or (-not $msi -and $exe -ne $env:ComSpec -and -not (Test-Path -LiteralPath $exe))) { continue }
+    $pr = Start-Process -FilePath $exe -ArgumentList $arg -PassThru -WindowStyle Hidden
+    # Los adivinados (/S, archivo de respuestas) van al final y no se esperan: siguen de
+    # fondo despues de salir (Easy Photo Print, dos minutos), y si alguno pide un clic, la
+    # ventana queda para el tecnico. Lo que no salio lo avisa el final de la opcion 1.
+    if ($adivinado) { $fondo++; continue }
+    # Un MSI se espera porque Windows Installer corre de a uno; tarda segundos, el tope es
+    # por si se cuelga. Los de desinstalacion silenciosa propia, igual: llaman a MSI.
+    if ($msi) { $tope = 600000 } else { $tope = 120000; $paquetes++ }
+    if (-not $pr.WaitForExit($tope)) { Stop-Process -Id $pr.Id -Force }
+    if (-not (Test-Path -LiteralPath $p.PSPath)) { Write-Output ('    - ' + $nombre); $n++ }
+}
+if ($wild.Count) {
+    $dirs = @()
+    foreach ($p in $wild) {
+        foreach ($d in @([string]$p.InstallLocation, (Split-Path -Parent ([string]$p.UninstallString -replace '"', '')))) {
+            if ($d -match '\\(WildGames|WildTangent Games)\\?' -and [IO.Directory]::Exists($d)) { $dirs += $d.TrimEnd('\') }
+        }
+    }
+    foreach ($d in $dirs) { Get-Process | Where-Object { $_.Path -and $_.Path.StartsWith($d + '\', [StringComparison]::OrdinalIgnoreCase) } | Stop-Process -Force }
+    $sh = New-Object -ComObject WScript.Shell
+    foreach ($l in @(Get-ChildItem -Path ($env:ProgramData + '\Microsoft\Windows\Start Menu'), ($env:SystemDrive + '\Users\*\AppData\Roaming\Microsoft\Windows\Start Menu'), ($env:PUBLIC + '\Desktop') -Recurse -Filter *.lnk)) {
+        $dest = [string]$sh.CreateShortcut($l.FullName).TargetPath
+        if ($l.Name -match '^WildTangent' -or @($dirs | Where-Object { $dest.StartsWith($_ + '\', [StringComparison]::OrdinalIgnoreCase) }).Count) { Remove-Item -LiteralPath $l.FullName -Force }
+    }
+    foreach ($d in $dirs) { Remove-Item -LiteralPath $d -Recurse -Force }
+    foreach ($p in $wild) {
+        $nombre = [string]$p.DisplayName
+        if (@($dirs | Where-Object { [IO.Directory]::Exists($_) }).Count) { Write-Output ('  [AVISO] ' + $nombre + ': no se pudo borrar su carpeta.'); continue }
+        Remove-Item -LiteralPath $p.PSPath -Recurse -Force
+        Write-Output ('    - ' + $nombre); $n++
+    }
+    # Sin ningun programa de WildTangent, sus carpetas comunes quedan de mas.
+    if (-not @(Get-ItemProperty -Path $u | Where-Object { $_.Publisher -match '^WildTangent' }).Count) {
+        foreach ($d in ("${env:ProgramFiles(x86)}\WildTangent Games"), ($env:ProgramData + '\WildTangent')) { Remove-Item -LiteralPath $d -Recurse -Force }
+    }
+}
+if ($n) { Write-Output ('  [OK] ' + $n + ' programas de fabrica y de impresoras desinstalados. Quedan los drivers y el escaner.') }
+if ($fondo) { Write-Output ('  [OK] ' + $fondo + ' mas se siguen desinstalando de fondo.') }
+# ponytail-keep: el instalador de HP Orbit vuelve a prender Restaurar sistema para crear su
+# punto antes de desinstalar (eventos 8195 y 8196 de System Restore, 14/11/2026), y el
+# paso 7 ya lo habia apagado: quedaba prendido con 7 GB de puntos. Se vuelve a apagar.
+if ($paquetes) { try { ApagarRestaurar } catch { } }
+# La barra "HP Support Assistant Quick Access" (clic derecho en la barra de tareas, Barras
+# de herramientas) queda registrada aunque HP Support Assistant ya no este: en la HP de
+# prueba era el resto de una version vieja que ya no figuraba en Programas. Se da de baja
+# como lo haria su desinstalador; se va de la barra al reiniciar.
+$k = 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Classes\CLSID\{0DB64048-7207-4864-8417-D5E2A500423D}'
+if (Test-Path -LiteralPath $k) {
+    $dll = [string](Get-Item -LiteralPath ($k + '\InprocServer32')).GetValue('')
+    if ($dll -and (Test-Path -LiteralPath $dll)) { Start-Process -FilePath regsvr32.exe -ArgumentList ('/u /s "' + $dll + '"') -Wait -WindowStyle Hidden }
+    Remove-Item -LiteralPath $k -Recurse -Force
+    Write-Output '  [OK] Barra de HP Support Assistant fuera de la barra de tareas (se va al reiniciar).'
+}
+# Accesos del menu Inicio a un programa que ya no esta, con su mosaico: en la HP de prueba,
+# el de McAfee LiveSafe dejaba un mosaico vacio. Solo los que apuntan a Archivos de
+# programa o ProgramData: uno a un pendrive o a la red no esta roto porque falte ahora.
+$sh = New-Object -ComObject WScript.Shell
+$rotos = @()
+foreach ($l in @(Get-ChildItem -Path ($env:ProgramData + '\Microsoft\Windows\Start Menu'), ($env:SystemDrive + '\Users\*\AppData\Roaming\Microsoft\Windows\Start Menu') -Recurse -Filter *.lnk -ErrorAction SilentlyContinue)) {
+    $dest = [string]$sh.CreateShortcut($l.FullName).TargetPath
+    if ($dest -match '^[A-Za-z]:\\(Program Files|Program Files \(x86\)|ProgramData)\\' -and -not (Test-Path -LiteralPath $dest)) {
+        Remove-Item -LiteralPath $l.FullName -Force
+        $rotos += $l.BaseName
+        # La carpeta que queda vacia tambien se va.
+        if (-not @(Get-ChildItem -LiteralPath $l.DirectoryName -Force -ErrorAction SilentlyContinue).Count) { Remove-Item -LiteralPath $l.DirectoryName -Force }
+    }
+}
+if ($rotos.Count) { Write-Output ('  [OK] Accesos rotos del menu Inicio borrados: ' + ($rotos -join ', ') + '.') }
+# ESET vencido o apagado no protege, y su servicio sigue ocupando 200 MB: se desinstala
+# con su MSI y queda Defender. Va ultimo y de fondo, porque tarda minutos y despues no
+# hay otro MSI que tenga que esperarlo. El final de la opcion 1 avisa si quedo.
+foreach ($p in @(EsetVencido)) {
+    if ($p.UninstallString -notmatch '\{[0-9A-Fa-f-]{36}\}') { continue }
+    Start-Process -FilePath msiexec.exe -ArgumentList ('/x ' + $Matches[0] + ' /qn REBOOT=ReallySuppress') -WindowStyle Hidden
+    Write-Output ('  Desinstalando ' + $p.DisplayName + ' de fondo: esta vencido o apagado, y Defender queda a cargo.')
+}
 # Adobe Reader, si esta instalado: fuera todo lo que arranca solo con Windows,
 # incluido su actualizador automatico (tarea y servicio). Los PDF quedan para
 # Edge o Chrome. Reader sigue andando si alguien lo abre.
@@ -2055,6 +2253,20 @@ foreach ($p in @(Get-ItemProperty -Path $u -ErrorAction SilentlyContinue | Where
     Write-Output ''
     Write-Output ('  AVISO: ' + $p.DisplayName + ' sigue instalado. Pide plata y mientras este, Defender')
     Write-Output '  queda apagado. Sacalo en Configuracion, Aplicaciones; Defender se activa solo.'
+}
+# Lo que el paso 9 no pudo desinstalar solo: pidio un clic, sigue de fondo o esta roto.
+# Para eso se puede correr la opcion 1 otra vez: lo que ya salio no se toca.
+$sigue = @(Get-ItemProperty -Path $u -ErrorAction SilentlyContinue | Where-Object { (DeFabrica $_) -and $_.DisplayName } | ForEach-Object { $_.DisplayName } | Sort-Object -Unique)
+if ($sigue.Count) {
+    Write-Output ''
+    Write-Output ('  Programas de fabrica que siguen instalados: ' + ($sigue -join ', ') + '.')
+    Write-Output '  Puede que sigan desinstalandose de fondo: correr la opcion 1 otra vez los'
+    Write-Output '  vuelve a intentar, o sacalos en Configuracion, Aplicaciones.'
+}
+foreach ($p in @(EsetVencido)) {
+    Write-Output ''
+    Write-Output ('  ' + $p.DisplayName + ' sigue instalado, vencido o apagado: puede que siga desinstalandose.')
+    Write-Output '  Si pide contrasena, sacalo en Configuracion, Aplicaciones.'
 }
 if (ReinicioPendiente) {
     Write-Output ''
@@ -2164,12 +2376,15 @@ $volver = ($env:ARRANQUE_MODO -eq 'volver')
 $perfil = $env:USERPROFILE
 if ($env:USID) { $lp = (Get-CimInstance Win32_UserProfile | Where-Object { $_.SID -eq $env:USID }).LocalPath; if ($lp) { $perfil = $lp } }
 # Actualizadores, bandejas de drivers, "optimizadores", torrents, lanzadores de
-# juegos y mensajeros: ninguno hace falta al iniciar sesion. Que Spotify o WhatsApp
-# arranquen solos no lo pidio nadie: se abren cuando se usan. Fuera de la lista: el
-# acceso remoto, los monitores de impresora, los antivirus y las nubes en uso. McAfee
-# tampoco, ni su bandeja: no se puede matar (Defender queda apagado mientras este, y
-# su autoproteccion no deja parar los servicios), y escondido se olvida que corre.
-$patron = 'jusched|SunJavaUpdateSched|iTunesHelper|QuickTime Task|APSDaemon|igfxtray|hkcmd|igfxpers|HotKeysCmds|\bPersistence\b|RTHDVCPL|RtHDVBg|RAVCpl64|RtkNGUI|CCleaner|IObit|Driver Booster|Advanced SystemCare|uTorrent|BitTorrent|EpsonCustomerParticipation|EPSON Customer Research|Logitech Download Assistant|KiesTrayAgent|Wondershare|\bSteam\b|EpicGamesLauncher|\bSpotify\b|\bSkype\b|\bDiscord\b|\bWhatsApp\b|\bTelegram\b|\bZoom\b'
+# juegos, mensajeros y monitores de impresora: ninguno hace falta al iniciar sesion.
+# Que Spotify o WhatsApp arranquen solos no lo pidio nadie: se abren cuando se usan, y
+# para imprimir no hace falta el monitor, que solo avisa de la tinta y los atascos.
+# Fuera de la lista: el acceso remoto, lo que atiende el boton Escanear de la impresora
+# (ControlCenter4 y TwDsUiLaunch de Brother, Event Manager de Epson), los antivirus y
+# las nubes en uso. McAfee tampoco, ni su bandeja: no se puede matar (Defender queda
+# apagado mientras este, y su autoproteccion no deja parar los servicios), y escondido
+# se olvida que corre.
+$patron = 'jusched|SunJavaUpdateSched|iTunesHelper|QuickTime Task|APSDaemon|igfxtray|hkcmd|igfxpers|HotKeysCmds|\bPersistence\b|RTHDVCPL|RtHDVBg|RAVCpl64|RtkNGUI|CCleaner|IObit|Driver Booster|Advanced SystemCare|uTorrent|BitTorrent|EpsonCustomerParticipation|EPSON Customer Research|Logitech Download Assistant|KiesTrayAgent|Wondershare|\bSteam\b|EpicGamesLauncher|\bSpotify\b|\bSkype\b|\bDiscord\b|\bWhatsApp\b|\bTelegram\b|\bZoom\b|ciscowebexstart|CiscoMeetingDaemon|BrStMonW|BrIndicator|EPSDNMON|hppusg|\bPantum-|Status Window|CNAB3'
 # Nubes: se quedan si se usan. Dropbox, con el criterio de OneDrive: mas de 3 archivos
 # en su carpeta (sin su cache). Google Drive no guarda los archivos en una carpeta que
 # se pueda contar: se queda si hay una cuenta iniciada (carpeta numerica en DriveFS).
@@ -2207,8 +2422,9 @@ function Marcar([string]$clave, [string]$valor) {
     if (-not (Test-Path -LiteralPath $clave)) { New-Item -Path $clave -Force | Out-Null }
     Set-ItemProperty -LiteralPath $clave -Name $valor -Value $b -Type Binary
 }
-# Con volver: solo lo que esta en 03 vuelve a 02; al desactivar, lo que ya esta en 03 se saltea.
-function Toca([int]$estado) { if ($volver) { return ($estado -eq 3) } else { return ($estado -ne 3) } }
+# Con volver: solo lo que esta en 03 vuelve a 02; al desactivar, lo que ya esta desactivado se
+# saltea. Impar es desactivado: el Administrador de tareas escribe 03, pero tambien aparece 07.
+function Toca([int]$estado) { if ($volver) { return ($estado -eq 3) } else { return -not ($estado -band 1) } }
 if ($volver) { Write-Output '  Vuelven al inicio de Windows los programas que saco la opcion 1...' }
 else { Write-Output '  Sacando del inicio de Windows lo que arranca solo sin que nadie lo pida...' }
 $n = 0
@@ -2267,7 +2483,10 @@ foreach ($paq in @(Get-ChildItem -LiteralPath ($ucls + '\Local Settings\Software
 }
 # Servicios de fabricante y de actualizadores que arrancan con Windows: a Manual (los
 # levanta el programa que los necesita) y detenidos ahora. Con volver, a Automatico.
-$patronServ = 'AGSService|AGMService|AdobeUpdateService|Bonjour|HPSupportSolutionsFrameworkService|HPTouchpointAnalytics|HP Analytics|^HP\w+Cap$|SupportAssist|DellClientManagement|DellDigitalDelivery|DellTechHub|^DDV|LenovoVantage|ImControllerService|LenovoSystemUpdate|ArmouryCrate|ASUSSystemAnalysis|ASUSSystemDiagnosis|^DSAService$|DSAUpdateService|NvTelemetryContainer|LGHUBUpdaterService|IObit|AdvancedSystemCare|LiveUpdateSvc|DriverBooster|Wondershare|WsAppService|WebAdvisor'
+$patronServ = 'AGSService|AGMService|AdobeUpdateService|Bonjour|HPSupportSolutionsFrameworkService|HPTouchpointAnalytics|HP Analytics|^HP\w+Cap$|SupportAssist|DellClientManagement|DellDigitalDelivery|DellTechHub|^DDV|LenovoVantage|ImControllerService|LenovoSystemUpdate|ArmouryCrate|ASUSSystemAnalysis|ASUSSystemDiagnosis|^DSAService$|DSAUpdateService|NvTelemetryContainer|LGHUBUpdaterService|IObit|AdvancedSystemCare|LiveUpdateSvc|DriverBooster|Wondershare|WsAppService|WebAdvisor|EpsonCustomerResearchParticipation|HPCommRecovery|HP Comm Recover|HPOrbitService|HPJumpStartBridge|GamesAppIntegrationService'
+# Sin el programa de Dropbox, su actualizador (lo deja la promo de fabrica) no protege nada.
+$dropbox = DropboxInstalado
+if (-not $dropbox) { $patronServ += '|^dbupdate|^DropboxUpdater' }
 foreach ($s in @(Get-Service | Where-Object { $_.Name -match $patronServ -or $_.DisplayName -match $patronServ })) {
     if (-not $volver -and $s.StartType -eq 'Automatic') {
         Set-Service -Name $s.Name -StartupType Manual
@@ -2280,13 +2499,15 @@ foreach ($s in @(Get-Service | Where-Object { $_.Name -match $patronServ -or $_.
 }
 # Tareas programadas fuera de \Microsoft: actualizadores, telemetria y "asistentes" de
 # fabricantes (HP, Dell, Lenovo, NVIDIA, Avast). Se desactivan todas salvo los
-# actualizadores de navegadores, Office, OneDrive y Dropbox, que son seguridad. Lo que
-# se desactiva queda anotado para que la opcion 6 lo devuelva; lo que ya estaba
-# desactivado no se anota, asi no se reactiva lo que apago otro.
+# actualizadores de navegadores, Office, OneDrive y Dropbox (si su programa esta
+# instalado), que son seguridad. Lo que se desactiva queda anotado para que la
+# opcion 6 lo devuelva; lo que ya estaba desactivado no se anota, asi no se
+# reactiva lo que apago otro.
 # GoogleUpdate y GoogleSystem son el actualizador de Chrome; GoogleUserPEH (Platform
 # Experience Helper) son metricas y se desactiva.
 # McAfee queda: sus tareas son las firmas y los analisis mientras sea el antivirus.
-$quedan = 'GoogleUpdate|GoogleSystem|MicrosoftEdgeUpdate|Office|OneDrive|Dropbox|Brave|Opera|Vivaldi|OptimizarPC|CreateExplorerShellUnelevatedTask|McAfee'
+$quedan = 'GoogleUpdate|GoogleSystem|MicrosoftEdgeUpdate|Office|OneDrive|Brave|Opera|Vivaldi|OptimizarPC|CreateExplorerShellUnelevatedTask|McAfee'
+if ($dropbox) { $quedan += '|Dropbox' }
 $anot = Join-Path $env:ProgramData 'OptimizarPC\tareas-desactivadas.txt'
 if ($volver) {
     foreach ($t in @(Get-Content -LiteralPath $anot)) {
@@ -2324,13 +2545,10 @@ else {
 # queda: sin eso la sesion se cierra o se cuelga, y ahi estan este cmd, Explorer
 # y PowerShell. El acceso remoto tambien queda, por si alguien ayuda a distancia.
 $ErrorActionPreference = 'SilentlyContinue'
-# Con una actualizacion instalandose se espera (COMUN): cortarla la deja a medias y
-# el paso 9 usa DISM, que falla mientras tanto.
-EsperarTiWorker
-# Windows Update, descargas y el orquestador, parados mientras corre el script. Solo
-# parados: al reiniciar vuelven solos, y el paso 1 solo repara lo deshabilitado.
-foreach ($s in 'wuauserv', 'UsoSvc', 'BITS', 'DoSvc') { Stop-Service -Name $s -Force }
-Write-Output '  [OK] Windows Update frenado hasta el reinicio.'
+# Los programas se cierran primero y sin esperar a Windows Update: no tocan una
+# actualizacion en curso (TiWorker y el instalador de versiones viven en C:\Windows o
+# en la sesion 0), y la RAM que liberan la ayuda a terminar. Antes se esperaba a que
+# terminara, y en una PC apestada nunca termina: la opcion A no hacia nada.
 $antes = [int64](Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory
 $sesion = (Get-Process -Id $PID).SessionId
 $win = $env:SystemRoot.TrimEnd('\') + '\'
@@ -2338,8 +2556,8 @@ function Objetivos {
     Get-Process | Where-Object { $_.SessionId -eq $sesion -and $_.Path -and -not $_.Path.StartsWith($win, [StringComparison]::OrdinalIgnoreCase) -and $_.Name -notmatch 'anydesk|rustdesk|hoptodesk|teamviewer|screenconnect|splashtop' }
 }
 $nombres = @(Objetivos | ForEach-Object Name | Sort-Object -Unique)
-if (-not $nombres.Count) { Write-Output '  [OK] No habia programas abiertos.'; exit 0 }
-Write-Output ('  Cerrando ' + $nombres.Count + ' programas: ' + ($nombres -join ', '))
+if (-not $nombres.Count) { Write-Output '  [OK] No habia programas abiertos.' }
+else { Write-Output ('  Cerrando ' + $nombres.Count + ' programas: ' + ($nombres -join ', ')) }
 # Primero se les pide cerrar, como con la X, y se esperan hasta 10 s. Despues se
 # fuerza todo lo que quede, incluidos los que corren sin ventana.
 Objetivos | Where-Object { $_.MainWindowHandle -ne 0 } | ForEach-Object { [void]$_.CloseMainWindow() }
@@ -2350,6 +2568,32 @@ $quedan = @(Objetivos | ForEach-Object Name | Sort-Object -Unique)
 $despues = [int64](Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory
 Write-Output ('  [OK] RAM libre: ' + [math]::Round($antes / 1KB) + ' MB antes, ' + [math]::Round($despues / 1KB) + ' MB ahora.')
 if ($quedan.Count) { Write-Output ('  No se dejaron cerrar: ' + ($quedan -join ', ') + '. Suelen ser antivirus.') }
+# Windows Update: buscar y bajar se cortan sin riesgo, y lo bajado se retoma. Instalar
+# no: cortar a TiWorker tira lo avanzado, y en una PC lenta es lo que la deja
+# actualizando para siempre. Si esta instalando, sigue con la prioridad de procesador y
+# de disco al minimo (en disco mecanico la traba es el disco), y se frenan solo las
+# descargas: parar wuauserv o el orquestador la cancelaria. Solo parados, no
+# deshabilitados: al reiniciar vuelven solos.
+if (TiWorkerOcupado) {
+    # PowerShell solo trae la prioridad de procesador; la de disco de otro proceso es
+    # NtSetInformationProcess con ProcessIoPriority (33) en 0, "muy baja". Probado contra
+    # un servicio de SYSTEM desde la sesion elevada, sin privilegio de depuracion.
+    Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public static class OptPrio { [DllImport("ntdll.dll")] public static extern int NtSetInformationProcess(IntPtr h, int clase, ref int dato, int largo); [DllImport("kernel32.dll")] public static extern IntPtr OpenProcess(uint acceso, bool hereda, int pid); [DllImport("kernel32.dll")] public static extern bool CloseHandle(IntPtr h); }'
+    foreach ($p in @(Get-Process -Name TiWorker, TrustedInstaller)) {
+        try { $p.PriorityClass = 'Idle' } catch { }
+        $h = [OptPrio]::OpenProcess(0x0200, $false, $p.Id)
+        if ($h -ne [IntPtr]::Zero) { $v = 0; [void][OptPrio]::NtSetInformationProcess($h, 33, [ref]$v, 4); [void][OptPrio]::CloseHandle($h) }
+    }
+    $servicios = 'BITS', 'DoSvc'
+    Write-Output '  Windows esta instalando una actualizacion: sigue, pero con la prioridad al minimo,'
+    Write-Output '  sin competirle al script. Las descargas quedan frenadas hasta el reinicio.'
+} else {
+    $servicios = 'wuauserv', 'UsoSvc', 'BITS', 'DoSvc'
+}
+# Se les pide parar y no se los espera: Stop-Service espera sin fin si Windows Update
+# esta bajando algo (12 minutos en la laptop de prueba).
+foreach ($s in @(Get-Service -Name $servicios)) { try { $s.Stop() } catch { } }
+if ($servicios.Count -eq 4) { Write-Output '  [OK] Windows Update frenado hasta el reinicio.' }
 #CERRAR-FIN#
 #LIMPIEZA-INICIO#
 $ErrorActionPreference = 'SilentlyContinue'
@@ -2729,6 +2973,7 @@ $lista = @(
     @(($U + '\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'), 'TaskbarGlomLevel'),
     @(($U + '\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'), 'ShowCopilotButton'),
     @(($U + '\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'), 'ShowTaskViewButton'),
+    @('HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer', 'HideSCAMeetNow'),
     @(($U + '\System\GameConfigStore'), 'GameDVR_Enabled')
 )
 foreach ($par in $lista) { L ($par[1].PadRight(32) + (Leer $par[0] $par[1])) }
@@ -2899,7 +3144,7 @@ L ('Chrome de aula (BrowserSignin): ' + (Leer 'HKEY_LOCAL_MACHINE\SOFTWARE\Polic
 
 # --- Apps preinstaladas -------------------------------------------------------
 Titulo 'Apps preinstaladas que la opcion 1 puede quitar (presentes)'
-$apps = 'Microsoft.549981C3F5F10', 'Microsoft.BingNews', 'Microsoft.Copilot', 'Microsoft.GetHelp', 'Microsoft.Getstarted', 'Microsoft.MicrosoftOfficeHub', 'Microsoft.MicrosoftSolitaireCollection', 'Microsoft.MicrosoftStickyNotes', 'Microsoft.Office.OneNote', 'Microsoft.OutlookForWindows', 'Microsoft.People', 'Microsoft.SkypeApp', 'Microsoft.WindowsAlarms', 'Microsoft.WindowsMaps', 'microsoft.windowscommunicationsapps', 'Microsoft.YourPhone', 'Microsoft.ZuneMusic', 'Microsoft.ZuneVideo', 'Microsoft.XboxApp', 'Microsoft.XboxGamingOverlay', 'king.com.*', 'MSTeams', 'Microsoft.Windows.DevHome', 'MicrosoftCorporationII.MicrosoftFamily', 'MicrosoftCorporationII.QuickAssist', 'Microsoft.Edge.GameAssist'
+$apps = 'Microsoft.549981C3F5F10', 'Microsoft.BingNews', 'Microsoft.Copilot', 'Microsoft.GetHelp', 'Microsoft.Getstarted', 'Microsoft.MicrosoftOfficeHub', 'Microsoft.MicrosoftSolitaireCollection', 'Microsoft.MicrosoftStickyNotes', 'Microsoft.Office.OneNote', 'Microsoft.OutlookForWindows', 'Microsoft.People', 'Microsoft.SkypeApp', 'Microsoft.WindowsAlarms', 'Microsoft.WindowsMaps', 'microsoft.windowscommunicationsapps', 'Microsoft.YourPhone', 'Microsoft.ZuneMusic', 'Microsoft.ZuneVideo', 'Microsoft.XboxApp', 'Microsoft.XboxGamingOverlay', 'king.com.*', 'MSTeams', 'Microsoft.Windows.DevHome', 'MicrosoftCorporationII.MicrosoftFamily', 'MicrosoftCorporationII.QuickAssist', 'Microsoft.Edge.GameAssist', 'Microsoft.3DBuilder', '4DF9E0F8.Netflix', 'A278AB0D.*', 'CAF9E577.Plex', '89006A2E.AutodeskSketchBook', 'KeeperSecurityInc.Keeper', 'AD2F1837.HPJumpStart', 'AD2F1837.HPSupportAssistant'
 $hay = foreach ($a in $apps) { Get-AppxPackage -AllUsers -Name $a | Select-Object -ExpandProperty Name -Unique }
 if ($hay) { L (($hay | Sort-Object -Unique) -join ', ') } else { L '(ninguna)' }
 $cp = (Test-Path -LiteralPath 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Microsoft Copilot') -or (Test-Path -LiteralPath 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\Microsoft Copilot')
