@@ -30,7 +30,7 @@ suspende (ver [Perfiles](#perfiles-según-el-hardware)).
 |---|---|---|
 | `A` | PC apestada: cierra todos los programas de la sesión, frena Windows Update y sigue con la `1` sin volver a preguntar. Pide confirmación. | Sí |
 | `1` | Optimizar. | Sí |
-| `2` | Actualizar los programas con winget, Windows a fondo (todo lo pendiente; si algo pide reiniciar, avisa y se vuelve a elegir) y limpiar WinSxS con DISM `/ResetBase`. Horas; la limpieza es irreversible. | Sí |
+| `2` | Actualizar los programas con winget y las apps de la Store, Windows a fondo (todo lo pendiente; si algo pide reiniciar, avisa y se vuelve a elegir) y limpiar WinSxS con DISM `/ResetBase`. Horas; la limpieza es irreversible. | Sí |
 | `3` | Desfragmentación completa. Horas. | Sí |
 | `4` | Instalar WinRAR, Everything, VLC y Chrome con winget. | Sí |
 | `5` | Chrome de aula: cierra Chrome y borra todos sus perfiles; arranca sin pedir iniciar sesión. Pide confirmación. | Sí |
@@ -191,7 +191,7 @@ Sin exclusiones.
 | Apps en segundo plano | Con menos de 4 GB, interruptor general apagado (`GlobalUserDisabled=1`, `BackgroundAppGlobalToggle=0`). Contras: el Inicio puede tardar en encontrar apps nuevas de la Store ([PR #42](https://github.com/Disassembler0/Win10-Initial-Setup-Script/pull/42)); alarmas y avisos de apps cerradas no funcionan. No afecta programas Win32. Con 4 GB o más, de fábrica. |
 | Recolección de compatibilidad | `AppCompat`: `DisableInventory=1`, `AITEnable=0`. La tarea del *Compatibility Appraiser* se desactiva en el paso 3, pero Windows Update la vuelve a activar; con las políticas, `CompatTelRunner` no tiene qué recolectar. |
 | Experiencias compartidas y Vincular al teléfono | `System`: `EnableCdp=0`, `EnableMmx=0`. Buscan celulares por Bluetooth y red; en Windows 11 es `CrossDeviceService`. |
-| Actualización automática de la Store | Apagada: política `HKLM\SOFTWARE\Policies\Microsoft\WindowsStore` `AutoDownload=2` (más el valor del interruptor viejo). Desde 2025 la Store solo permite pausar 1-5 semanas ([Tom's Hardware](https://www.tomshardware.com/software/windows/microsoft-store-change-removes-the-ability-to-stop-app-updates-pausing-automatic-updates-now-limited-to-a-5-week-duration)); la política sigue vigente ([The Windows Club](https://www.thewindowsclub.com/disable-automatic-microsoft-store-updates)). Actualizar a mano: *Store > Biblioteca > Obtener actualizaciones* (incluye winget). |
+| Actualización automática de la Store | Apagada: política `HKLM\SOFTWARE\Policies\Microsoft\WindowsStore` `AutoDownload=2` (más el valor del interruptor viejo). Desde 2025 la Store solo permite pausar 1-5 semanas ([Tom's Hardware](https://www.tomshardware.com/software/windows/microsoft-store-change-removes-the-ability-to-stop-app-updates-pausing-automatic-updates-now-limited-to-a-5-week-duration)); la política sigue vigente ([The Windows Club](https://www.thewindowsclub.com/disable-automatic-microsoft-store-updates)). Las actualiza la opción 2, o a mano: *Store > Biblioteca > Obtener actualizaciones* (incluye winget). Ese botón anda con la política puesta: en la HP de prueba actualizó seis apps. |
 | Precarga de apps (`ApplicationPreLaunch`) | Apagada. |
 | WPBT y apps acompañantes de dispositivos | Apagado (WinUtil). |
 
@@ -661,6 +661,11 @@ el taller es lo que la deja bien. Arranca sin preguntar, igual que la 3 y la 4.
 1. **Programas con winget**, lo rápido primero (minutos): `winget upgrade --all --include-unknown --source winget --silent` (lista lo que va
    a actualizar y lo instala). `--include-unknown` porque los VLC y WinRAR viejos no declaran bien su versión y sin eso winget los
    saltea. Solo toca lo que está en su catálogo (Chrome, VLC, VC++, .NET); el software de gestión no está ahí.
+   Después, **las apps de la Store** (sección `TIENDA`), que la opción 1 deja sin actualizarse solas: lo mismo que
+   *Obtener actualizaciones*, con `AppInstallManager.SearchForAllUpdatesAsync()` (la interfaz que usa la Store). Lo
+   encontrado queda instalándose de fondo y no se espera. winget no sirve para esto: con `--source msstore` no
+   encontró ninguna, con Recortes de 2020 y la Store de 2022 instaladas. Sin probar todavía una instalación por esta
+   vía: en la HP de prueba ya no quedaba nada pendiente cuando se escribió.
 2. **Windows Update hasta el final** (sección `ACTUALIZAR`): primero espera a que Windows termine lo que esté
    instalando. Le pregunta a Windows Update (`IsBusy` del instalador) y, si esa COM no responde, mide CPU **y bytes
    de disco** de `TiWorker` cada 10 s: preparando 26H2 en la laptop de prueba, `TiWorker` usaba 0,36 s de CPU cada

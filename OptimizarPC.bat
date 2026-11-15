@@ -449,8 +449,8 @@ if "%_bg%"=="1" (echo   [OK] Apps en segundo plano: todas apagadas con el interr
 :: que escribia el viejo interruptor de la Store, para Stores sin actualizar.
 call :dword "HKLM\SOFTWARE\Policies\Microsoft\WindowsStore" AutoDownload 2
 call :dword "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsStore\WindowsUpdate" AutoDownload 2
-echo   [OK] Microsoft Store: las apps ya no se actualizan solas. Para actualizarlas,
-echo        abri la Store: Biblioteca, Obtener actualizaciones.
+echo   [OK] Microsoft Store: las apps ya no se actualizan solas. Las actualiza la
+echo        opcion 2, o la Store: Biblioteca, Obtener actualizaciones.
 
 :: =========================================================================
 call :titulo "6/10  Interfaz y Explorador"
@@ -830,7 +830,7 @@ echo ==========================================================================
 echo   ACTUALIZAR WINDOWS A FONDO Y LIMPIAR RESTOS
 echo ==========================================================================
 echo.
-echo   1. Actualiza los programas con winget.
+echo   1. Actualiza los programas con winget y las apps de la Store.
 echo   2. Vacia la cache de descargas de Windows Update e instala TODO lo
 echo      pendiente (calidad, drivers, version). Si algo pide reiniciar, avisa:
 echo      reinicia y volve a elegir esta opcion. Horas en un disco mecanico.
@@ -842,12 +842,15 @@ echo      desinstalar. Hasta una hora mas. No apagues la PC.
 :: --include-unknown: los VLC y WinRAR viejos no declaran bien su version y sin
 :: eso winget los saltea.
 :: -------------------------------------------------------------------------
-call :titulo "1/3  Programas, con winget"
+call :titulo "1/3  Programas y apps de la Store"
 call :buscar_winget
 if errorlevel 1 goto :wu_sin_winget
 %WINGET% upgrade --all --include-unknown --source winget --silent --accept-package-agreements --accept-source-agreements
 echo   [OK] Programas actualizados con winget.
 :wu_sin_winget
+:: Las apps de la Store, que la opcion 1 deja sin actualizarse solas (seccion TIENDA).
+:: winget no sirve para eso: con --source msstore no encuentra ninguna.
+call :ps TIENDA
 
 :: -------------------------------------------------------------------------
 :: 2. Windows Update hasta el final. La seccion ACTUALIZAR sale con 0 si no queda
@@ -1575,6 +1578,7 @@ goto :eof
 ::   - FINAL: estado de Defender e inicio de Windows (final de la opcion 1).
 ::   - ARRANQUE: lo que arranca solo con Windows (paso 9 de la opcion 1 y opcion 6).
 ::   - ACTUALIZAR: todo lo pendiente de Windows Update (opcion 2).
+::   - TIENDA: actualizaciones de las apps de la Store (opcion 2).
 ::   - VERIFICAR: el reporte de la opcion 7.
 ::   - LUZ: luz nocturna del anochecer al amanecer (paso 6 de la opcion 1).
 ::   - AULA: borrado de perfiles de Chrome (opcion 5).
@@ -3311,3 +3315,26 @@ if ($usuarios -eq 0) { Write-Output '  Chrome no tiene datos en ningun usuario d
 else { Write-Output ('  [OK] Chrome: ' + $total + ' perfil(es) borrado(s) en ' + $usuarios + ' usuario(s) de Windows.') }
 if ($fallas) { Write-Output ('  [AVISO] En ' + $fallas + ' usuario(s) quedaron archivos en uso: reinicia y repeti la opcion 5.') }
 #AULA-FIN#
+#TIENDA-INICIO#
+# Opcion 2, paso 1: las apps de la Store, que la opcion 1 deja sin actualizarse solas.
+# Es lo mismo que "Obtener actualizaciones" en la Store, y la politica no lo frena: en la
+# HP de prueba, con la politica puesta, ese boton actualizo seis apps. La busqueda tarda
+# segundos; lo encontrado queda instalandose de fondo y no se lo espera.
+$ErrorActionPreference = 'SilentlyContinue'
+try {
+    Add-Type -AssemblyName System.Runtime.WindowsRuntime
+    $asTask = [System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object { $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncOperation`1' } | Select-Object -First 1
+    [void][Windows.ApplicationModel.Store.Preview.InstallControl.AppInstallManager, Windows.ApplicationModel.Store.Preview, ContentType = WindowsRuntime]
+    $m = New-Object Windows.ApplicationModel.Store.Preview.InstallControl.AppInstallManager
+    $tipo = [System.Collections.Generic.IReadOnlyList[Windows.ApplicationModel.Store.Preview.InstallControl.AppInstallItem]]
+    $t = $asTask.MakeGenericMethod($tipo).Invoke($null, @($m.SearchForAllUpdatesAsync()))
+    # El tope es por si la Store no contesta.
+    if (-not $t.Wait(120000)) { Write-Output '  [AVISO] La Store no contesto: se sigue sin actualizar sus apps.'; exit 1 }
+    $items = @($t.Result)
+    if (-not $items.Count) { Write-Output '  [OK] Apps de la Store al dia.'; exit 0 }
+    foreach ($i in $items) { Write-Output ('    - ' + $i.PackageFamilyName.Split('_')[0]) }
+    Write-Output ('  [OK] ' + $items.Count + ' apps de la Store actualizandose de fondo.')
+} catch {
+    Write-Output '  [AVISO] No se pudo pedir a la Store que actualice: abrila, Biblioteca, Obtener actualizaciones.'
+}
+#TIENDA-FIN#
