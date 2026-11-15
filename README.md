@@ -374,11 +374,14 @@ imprimir ni escanear:
 | Epson | La encuesta (*Customer Research Participation*), el actualizador, *Connect Printer Setup*, *Easy Photo Print* (con su barra en el Explorador), *Easy Photo Scan*, *EpsonNet Print* y el manual. |
 | Brother | El aviso de actualizaciones, las herramientas de soporte y de reparación, la guía y el monitor de estado. |
 | Lavasoft | *Web Companion*, adware. |
+| Wondershare | Toda la suite: Filmora y compañía vienen de prueba en algunas PCs, y *Helper Compact* corre de fondo y vuelve con cualquiera de ellos. |
+| Microsoft | *Comprobación de estado de PC Windows* (*PC Health Check*), la app que empuja Windows 11: en una PC que no lo soporta no sirve, y en una que sí, Windows Update ya avisa solo. |
 
 Quedan los drivers, Epson Scan 2, ControlCenter4 y Event Manager (el botón *Escanear* de la impresora), *HP System
 Event* (las teclas de función) y *HP Recovery Manager*. Cada programa se reconoce por editor y nombre a la vez:
 `StatusMonitor` o `HowToGuide` a secas solo cuentan si los firma Brother. Cada uno sale con lo que acepta: los MSI con
-`msiexec /x /qn`; los que traen desinstalación silenciosa propia (HP Orbit, HP ePrint, el manual de Epson), con ella;
+`msiexec /x /qn`; los que traen desinstalación silenciosa propia (HP Orbit, HP ePrint), con ella; los de Inno Setup
+(Wondershare, el manual de Epson) con `/VERYSILENT /SUPPRESSMSGBOXES`, sin ventana ni carteles;
 los NSIS (la tienda de WildTangent y sus categorías del Explorador de juegos) con `/S`; los de InstallScript (Easy
 Photo Print, HP Sure Connect), con un archivo de respuestas; y Web Companion, que no deja desinstalador, borrando su
 carpeta. Los juegos de WildTangent tampoco: su desinstalador general pide tildarlos uno por uno, y cada juego y la
@@ -403,9 +406,10 @@ dueños no habían instalado. Salieron en silencio 34 entradas de HP, Epson, Bro
 Companion, y 14 apps de la Store. *Easy Photo Print* terminó de irse dos minutos después de que su desinstalador
 devolviera el control, y *HP Sure Connect* salió con el archivo de respuestas. WildTangent se borró a mano (11
 entradas) y ESET tardó 5 minutos. *Epson Customer Research* falló la primera vez (1603) con su servicio corriendo y
-salió al repetir: ahora el paso 9 de inicio lo frena antes. No sale *HP Support Solutions Framework*: su MSI falla
-siempre, también desde Configuración, porque busca `ACLMInstaller.exe` y HP ya no lo deja; queda con su servicio en
-Manual.
+salió al repetir: ahora el paso 9 de inicio lo frena antes. *HP Support Solutions Framework* fallaba siempre (1603),
+también desde Configuración: su MSI copia `ACLMInstaller.exe` y su `.config` a TEMP para correrlos, y HP ya no los
+deja. Con un exe que no hace nada y sale con 0, compilado en el momento con `Add-Type`, y un `.config` vacío
+(`<configuration />`), sale; el MSI se los lleva como si fueran suyos. Con el exe solo falla igual, por el `.config`.
 
 ### 10. Inicio de Windows: lo que arranca solo
 
@@ -443,7 +447,9 @@ WebAdvisor, la encuesta de Epson (`EpsonCustomerResearchParticipation`), HP Comm
 Bridge, WildTangent (`GamesAppIntegrationService`) y, si el programa de Dropbox no está, su actualizador (`dbupdate`,
 `DropboxUpdater*`). `Apple Mobile Device Service` no: sin él iTunes no ve el iPhone. Los nombres salen de memoria y de guías;
 la opción 7 y el final de la opción 1 listan lo que sigue corriendo fuera de `C:\Windows` con sus MB, para que la
-lista crezca con datos de PCs reales.
+lista crezca con datos de PCs reales. El final de la opción 1 también lista lo que arranca con Windows, solo lo que
+arranca de verdad: el Administrador de tareas muestra también lo desactivado (primer byte impar en
+`StartupApproved`), y con eso la lista confundía.
 
 **Tareas programadas fuera de `\Microsoft`:** actualizadores, telemetría y "asistentes" de fabricantes (HP, Dell,
 Lenovo, NVIDIA, Avast, *Google Platform Experience Helper*, *SoftLanding*). Se desactivan todas salvo los

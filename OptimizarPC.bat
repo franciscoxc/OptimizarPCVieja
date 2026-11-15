@@ -1634,7 +1634,13 @@ $fabrica = @(
     @('^(Seiko|SEIKO) Epson', '^(Epson Customer Research Participation|Epson Software Updater|Epson Connect Printer Setup|Epson Easy Photo Print.*|Easy Photo Scan|EpsonNet Print)$'),
     @('', '^Manual Epson '),
     @('^Brother', '^(SoftwareUpdateNotification|BrSupportTools|HowToGuide|NetworkRepairTool|UsbRepairTool|StatusMonitor)$'),
-    @('^Lavasoft', '^Web Companion$')
+    @('^Lavasoft', '^Web Companion$'),
+    # Wondershare entero: Filmora y compania vienen de prueba en algunas PCs, y Helper
+    # Compact corre de fondo y vuelve con cualquiera de ellos.
+    @('^Wondershare', ''),
+    # La app de Microsoft que empuja Windows 11: en una PC que no lo soporta no sirve, y en
+    # una que si, Windows Update ya avisa solo.
+    @('^Microsoft', '^(Windows PC Health Check|Comprobaci.n de estado de PC Windows)$')
 )
 function DeFabrica($p) {
     foreach ($f in $fabrica) { if ([string]$p.Publisher -match $f[0] -and [string]$p.DisplayName -match $f[1]) { return $true } }
@@ -2043,11 +2049,26 @@ function CodigoMsi($p) {
 # MSI, solo borran su entrada (2 s).
 function Turno($p) {
     if (CodigoMsi $p) { return 0 }
-    if ($p.QuietUninstallString -or [string]$p.UninstallString -match '^(?i)cmd /c') { return 1 }
+    if ($p.QuietUninstallString -or [string]$p.UninstallString -match '(?i)^cmd /c|\\unins\d{3}\.exe') { return 1 }
     return 2
 }
 $lista = @(Get-ItemProperty -Path $u -ErrorAction SilentlyContinue | Where-Object { DeFabrica $_ } | Sort-Object { Turno $_ }, DisplayName)
 if ($lista.Count) { Write-Output '  Desinstalando programas de fabrica y de impresoras que no hacen falta...' }
+# ponytail-keep: HP Support Solutions Framework no se desinstala si faltan su
+# ACLMInstaller.exe y su .config: su MSI los copia a TEMP para correrlos, no los encuentra
+# y sale con 1603 (en la HP de prueba siempre, tambien desde Configuracion; con el exe
+# solo, falla igual por el .config). Un exe que no hace nada y sale con 0, con un .config
+# vacio, lo destraban, y el MSI se los lleva como si fueran suyos.
+$pf = ${env:ProgramFiles(x86)}
+if (-not $pf) { $pf = $env:ProgramFiles }
+$aclm = $pf + '\Hewlett-Packard\HP Support Solutions\Modules\ACLMInstaller.exe'
+if (@($lista | Where-Object { $_.DisplayName -eq 'HP Support Solutions Framework' }).Count) {
+    try {
+        New-Item -ItemType Directory -Path (Split-Path -Parent $aclm) -Force | Out-Null
+        if (-not (Test-Path -LiteralPath $aclm)) { Add-Type -TypeDefinition 'public static class OptAclm { public static int Main() { return 0; } }' -OutputAssembly $aclm -OutputType ConsoleApplication }
+        if (-not (Test-Path -LiteralPath ($aclm + '.config'))) { Set-Content -LiteralPath ($aclm + '.config') -Value '<configuration />' -Encoding Ascii }
+    } catch { }
+}
 $n = 0; $fondo = 0; $paquetes = 0; $wild = @()
 foreach ($p in $lista) {
     if (-not (Test-Path -LiteralPath $p.PSPath)) { continue }
@@ -2091,6 +2112,9 @@ foreach ($p in $lista) {
             $arg = '/S'; $adivinado = $true
         }
     }
+    # Inno Setup (Wondershare, el manual de Epson): con /SILENT muestra el avance y algun
+    # cartel; asi, nada.
+    if ($exe -match '(?i)\\unins\d{3}\.exe$') { $arg = '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART'; $adivinado = $false }
     if (-not $exe -or (-not $msi -and $exe -ne $env:ComSpec -and -not (Test-Path -LiteralPath $exe))) { continue }
     $pr = Start-Process -FilePath $exe -ArgumentList $arg -PassThru -WindowStyle Hidden
     # Los adivinados (/S, archivo de respuestas) van al final y no se esperan: siguen de
@@ -2225,17 +2249,28 @@ if ($s) {
 Write-Output ''
 Write-Output '  Programas que arrancan con Windows. Desactiva los que no uses en'
 Write-Output '  Administrador de tareas, pestana Inicio, desde la sesion del usuario:'
-$ks = ($env:UPS + '\Software\Microsoft\Windows\CurrentVersion\Run'), 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Run', 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Run'
-foreach ($k in $ks) {
-    $it = Get-Item -LiteralPath $k -ErrorAction SilentlyContinue
-    if ($it) {
-        $it.Property | ForEach-Object {
-            $m = ''
-            if ($_ -match 'Theft|Deterrent|TDAgent') { $m = '   <-- antirrobo de Conectar Igualdad: NO lo desactives' }
-            Write-Output ('    - ' + $_ + $m)
-        }
+# Solo lo que arranca de verdad: con los ya desactivados (primer byte impar en
+# StartupApproved) la lista confundia, porque el Administrador de tareas tambien los muestra.
+$apr = 'Microsoft\Windows\CurrentVersion\Explorer\StartupApproved'
+$ks = @(@(($env:UPS + '\Software\Microsoft\Windows\CurrentVersion\Run'), ($env:UPS + '\Software\' + $apr + '\Run')),
+    @('Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Run', ('Registry::HKEY_LOCAL_MACHINE\SOFTWARE\' + $apr + '\Run')),
+    @('Registry::HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Run', ('Registry::HKEY_LOCAL_MACHINE\SOFTWARE\' + $apr + '\Run32')))
+$hay = 0
+foreach ($par in $ks) {
+    $it = Get-Item -LiteralPath $par[0] -ErrorAction SilentlyContinue
+    if (-not $it) { continue }
+    $ap = Get-Item -LiteralPath $par[1] -ErrorAction SilentlyContinue
+    foreach ($v in $it.Property) {
+        if (-not [string]$it.GetValue($v)) { continue }
+        $d = $null
+        if ($ap) { $d = $ap.GetValue($v) }
+        if ($d -is [byte[]] -and $d.Length -and ($d[0] -band 1)) { continue }
+        $m = ''
+        if ($v -match 'Theft|Deterrent|TDAgent') { $m = '   <-- antirrobo de Conectar Igualdad: NO lo desactives' }
+        Write-Output ('    - ' + $v + $m); $hay++
     }
 }
+if (-not $hay) { Write-Output '    (ninguno)' }
 Write-Output ''
 Write-Output '  Corriendo ahora fuera de C:\Windows, en MB privados: lo que arranca solo o'
 Write-Output '  quedo abierto. Si algo sobra: Administrador de tareas, pestana Inicio.'
