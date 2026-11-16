@@ -216,6 +216,8 @@ y Configuración abre en Sistema. La opción 6 borra todo eso.
   (`DisableAcrylicBackgroundOnLogon`), salvo en "mejor apariencia".
 - `MenuShowDelay`: 400 a 100 ms.
 - El Explorador abre en *Este equipo* (Acceso rápido calcula recientes en disco).
+- Queda prendido el seguimiento de programas (`Start_TrackProgs=1`): apagado, *Ejecutar* (Win+R) no guarda lo
+  que se escribe, y no da velocidad. Hasta la versión 63 el script lo apagaba; en esas PCs vuelve.
 - Barra de tareas: sin caja ni lupa de búsqueda (`SearchboxTaskbarMode=0`; se busca abriendo el Inicio y
   escribiendo), sin los botones de Cortana, Copilot y Vista de tareas (`ShowTaskViewButton=0`), y con el nombre de
   cada ventana: los botones se agrupan recién cuando la barra se llena (`TaskbarGlomLevel=1`). En Windows 11, sin

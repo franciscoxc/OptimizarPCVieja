@@ -508,9 +508,12 @@ echo   [OK] Menus rapidos (100 ms en vez de 400).
 :: encuentran las fotos, y eso pesa mas que la lectura extra al abrir la carpeta.
 :: Se escribe 0 para que tambien vuelvan en una PC donde una version anterior las apago.
 call :dword "%_adv%" IconsOnly 0
-:: El Explorador abre en "Este equipo" y no rastrea los programas abiertos.
+:: El Explorador abre en "Este equipo".
 call :dword "%_adv%" LaunchTo 1
-call :dword "%_adv%" Start_TrackProgs 0
+:: Seguimiento de programas prendido: apagado, Ejecutar (Win+R) no guarda lo que se
+:: escribe, y no da velocidad. Se escribe 1 para que vuelva en una PC donde una
+:: version anterior lo apago.
+call :dword "%_adv%" Start_TrackProgs 1
 :: Barra de tareas: sin caja ni lupa de busqueda (abriendo el Inicio y escribiendo
 :: se busca igual), sin los botones de Cortana, Copilot y Vista de tareas, y con el
 :: nombre de cada ventana: los botones se agrupan recien cuando la barra se llena.
