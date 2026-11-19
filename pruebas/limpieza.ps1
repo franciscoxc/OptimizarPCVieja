@@ -36,6 +36,10 @@ if (Test-Path (Join-Path $temp 'sub')) { $fallas += 'no borro una subcarpeta que
 if (-not (Test-Path (Join-Path $afuera 'importante.txt'))) { $fallas += 'siguio un enlace y borro afuera' }
 if (-not (Test-Path (Join-Path $carpetaScript 'OptimizarPC.bat'))) { $fallas += 'borro la carpeta del script' }
 
+# La carpeta pedida es ella misma un enlace: el que quedo en Temp, que apunta afuera.
+Vaciar 'la pedida es un enlace' (Join-Path $temp 'enlace') -Callado
+if (-not (Test-Path (Join-Path $afuera 'importante.txt'))) { $fallas += 'la carpeta pedida era un enlace y borro adonde apuntaba' }
+
 'x' | Set-Content (Join-Path $temp 'nueva.tmp')
 $self = [IO.Path]::GetPathRoot($temp)
 Vaciar 'script en la raiz' $temp -Callado

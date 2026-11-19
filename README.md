@@ -45,8 +45,9 @@ Secuencia habitual: `1`, `4`. En una PC trabada: `A` (que sigue sola con la `1`)
 **Opción A.** Como Onyx en Mac: cierra todo lo de la sesión instalado fuera de `C:\Windows`, con lo que caen los
 programas abiertos y los que arrancan solos sin que nadie los conozca (impresoras, actualizadores, mensajeros). Primero
 les pide cerrarse, como la X, y a los 10 s fuerza lo que quede; lo no guardado se pierde. Quedan Windows, Explorer
-(la opción 1 lo necesita para reconocer al usuario) y el acceso remoto (AnyDesk, RustDesk, HopToDesk, TeamViewer,
-ScreenConnect, Splashtop). Windows Update se frena mientras corre el script: si está instalando una actualización
+(la opción 1 lo necesita para reconocer al usuario), Windows Terminal (en Windows 11 es la ventana del script) y el
+acceso remoto (AnyDesk, RustDesk, HopToDesk, TeamViewer, ScreenConnect, Splashtop, Escritorio remoto de Chrome,
+Asistencia rápida, VNC). Windows Update se frena mientras corre el script: si está instalando una actualización
 (`TiWorker.exe` con CPU o disco), no la espera ni la corta: cortarla tira lo avanzado, y en una PC lenta es lo que
 la deja actualizando para siempre. La deja seguir con la prioridad de procesador y de disco al mínimo (la de disco con
 `NtSetInformationProcess`, `ProcessIoPriority` en 0) y frena solo las descargas (`BITS`, `DoSvc`); si no está
@@ -113,7 +114,7 @@ PC vieja con instalación limpia rara vez está encendida: la tabla de Microsoft
 
 | Elemento | Acción |
 |---|---|
-| Servicios esenciales | Si están deshabilitados, vuelven a su valor de fábrica: Defender, Centro de seguridad, Firewall, Windows Update (`BITS`, `UsoSvc`, `WaaSMedicSvc`, `DoSvc`), Store y licencias, `Appinfo` (UAC), `VSS`, `swprv`, `W32Time`, red, audio, temas. |
+| Servicios esenciales | Si están deshabilitados, vuelven a su valor de fábrica: Defender, Centro de seguridad, Firewall, Windows Update (`BITS`, `UsoSvc`, `WaaSMedicSvc`, `DoSvc`), Store y licencias, `Appinfo` (UAC), `VSS`, `swprv`, `W32Time`, red, audio, temas y el teclado táctil (`TabletInputService`: deshabilitado, no se puede escribir en Inicio, Configuración ni apps de la Store). |
 | Defender | Borra políticas que lo desactivan. El bloqueo de PUA se activa en el [paso 4](#4-defender). |
 | Firewall | Encendido en los 3 perfiles; borra políticas que lo apagan. |
 | SmartScreen | Borra políticas que lo apagan (Windows y Edge). |
@@ -135,7 +136,7 @@ PC vieja con instalación limpia rara vez está encendida: la tabla de Microsoft
 | Deshabilitado | `RemoteRegistry` | Fábrica; se asegura. |
 | Deshabilitado | `AdobeARMservice` | Actualizador de Adobe Reader, si está. |
 | Manual | `PcaSvc`, `TrkWks`, `iphlpsvc`, `DPS`, `CDPSvc`, `MapsBroker`, `edgeupdate` | No necesitan arrancar con Windows. Edge se actualiza por tareas programadas. Con `DPS` en Manual, los solucionadores de problemas no andan hasta que el servicio se inicia. |
-| Manual | `lfsvc`, `WbioSrvc`, `RetailDemo`, `TabletInputService` | Fábrica. `lfsvc` es la ubicación: la usa la luz nocturna. |
+| Manual | `lfsvc`, `WbioSrvc`, `RetailDemo` | Fábrica. `lfsvc` es la ubicación: la usa la luz nocturna. |
 | Automático (retrasado) | `BITS`, `WpnService` | Necesarios, pero no en el arranque. |
 | Automático (retrasado) | `Spooler` | Siempre: una impresora que deja de andar sin aviso cuesta más que lo que ahorra. |
 | Automático | `LanmanServer` | Siempre, para compartir carpetas e impresoras en la red. |
@@ -258,7 +259,8 @@ y Configuración abre en Sistema. La opción 6 borra todo eso.
   Celeron hasta 2016) cifra por software cada lectura y escritura. Se leen los volúmenes de `Win32_EncryptableVolume`
   (`ConversionStatus` distinto de 0: cifrado, cifrando o en pausa, también el "cifrado con clave en claro" que viene de
   fábrica) y se descifran con `manage-bde -off`, primero los de datos y al final el del sistema, que guarda las claves
-  de los otros. Descifrar tarda horas en un disco grande, sigue solo en segundo plano y continúa después de reiniciar;
+  de los otros. Los extraíbles (`VolumeType` 2: un pendrive o un disco externo con BitLocker To Go) no se tocan: a
+  esos no los cifra Windows solo, los cifró alguien a propósito. Descifrar tarda horas en un disco grande, sigue solo en segundo plano y continúa después de reiniciar;
   el final de la opción 1 y la opción 7 muestran el porcentaje. `PreventDeviceEncryption=1` en
   `HKLM\SYSTEM\CurrentControlSet\Control\BitLocker` evita que Windows vuelva a cifrar solo. La opción 6 no lo
   recifra.
@@ -326,7 +328,8 @@ Las apps preinstaladas se quitan siempre, y se deshabilitan sus servicios de sin
 Apps quitadas (todos los usuarios): Xbox, Solitario, Candy Crush, Noticias, Skype, Enlace Móvil (`Microsoft.YourPhone`),
 Obtener ayuda (`Microsoft.GetHelp`), Sugerencias (`Microsoft.Getstarted`), Contactos, Mapas, Correo y Calendario,
 Outlook nuevo (salvo que se haya usado en el último año: algo escrito en su carpeta de datos,
-`AppData\Local\Microsoft\Olk`), OneNote para Win10, Notas rápidas, Alarmas, Groove, Películas y TV, Paint 3D, Visor 3D, Portal de
+`AppData\Local\Microsoft\Olk`), OneNote para Win10, Notas rápidas (salvo que alguna cuenta la haya abierto: las notas
+viven en la carpeta de la app, `LocalState\plum.sqlite`, y se borran con ella), Alarmas, Groove, Películas y TV, Paint 3D, Visor 3D, Portal de
 realidad mixta, Centro de comentarios, To Do, Cortana, Dev Home, Clipchamp, Power Automate y, en Windows 11, Teams,
 Microsoft Family, Asistencia rápida, Edge para Game Bar y Experiencias de Inicio. Con Teams se van el complemento de
 Teams para Office y el instalador de Teams para todas las cuentas (MSI, `msiexec /x /qn`). Quedan: Store,
@@ -360,7 +363,8 @@ quedan mientras sea el antivirus, y el final de la opción 1 avisa si sigue inst
 
 **ESET, si está vencido o apagado.** Si *Seguridad de Windows* no lo da por el antivirus activo (bit `0x1000` de
 `productState` en `root/SecurityCenter2`), se desinstala con su MSI (`msiexec /x /qn REBOOT=ReallySuppress`) y queda
-Defender. Si es el activo, queda. Si no se puede leer quién protege, también queda: podría ser el único. Va al final del
+Defender. Si es el activo, queda. En pausa pero con las firmas al día (bit `0x10` apagado) también: tiene licencia y
+alguien lo pausó un rato. Si no se puede leer quién protege, también queda: podría ser el único. Va al final del
 paso y de fondo, porque tarda minutos; el final de la opción 1 avisa si quedó. En la HP de prueba estaba ESET Internet
 Security 15 con la licencia desactivada desde julio de 2023 y las firmas de diciembre de 2021, sin registrarse como
 antivirus, y su servicio `ekrn` seguía ocupando 200 MB.
@@ -393,7 +397,8 @@ sus carpetas, accesos y entradas.
 Después, la barra *HP Support Assistant Quick Access* de la barra de tareas (*Barras de herramientas*), que queda
 registrada aunque HP Support Assistant ya no esté, se da de baja con `regsvr32 /u` (en la HP de prueba era el resto de
 una versión vieja que ya no figuraba en Programas). Y se borran los accesos del menú Inicio que apuntan a un programa
-que ya no está en *Archivos de programa* o *ProgramData*, con su mosaico: el de McAfee LiveSafe dejaba uno vacío. Los
+que ya no está en *Archivos de programa* o *ProgramData* del disco del sistema, con su mosaico: el de McAfee LiveSafe
+dejaba uno vacío. Los que apuntan a otro disco no se tocan: puede estar desenchufado. Los
 mosaicos de promoción de Windows (Disney, Spotify, Candy Crush) no se pueden desanclar desde un programa sin rehacer el
 menú Inicio entero: se desanclan con clic derecho.
 
@@ -455,9 +460,13 @@ arranca de verdad: el Administrador de tareas muestra también lo desactivado (p
 
 **Tareas programadas fuera de `\Microsoft`:** actualizadores, telemetría y "asistentes" de fabricantes (HP, Dell,
 Lenovo, NVIDIA, Avast, *Google Platform Experience Helper*, *SoftLanding*). Se desactivan todas salvo los
-actualizadores de navegadores (`GoogleUpdate*`, `GoogleSystem`, `MicrosoftEdgeUpdate*`, Brave, Opera, Vivaldi), Office,
-OneDrive, Dropbox (si su programa está instalado; la promo de fábrica deja el actualizador solo) y
-`CreateExplorerShellUnelevatedTask`, que son seguridad o los necesita Windows. Dentro de
+actualizadores de navegadores (`GoogleUpdate*`, `GoogleSystem`, `MicrosoftEdgeUpdate*`, `Firefox Background Update*`,
+Brave, Opera, Vivaldi), Office, OneDrive, Dropbox (si su programa está instalado; la promo de fábrica deja el
+actualizador solo) y `CreateExplorerShellUnelevatedTask`, que son seguridad o los necesita Windows. También quedan, por
+lo que corren o por cómo se llaman: las copias de seguridad (Macrium, Veeam, AOMEI, Acronis, SyncBack, o una tarea
+con «backup», «respaldo» o «copia» en el nombre), el antirrobo de Conectar Igualdad y lo que armó una persona (una
+tarea que corre un `.bat`, `.cmd` o `.ps1`, `robocopy` o `wbadmin`). Una copia de seguridad apagada no avisa hasta el
+día que hace falta. Los `.vbs` no entran: así se engancha el adware. Dentro de
 `\Microsoft\Windows` no se toca nada más que la lista del paso 3: la mayoría son disparadores dormidos y varias
 benefician (desfragmentación, Defender, hora, `StartComponentCleanup`, Windows Update, la compilación de .NET, la
 copia del registro). Lo que se desactivó queda anotado en `%ProgramData%\OptimizarPC\tareas-desactivadas.txt`, y la
@@ -680,7 +689,8 @@ el taller es lo que la deja bien. Arranca sin preguntar, igual que la 3 y la 4.
    la laptop de prueba llevaba siete intentos de 26H2 en tres días. Para eso pide parar `wuauserv` con tope de un
    minuto: `Stop-Service` espera sin fin si Windows Update está bajando algo (12 minutos de "Esperando a que se
    detenga el servicio" en la laptop); si no para, sigue sin vaciar la caché. Solo `Download`, nunca `DataStore`,
-   que es el historial y el catálogo. Con la API COM de Windows
+   que es el historial y el catálogo. La caché se vacía una vez, en la primera búsqueda: en las siguientes ya está
+   limpia, y vaciarla de nuevo haría bajar otra vez lo que no se pudo instalar. Con la API COM de Windows
    (`Microsoft.Update.Session`, anda en Home, sin módulos) busca `IsInstalled=0 and IsHidden=0` e instala todo de
    a una: calidad, drivers, versiones nuevas. Afuera quedan solo las optativas que no son drivers (las acumulativas
    *preview* se instalarían dos veces); las que declaran que podrían preguntar algo (los drivers, casi siempre) se
@@ -842,17 +852,25 @@ fija; revisar *Load/Unload Cycle Count* con [CrystalDiskInfo](https://crystalmar
   de `choice` y la tabla de este README. Corre en la Action antes de publicar: si no coinciden, la release no se toca.
 - **Limpieza, automática:** [`pruebas/limpieza.ps1`](pruebas/limpieza.ps1) corre la función que borra (`Vaciar`)
   con PowerShell 7 contra un árbol de prueba: borra lo común, no sigue enlaces, respeta la carpeta del script y las
-  prohibidas, y limpia aunque el script esté en la raíz del disco. Corre antes de publicar.
+  prohibidas, no entra si la carpeta pedida es ella misma un enlace, y limpia aunque el script esté en la raíz del
+  disco. Corre antes de publicar.
+- **Programas de fábrica:** [`pruebas/fabrica.ps1`](pruebas/fabrica.ps1) pasa programas inventados por
+  `DeFabrica`, la que decide qué se desinstala: se va lo que sobra (HP JumpStart, la promo de Dropbox, Wondershare)
+  y queda lo que hace falta (Epson Scan 2, ControlCenter4, HP System Event). Corre antes de publicar.
 - **Secciones:** [`pruebas/secciones.py`](pruebas/secciones.py) comprueba que cada `call :ps` tenga su sección de
   PowerShell y que cada marcador aparezca una sola vez: un nombre mal escrito saltearía el paso sin avisar. También
-  corre antes de publicar.
+  que el archivo siga en CRLF: con LF, `cmd` puede no encontrar una etiqueta que existe. Corre antes de publicar.
 - **Sintaxis:** [`pruebas/sintaxis.ps1`](pruebas/sintaxis.ps1) pasa cada sección y cada PowerShell de una línea por el
   parser oficial, sin ejecutarlos: `:ps` corre las secciones con `Invoke-Expression`, y una llave de más tira el paso
   entero sin que el resto se entere. Corre antes de publicar.
 
 Sin probar en Windows real: la opción 3, y lo nuevo de octubre de 2026: el inicio de Windows (`StartupApproved` y
 servicios de fabricante), BitLocker, VBS, el menú clásico de Windows 11, el ID de uBlock Origin Lite en Edge,
-`PreventDeviceEncryption` en 24H2 y la desinstalación de Avast, AVG, CCleaner y McAfee. De la opción 2 sí se probó en
+`PreventDeviceEncryption` en 24H2 y la desinstalación de Avast, AVG, CCleaner y McAfee. Tampoco lo que salió de la
+revisión del 18/11/2026: Notas rápidas que queda si se abrió, la opción A sin cerrar Windows Terminal, las tareas
+programadas que quedan por lo que corren, BitLocker sin tocar los extraíbles (falta ver si un disco USB externo
+informa `VolumeType` 2), ESET en pausa con las firmas al día, Ctrl+C en una pregunta y el aviso de winget cuando
+falla. De la opción 2 sí se probó en
 la laptop i3 (Windows 11 25H2, HDD; después 26H2 con SSD): la caché se aparta, la búsqueda, la descarga y la
 instalación por COM andan en la sesión de consola
 (un driver Intel de 34 MB con `ForceQuiet`, instalado en un minuto y sin preguntar), winget actualiza y `ResetBase`

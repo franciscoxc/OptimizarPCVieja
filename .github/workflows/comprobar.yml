@@ -19,5 +19,7 @@ jobs:
         run: python3 pruebas/secciones.py
       - name: Probar la limpieza
         run: pwsh -NoProfile pruebas/limpieza.ps1
+      - name: Probar la lista de programas de fabrica
+        run: pwsh -NoProfile pruebas/fabrica.ps1
       - name: Comprobar la sintaxis de PowerShell
         run: pwsh -NoProfile pruebas/sintaxis.ps1

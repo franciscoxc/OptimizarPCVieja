@@ -210,6 +210,9 @@ echo          pero conviene descomprimir la carpeta primero.
 echo.
 echo   - No crea punto de restauracion: Restaurar sistema se desactiva. Si algo
 echo     sale mal, la vuelta atras es la opcion 6 del menu.
+echo   - La opcion 6 NO deshace esto: desinstala Avast, AVG, CCleaner y Wondershare
+echo     (aunque sean pagos), los programas de prueba de fabrica y las apps
+echo     preinstaladas; borra los puntos de restauracion que haya y descifra BitLocker.
 echo   - En un disco mecanico puede tardar entre 10 y 20 minutos. La primera vez,
 echo     bastante mas: quitar las caracteristicas opcionales es lento.
 echo   - Al terminar hay que REINICIAR la PC.
@@ -230,7 +233,9 @@ for %%s in (WinDefend:auto WdNisSvc:demand SecurityHealthService:demand wscsvc:d
 for %%s in (wuauserv:demand UsoSvc:delayed-auto WaaSMedicSvc:demand BITS:delayed-auto DoSvc:delayed-auto CryptSvc:auto TrustedInstaller:demand) do call :asegurar_par %%s
 for %%s in (AppXSvc:demand ClipSVC:demand InstallService:demand LicenseManager:demand TokenBroker:demand wlidsvc:demand TimeBrokerSvc:demand) do call :asegurar_par %%s
 for %%s in (VSS:demand swprv:demand Appinfo:demand EventLog:auto Schedule:auto W32Time:demand KeyIso:demand VaultSvc:demand seclogon:demand SamSs:auto Winmgmt:auto) do call :asegurar_par %%s
-for %%s in (Dhcp:auto Dnscache:auto NlaSvc:auto nsi:auto Audiosrv:auto AudioEndpointBuilder:auto Themes:auto ProfSvc:auto) do call :asegurar_par %%s
+:: TabletInputService es el teclado tactil: deshabilitado (lo apagan varios "debloaters")
+:: no se puede escribir en el Inicio, en Configuracion ni en las apps de la Store.
+for %%s in (Dhcp:auto Dnscache:auto NlaSvc:auto nsi:auto Audiosrv:auto AudioEndpointBuilder:auto Themes:auto ProfSvc:auto TabletInputService:demand) do call :asegurar_par %%s
 
 :: Defender: quitar politicas que lo apagan (las ponen algunos "debloaters")
 set "_wd=HKLM\SOFTWARE\Policies\Microsoft\Windows Defender"
@@ -824,7 +829,7 @@ goto :menu
 ::  Cada actualizacion guarda la version anterior de lo que reemplaza, en
 ::  C:\Windows\WinSxS. Windows las borra solo recien a los 30 dias y con una
 ::  tarea que se corta a la hora. Aca se hace completo con DISM:
-::  /StartComponentCleanup /ResetBase. Opcion avanzada: pide confirmacion.
+::  /StartComponentCleanup /ResetBase. No pide confirmacion: avisa lo que hace y arranca.
 ::  No usa /SPSuperseded: limpia restos de Service Packs, y Windows 10 no tiene.
 :: =========================================================================
 :op_limpiar_wu
@@ -849,7 +854,13 @@ call :titulo "1/3  Programas y apps de la Store"
 call :buscar_winget
 if errorlevel 1 goto :wu_sin_winget
 %WINGET% upgrade --all --include-unknown --source winget --silent --accept-package-agreements --accept-source-agreements
-echo   [OK] Programas actualizados con winget.
+set "_rc=%errorlevel%"
+:: 0x8A15002B: no habia nada para actualizar.
+if "%_rc%"=="-1978335189" set "_rc=0"
+if "%_rc%"=="0" echo   [OK] Programas actualizados con winget.
+if "%_rc%"=="0" goto :wu_sin_winget
+call :a_hex %_rc%
+echo   [AVISO] winget no pudo actualizar todo (error %_hex%): arriba dice cual fallo. Se sigue con el resto.
 :wu_sin_winget
 :: Las apps de la Store, que la opcion 1 deja sin actualizarse solas (seccion TIENDA).
 :: winget no sirve para eso: con --source msstore no encuentra ninguna.
@@ -969,8 +980,8 @@ goto :menu
 :op_desfragmentar
 title %OPT_TITULO% - Desfragmentar a fondo
 set "DISCO=%SystemDrive%"
-set "MEDIO=desconocido"
-for /f "usebackq delims=" %%m in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "$n=(Get-Partition -DriveLetter $env:SystemDrive.Substring(0,1)).DiskNumber; $d=Get-PhysicalDisk | Where-Object { $_.DeviceId -eq [string]$n } | Select-Object -First 1; if ($d) { [string]$d.MediaType } else { 'desconocido' }"`) do set "MEDIO=%%m"
+:: El tipo de disco ya lo sabe :detectar, que corre antes del menu.
+set "MEDIO=%DISCO_TIPO%"
 
 :: Con menos de 15% libre, defrag solo desfragmenta en parte: usa ese espacio
 :: para acomodar los pedazos.
@@ -1311,6 +1322,10 @@ goto :eof
 :preguntar
 <nul set /p "=%BS%  %~1"
 choice /c %~2 /n
+:: Con Ctrl+C y despues N a "Terminar el trabajo por lotes", choice deja errorlevel 0, y
+:: quien llama solo mira "if errorlevel 2": lo leia como un S que nadie toco. Se pregunta
+:: otra vez. Con error (255, sin consola) no: seria un bucle sin fin.
+if not errorlevel 1 goto :preguntar
 goto :eof
 
 :titulo
@@ -1657,9 +1672,11 @@ function DeFabrica($p) {
 # ESET vencido o apagado: instalado, pero Seguridad de Windows no lo da por el antivirus
 # activo (bit 0x1000 de productState, la proteccion en tiempo real). Si no se puede leer
 # quien protege, no devuelve nada: ESET podria ser el unico antivirus.
+# En pausa pero con las firmas al dia (bit 0x10 apagado) tambien queda: tiene licencia, y
+# alguien lo pauso un rato. Sin registrarse, o registrado con las firmas vencidas, se va.
 function EsetVencido {
     $av = @(Get-CimInstance -Namespace root/SecurityCenter2 -ClassName AntivirusProduct -ErrorAction SilentlyContinue)
-    if (-not $av.Count -or @($av | Where-Object { $_.displayName -match '^ESET' -and ($_.productState -band 0x1000) }).Count) { return }
+    if (-not $av.Count -or @($av | Where-Object { $_.displayName -match '^ESET' -and (($_.productState -band 0x1000) -or -not ($_.productState -band 0x10)) }).Count) { return }
     Get-ItemProperty -Path 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*', 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*' -ErrorAction SilentlyContinue | Where-Object { $_.Publisher -match '^ESET' -and $_.DisplayName -match '^ESET (Security|NOD32|Internet Security|Smart Security)' }
 }
 # Restaurar sistema apagado y sin puntos. Disable-ComputerRestore solo lo apaga: los
@@ -1673,6 +1690,22 @@ function ApagarRestaurar {
 function ReinicioPendiente {
     return ((Test-Path -LiteralPath 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired') -or (Test-Path -LiteralPath 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending'))
 }
+# Lo que corre fuera de C:\Windows, de mayor a menor en MB privados: una linea por
+# programa. Lo muestran el final de la opcion 1 y la opcion 7.
+function CorriendoFuera([int]$Cuantos) {
+    $win = $env:SystemRoot.TrimEnd('\') + '\'
+    Get-Process | Where-Object { $_.Path -and -not $_.Path.StartsWith($win, [StringComparison]::OrdinalIgnoreCase) } | Group-Object Name | ForEach-Object {
+        New-Object psobject -Property @{ N = $_.Name; MB = [math]::Round(($_.Group | Measure-Object PrivateMemorySize64 -Sum).Sum / 1MB); C = $_.Count }
+    } | Sort-Object MB -Descending | Select-Object -First $Cuantos | ForEach-Object {
+        $x = ''; if ($_.C -gt 1) { $x = ' (x' + $_.C + ')' }
+        ([string]$_.MB).PadLeft(5) + ' MB  ' + $_.N + $x
+    }
+}
+# Las apps preinstaladas que quita la opcion 1 y que la 7 busca. Una sola lista: con dos
+# escritas a mano, a la de la 7 le faltaban 21.
+# Las de terceros vienen de fabrica: Netflix, los juegos de Gameloft (A278AB0D: March of
+# Empires, Disney Magic Kingdoms), Simple Solitaire, Plex, SketchBook, Keeper y las de HP.
+$apps = 'Microsoft.549981C3F5F10','Microsoft.BingNews','Microsoft.BingSearch','Microsoft.GetHelp','Microsoft.Getstarted','Microsoft.Messaging','Microsoft.Microsoft3DViewer','Microsoft.MicrosoftOfficeHub','Microsoft.MicrosoftSolitaireCollection','Microsoft.MicrosoftStickyNotes','Microsoft.MixedReality.Portal','Microsoft.MSPaint','Microsoft.Office.OneNote','Microsoft.OneConnect','Microsoft.OutlookForWindows','Microsoft.People','Microsoft.PowerAutomateDesktop','Microsoft.Print3D','Microsoft.SkypeApp','Microsoft.Todos','Microsoft.Wallet','Microsoft.WindowsAlarms','Microsoft.WindowsFeedbackHub','Microsoft.WindowsMaps','microsoft.windowscommunicationsapps','Microsoft.YourPhone','Microsoft.ZuneMusic','Microsoft.ZuneVideo','Microsoft.GamingApp','Microsoft.XboxApp','Microsoft.Xbox.TCUI','Microsoft.XboxGameOverlay','Microsoft.XboxGamingOverlay','Microsoft.XboxIdentityProvider','Microsoft.XboxSpeechToTextOverlay','Clipchamp.Clipchamp','MicrosoftTeams','MSTeams','king.com.*','Microsoft.Windows.DevHome','MicrosoftCorporationII.MicrosoftFamily','MicrosoftCorporationII.QuickAssist','Microsoft.Edge.GameAssist','*StartExperiencesApp','Microsoft.3DBuilder','Microsoft.XboxCompanion','4DF9E0F8.Netflix','A278AB0D.*','26720RandomSaladGamesLLC.SimpleSolitaire','CAF9E577.Plex','89006A2E.AutodeskSketchBook','KeeperSecurityInc.Keeper','AD2F1837.HPJumpStart','AD2F1837.HPSupportAssistant'
 #COMUN-FIN#
 #EQUIPO-INICIO#
 # Lo que cmd necesita saber del equipo, una linea VARIABLE=valor por dato:
@@ -1883,6 +1916,9 @@ $ns = 'root\CIMV2\Security\MicrosoftVolumeEncryption'
 $vols = @(Get-CimInstance -Namespace $ns -ClassName Win32_EncryptableVolume | Where-Object { $_.DriveLetter -and $_.ConversionStatus -ne 0 } | Sort-Object { $_.DriveLetter -eq $env:SystemDrive })
 if (-not $vols.Count) { Write-Output '  [OK] BitLocker: ningun disco cifrado.' }
 foreach ($v in $vols) {
+    # VolumeType 2 es extraible: a un pendrive o a un disco externo no lo cifra Windows
+    # solo, lo cifro alguien a proposito, y puede ser el del tecnico que quedo enchufado.
+    if ($v.VolumeType -eq 2) { Write-Output ('  BitLocker en ' + $v.DriveLetter + ' queda: es extraible, lo cifro alguien a proposito.'); continue }
     # ConversionStatus: 0 descifrado, 1 cifrado, 2 cifrando, 3 descifrando, 4 y 5 en pausa.
     if ($v.ConversionStatus -eq 3) { Write-Output ('  BitLocker en ' + $v.DriveLetter + ' ya se esta descifrando.'); continue }
     manage-bde.exe -off $v.DriveLetter 2>&1 | Out-Null
@@ -1932,11 +1968,12 @@ function QuitarApp([string]$Nombre) {
     }
 }
 Write-Output '  Quitando apps preinstaladas para todos los usuarios, puede tardar...'
-# Las de terceros vienen de fabrica: Netflix, los juegos de Gameloft (A278AB0D: March of
-# Empires, Disney Magic Kingdoms), Simple Solitaire, Plex, SketchBook, Keeper y las de HP.
-$apps = 'Microsoft.549981C3F5F10','Microsoft.BingNews','Microsoft.BingSearch','Microsoft.GetHelp','Microsoft.Getstarted','Microsoft.Messaging','Microsoft.Microsoft3DViewer','Microsoft.MicrosoftOfficeHub','Microsoft.MicrosoftSolitaireCollection','Microsoft.MicrosoftStickyNotes','Microsoft.MixedReality.Portal','Microsoft.MSPaint','Microsoft.Office.OneNote','Microsoft.OneConnect','Microsoft.OutlookForWindows','Microsoft.People','Microsoft.PowerAutomateDesktop','Microsoft.Print3D','Microsoft.SkypeApp','Microsoft.Todos','Microsoft.Wallet','Microsoft.WindowsAlarms','Microsoft.WindowsFeedbackHub','Microsoft.WindowsMaps','microsoft.windowscommunicationsapps','Microsoft.YourPhone','Microsoft.ZuneMusic','Microsoft.ZuneVideo','Microsoft.GamingApp','Microsoft.XboxApp','Microsoft.Xbox.TCUI','Microsoft.XboxGameOverlay','Microsoft.XboxGamingOverlay','Microsoft.XboxIdentityProvider','Microsoft.XboxSpeechToTextOverlay','Clipchamp.Clipchamp','MicrosoftTeams','MSTeams','king.com.*','Microsoft.Windows.DevHome','MicrosoftCorporationII.MicrosoftFamily','MicrosoftCorporationII.QuickAssist','Microsoft.Edge.GameAssist','*StartExperiencesApp','Microsoft.3DBuilder','Microsoft.XboxCompanion','4DF9E0F8.Netflix','A278AB0D.*','26720RandomSaladGamesLLC.SimpleSolitaire','CAF9E577.Plex','89006A2E.AutodeskSketchBook','KeeperSecurityInc.Keeper','AD2F1837.HPJumpStart','AD2F1837.HPSupportAssistant'
+# Las notas viven en la carpeta de la app y se borran con ella. plum.sqlite aparece al
+# abrirla por primera vez: no dice si hay notas, pero sin leer la base no se sabe mas.
+$notas = Test-Path -Path ($env:SystemDrive + '\Users\*\AppData\Local\Packages\Microsoft.MicrosoftStickyNotes_*\LocalState\plum.sqlite')
 foreach ($a in $apps) {
     if ($a -eq 'Microsoft.OutlookForWindows' -and $env:OUTLOOK -eq 'S') { Write-Output '    (Outlook nuevo queda: se uso en el ultimo ano)'; continue }
+    if ($a -eq 'Microsoft.MicrosoftStickyNotes' -and $notas) { Write-Output '    (Notas rapidas queda: se abrio alguna vez y quitarla borraria sus notas)'; continue }
     QuitarApp $a | ForEach-Object { Write-Output ('    - ' + $_) }
 }
 # El complemento de Teams para Office y el instalador de Teams para todas las
@@ -2178,12 +2215,13 @@ if (Test-Path -LiteralPath $k) {
 }
 # Accesos del menu Inicio a un programa que ya no esta, con su mosaico: en la HP de prueba,
 # el de McAfee LiveSafe dejaba un mosaico vacio. Solo los que apuntan a Archivos de
-# programa o ProgramData: uno a un pendrive o a la red no esta roto porque falte ahora.
+# programa o ProgramData del disco del sistema: uno a un pendrive, a la red o a otro
+# disco (un "D:\Program Files" que hoy esta desenchufado) no esta roto porque falte ahora.
 $sh = New-Object -ComObject WScript.Shell
 $rotos = @()
 foreach ($l in @(Get-ChildItem -Path ($env:ProgramData + '\Microsoft\Windows\Start Menu'), ($env:SystemDrive + '\Users\*\AppData\Roaming\Microsoft\Windows\Start Menu') -Recurse -Filter *.lnk -ErrorAction SilentlyContinue)) {
     $dest = [string]$sh.CreateShortcut($l.FullName).TargetPath
-    if ($dest -match '^[A-Za-z]:\\(Program Files|Program Files \(x86\)|ProgramData)\\' -and -not (Test-Path -LiteralPath $dest)) {
+    if ($dest -match ('^' + [regex]::Escape($env:SystemDrive) + '\\(Program Files|Program Files \(x86\)|ProgramData)\\') -and -not (Test-Path -LiteralPath $dest)) {
         Remove-Item -LiteralPath $l.FullName -Force
         $rotos += $l.BaseName
         # La carpeta que queda vacia tambien se va.
@@ -2281,13 +2319,7 @@ if (-not $hay) { Write-Output '    (ninguno)' }
 Write-Output ''
 Write-Output '  Corriendo ahora fuera de C:\Windows, en MB privados: lo que arranca solo o'
 Write-Output '  quedo abierto. Si algo sobra: Administrador de tareas, pestana Inicio.'
-$win = $env:SystemRoot.TrimEnd('\') + '\'
-Get-Process | Where-Object { $_.Path -and -not $_.Path.StartsWith($win, [StringComparison]::OrdinalIgnoreCase) } | Group-Object Name | ForEach-Object {
-    New-Object psobject -Property @{ N = $_.Name; MB = [math]::Round(($_.Group | Measure-Object PrivateMemorySize64 -Sum).Sum / 1MB); C = $_.Count }
-} | Sort-Object MB -Descending | Select-Object -First 15 | ForEach-Object {
-    $x = ''; if ($_.C -gt 1) { $x = ' (x' + $_.C + ')' }
-    Write-Output ('    ' + ([string]$_.MB).PadLeft(5) + ' MB  ' + $_.N + $x)
-}
+CorriendoFuera 15 | ForEach-Object { Write-Output ('    ' + $_) }
 # Una actualizacion a medias se termina al reiniciar, y en un disco mecanico tarda:
 # que no apaguen la PC apenas vuelve.
 $u = 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*', 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*'
@@ -2316,7 +2348,7 @@ if (ReinicioPendiente) {
     Write-Output '  la PC prendida y enchufada hasta que el disco se calme, aunque tarde media hora.'
 }
 # BitLocker en marcha (3 descifrando, 5 en pausa): que se sepa que sigue solo.
-Get-CimInstance -Namespace root\CIMV2\Security\MicrosoftVolumeEncryption -ClassName Win32_EncryptableVolume | Where-Object { $_.DriveLetter -and $_.ConversionStatus -ne 0 } | ForEach-Object {
+Get-CimInstance -Namespace root\CIMV2\Security\MicrosoftVolumeEncryption -ClassName Win32_EncryptableVolume | Where-Object { $_.DriveLetter -and $_.ConversionStatus -ne 0 -and $_.VolumeType -ne 2 } | ForEach-Object {
     $c = Invoke-CimMethod -InputObject $_ -MethodName GetConversionStatus
     if ($_.ConversionStatus -eq 3 -or $_.ConversionStatus -eq 5) { Write-Output ('  BitLocker en ' + $_.DriveLetter + ': descifrando en segundo plano, queda el ' + $c.EncryptionPercentage + ' %. Se puede reiniciar: sigue solo.') }
     else { Write-Output ('  AVISO: BitLocker en ' + $_.DriveLetter + ' sigue cifrado. "manage-bde -status ' + $_.DriveLetter + '" dice por que no se apago.') }
@@ -2339,30 +2371,35 @@ if (ReinicioPendiente) { Write-Output '  Hay una actualizacion a medias que se t
 # nuevo. Solo Download: DataStore es el historial y el catalogo. Recien aca, con
 # TiWorker quieto y sin reinicio pendiente: vaciarla con una instalacion en curso la
 # rompe, que es justo lo que se quiere arreglar.
-$dl = Join-Path $env:SystemRoot 'SoftwareDistribution\Download'
-Stop-Service -Name BITS -Force
-# Stop-Service wuauserv se queda esperando sin fin si Windows Update esta bajando algo
-# (en la laptop de prueba, 12 minutos de "Esperando a que se detenga el servicio" y
-# seguia): se le pide parar y se le da un minuto. Si no para, se sigue sin vaciar la
-# cache: la busqueda y la descarga de abajo esperan a la que ya esta en curso.
-$svc = Get-Service -Name wuauserv
-try { $svc.Stop() } catch { }
-try { $svc.WaitForStatus('Stopped', '00:01:00') } catch { }
-# Se renombra y se borra aparte: medir o borrar miles de archivos en un disco mecanico
-# tarda minutos (3,6 GB de 26H2 en la laptop de prueba: mas de diez), y mientras tanto
-# la busqueda ya puede correr. Windows Update crea Download de nuevo al arrancar.
-$viejo = $dl + '.viejo' + (Get-Date -Format 'HHmmss')
-if ((Get-Service -Name wuauserv).Status -eq 'Stopped') { Rename-Item -Path $dl -NewName (Split-Path -Leaf $viejo) }
-if (Test-Path -LiteralPath $viejo) {
-    Write-Output '  Cache de descargas de Windows Update apartada; se borra de fondo.'
-} else {
-    Write-Output '  [AVISO] Windows Update esta ocupado y no suelta la cache de descargas; se sigue sin vaciarla.'
+# Solo en la primera busqueda de la opcion 2 (_wu_busquedas la cuenta el cmd): en las
+# siguientes la cache ya esta limpia, y vaciarla otra vez hacia bajar de nuevo lo que
+# no se pudo instalar, hasta cinco veces una version de varios GB.
+if ([int]$env:_wu_busquedas -le 1) {
+    $dl = Join-Path $env:SystemRoot 'SoftwareDistribution\Download'
+    Stop-Service -Name BITS -Force
+    # Stop-Service wuauserv se queda esperando sin fin si Windows Update esta bajando algo
+    # (en la laptop de prueba, 12 minutos de "Esperando a que se detenga el servicio" y
+    # seguia): se le pide parar y se le da un minuto. Si no para, se sigue sin vaciar la
+    # cache: la busqueda y la descarga de abajo esperan a la que ya esta en curso.
+    $svc = Get-Service -Name wuauserv
+    try { $svc.Stop() } catch { }
+    try { $svc.WaitForStatus('Stopped', '00:01:00') } catch { }
+    # Se renombra y se borra aparte: medir o borrar miles de archivos en un disco mecanico
+    # tarda minutos (3,6 GB de 26H2 en la laptop de prueba: mas de diez), y mientras tanto
+    # la busqueda ya puede correr. Windows Update crea Download de nuevo al arrancar.
+    $viejo = $dl + '.viejo' + (Get-Date -Format 'HHmmss')
+    if ((Get-Service -Name wuauserv).Status -eq 'Stopped') { Rename-Item -Path $dl -NewName (Split-Path -Leaf $viejo) }
+    if (Test-Path -LiteralPath $viejo) {
+        Write-Output '  Cache de descargas de Windows Update apartada; se borra de fondo.'
+    } else {
+        Write-Output '  [AVISO] Windows Update esta ocupado y no suelta la cache de descargas; se sigue sin vaciarla.'
+    }
+    foreach ($v in @(Get-ChildItem -Path (Split-Path -Parent $dl) -Directory -Filter 'Download.viejo*')) {
+        Start-Process -FilePath cmd.exe -ArgumentList ('/c rd /s /q "' + $v.FullName + '"') -WindowStyle Hidden
+    }
+    Delete-DeliveryOptimizationCache -Force *> $null
+    Start-Service -Name wuauserv
 }
-foreach ($v in @(Get-ChildItem -Path (Split-Path -Parent $dl) -Directory -Filter 'Download.viejo*')) {
-    Start-Process -FilePath cmd.exe -ArgumentList ('/c rd /s /q "' + $v.FullName + '"') -WindowStyle Hidden
-}
-Delete-DeliveryOptimizationCache -Force *> $null
-Start-Service -Name wuauserv
 $ses = New-Object -ComObject Microsoft.Update.Session
 $ses.ClientApplicationID = 'OptimizarPC'
 Write-Output '  Buscando actualizaciones, puede tardar varios minutos...'
@@ -2548,8 +2585,16 @@ foreach ($s in @(Get-Service | Where-Object { $_.Name -match $patronServ -or $_.
 # GoogleUpdate y GoogleSystem son el actualizador de Chrome; GoogleUserPEH (Platform
 # Experience Helper) son metricas y se desactiva.
 # McAfee queda: sus tareas son las firmas y los analisis mientras sea el antivirus.
-$quedan = 'GoogleUpdate|GoogleSystem|MicrosoftEdgeUpdate|Office|OneDrive|Brave|Opera|Vivaldi|OptimizarPC|CreateExplorerShellUnelevatedTask|McAfee'
+$quedan = 'GoogleUpdate|GoogleSystem|MicrosoftEdgeUpdate|Firefox Background Update|Office|OneDrive|Brave|Opera|Vivaldi|OptimizarPC|CreateExplorerShellUnelevatedTask|McAfee'
 if ($dropbox) { $quedan += '|Dropbox' }
+# Otras quedan por lo que corren o por como se llaman, este donde este la tarea: las
+# copias de seguridad (apagadas, nadie lo nota hasta el dia que hacen falta), el
+# antirrobo de Conectar Igualdad y lo que armo una persona: un .bat, .cmd o .ps1,
+# robocopy o wbadmin. Los .vbs no: asi se engancha el adware.
+$aMano = '\.(bat|cmd|ps1)\b|\b(robocopy|wbadmin)\b|backup|respaldo|\bcopia|Macrium|Veeam|AOMEI|Acronis|SyncBack|Theft|Deterrent|TDAgent'
+function TareaAMano($t) {
+    return (($t.TaskName + ' ' + (@($t.Actions | ForEach-Object { [string]$_.Execute + ' ' + [string]$_.Arguments }) -join ' ')) -match $aMano)
+}
 $anot = Join-Path $env:ProgramData 'OptimizarPC\tareas-desactivadas.txt'
 if ($volver) {
     foreach ($t in @(Get-Content -LiteralPath $anot)) {
@@ -2561,7 +2606,7 @@ if ($volver) {
     Remove-Item -LiteralPath $anot -Force
 } else {
     $lista = @(Get-Content -LiteralPath $anot)
-    foreach ($st in @(Get-ScheduledTask | Where-Object { $_.TaskPath -notlike '\Microsoft\*' -and [string]$_.State -ne 'Disabled' -and $_.TaskName -notmatch ('^(' + $quedan + ')') -and $_.TaskPath -notmatch ('^\\(' + $quedan + ')') })) {
+    foreach ($st in @(Get-ScheduledTask | Where-Object { $_.TaskPath -notlike '\Microsoft\*' -and [string]$_.State -ne 'Disabled' -and $_.TaskName -notmatch ('^(' + $quedan + ')') -and $_.TaskPath -notmatch ('^\\(' + $quedan + ')') -and -not (TareaAMano $_) })) {
         $st | Disable-ScheduledTask | Out-Null
         $lista += ($st.TaskPath + $st.TaskName)
         Write-Output ('    - tarea ' + $st.TaskPath + $st.TaskName); $n++
@@ -2595,7 +2640,9 @@ $antes = [int64](Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory
 $sesion = (Get-Process -Id $PID).SessionId
 $win = $env:SystemRoot.TrimEnd('\') + '\'
 function Objetivos {
-    Get-Process | Where-Object { $_.SessionId -eq $sesion -and $_.Path -and -not $_.Path.StartsWith($win, [StringComparison]::OrdinalIgnoreCase) -and $_.Name -notmatch 'anydesk|rustdesk|hoptodesk|teamviewer|screenconnect|splashtop' }
+    # Windows Terminal y su OpenConsole viven en WindowsApps, y en Windows 11 son la
+    # ventana de este script: cerrarlos lo corta a mitad de camino.
+    Get-Process | Where-Object { $_.SessionId -eq $sesion -and $_.Path -and -not $_.Path.StartsWith($win, [StringComparison]::OrdinalIgnoreCase) -and $_.Name -notmatch 'anydesk|rustdesk|hoptodesk|teamviewer|screenconnect|splashtop|remoting_|quickassist|vnc|tvnserver|WindowsTerminal|OpenConsole' }
 }
 $nombres = @(Objetivos | ForEach-Object Name | Sort-Object -Unique)
 if (-not $nombres.Count) { Write-Output '  [OK] No habia programas abiertos.' }
@@ -2659,6 +2706,10 @@ function Vaciar([string]$Nombre, [string]$Carpeta, [string]$Patron = '*', [strin
     $script:ultBytes = 0; $script:ultSalteados = 0; $script:ultSinPermiso = 0
     if (-not $Carpeta -or -not [IO.Directory]::Exists($Carpeta)) { return }
     if ($prohibidas -contains $Carpeta.TrimEnd('\')) { return }
+    # La carpeta pedida tambien puede ser un enlace (un Temp o una cache que alguien mando
+    # a otro disco con una junction): no se entra, igual que con los de adentro. Y si no se
+    # pueden leer los atributos, tampoco: sin saber que es, no se borra.
+    try { if ([IO.File]::GetAttributes($Carpeta.TrimEnd('\')) -band [IO.FileAttributes]::ReparsePoint) { return } } catch { return }
     $borrados = 0; $salteados = 0; $sinPermiso = 0; $bytes = 0
     $pendientes = New-Object System.Collections.Stack
     $subcarpetas = New-Object System.Collections.Generic.List[string]
@@ -2916,7 +2967,7 @@ $espera = [ordered]@{
     'wuauserv' = 'Manual'; 'UsoSvc' = 'Auto retrasado'; 'WaaSMedicSvc' = 'Manual'; 'CryptSvc' = 'Automatico'; 'TrustedInstaller' = 'Manual'
     'AppXSvc' = 'Manual'; 'ClipSVC' = 'Manual'; 'InstallService' = 'Manual'; 'Appinfo' = 'Manual'; 'VSS' = 'Manual'; 'swprv' = 'Manual'; 'W32Time' = 'Manual'
     'AdobeARMservice' = 'DESHABILITADO'
-    'OneSyncSvc' = 'segun respuesta'; 'PimIndexMaintenanceSvc' = 'segun respuesta'; 'UnistoreSvc' = 'segun respuesta'; 'UserDataSvc' = 'segun respuesta'; 'MessagingService' = 'segun respuesta'
+    'OneSyncSvc' = 'DESHABILITADO'; 'PimIndexMaintenanceSvc' = 'DESHABILITADO'; 'UnistoreSvc' = 'DESHABILITADO'; 'UserDataSvc' = 'DESHABILITADO'; 'MessagingService' = 'DESHABILITADO'
     'EventLog' = 'Automatico'; 'Schedule' = 'Automatico'; 'Winmgmt' = 'Automatico'; 'Audiosrv' = 'Automatico'; 'Dhcp' = 'Automatico'; 'Dnscache' = 'Automatico'; 'Themes' = 'Automatico'
 }
 foreach ($n in $espera.Keys) {
@@ -2924,7 +2975,8 @@ foreach ($n in $espera.Keys) {
     if ($ini -eq 'no existe') { continue }
     $sv = Get-Service -Name $n
     $est = if ($sv) { [string]$sv.Status } else { '?' }
-    $marca = if ($espera[$n] -eq 'segun respuesta' -or $espera[$n] -eq $ini) { ' ' } else { '*' }
+    # "segun RAM" y "segun disco y RAM" dependen del perfil del equipo: no se marcan.
+    $marca = if ($espera[$n] -like 'segun*' -or $espera[$n] -eq $ini) { ' ' } else { '*' }
     L ($marca + ' ' + $n.PadRight(22) + $ini.PadRight(16) + $est.PadRight(10) + $espera[$n])
 }
 L '  (* = distinto de lo que deja la opcion 1. Antes de correrla, es normal que haya varios.)'
@@ -2959,7 +3011,7 @@ foreach ($t in $tareas) {
     $estado = if ($st) { [string]$st.State } else { 'no existe' }
     L ($estado.PadRight(10) + $t)
 }
-L 'Fuera de \Microsoft (la opcion 1 desactiva todas salvo actualizadores de navegadores, Office, OneDrive y Dropbox):'
+L 'Fuera de \Microsoft (la opcion 1 desactiva todas salvo actualizadores de navegadores, Office, OneDrive y Dropbox, copias de seguridad y lo armado a mano):'
 foreach ($st in @(Get-ScheduledTask | Where-Object { $_.TaskPath -notlike '\Microsoft\*' } | Sort-Object TaskPath, TaskName)) {
     L (([string]$st.State).PadRight(10) + $st.TaskPath + $st.TaskName)
 }
@@ -3070,7 +3122,9 @@ if ($bl.Count) {
         $est = @{0 = 'descifrado'; 1 = 'CIFRADO'; 2 = 'cifrando'; 3 = 'descifrando'; 4 = 'cifrado en pausa'; 5 = 'descifrado en pausa'}[[int]$v.ConversionStatus]
         $pct = ''
         if ($conv -and $v.ConversionStatus -ge 2) { $pct = ', ' + $conv.EncryptionPercentage + ' % cifrado' }
-        L ('BitLocker en ' + $v.DriveLetter + ':                 ' + $est + $pct + '  (proteccion ' + @{0 = 'apagada'; 1 = 'ACTIVA'; 2 = '?'}[[int]$v.ProtectionStatus] + '; la opcion 1 descifra todo)')
+        $nota = 'la opcion 1 lo descifra'
+        if ($v.VolumeType -eq 2) { $nota = 'extraible: la opcion 1 no lo toca' }
+        L ('BitLocker en ' + $v.DriveLetter + ':                 ' + $est + $pct + '  (proteccion ' + @{0 = 'apagada'; 1 = 'ACTIVA'; 2 = '?'}[[int]$v.ProtectionStatus] + '; ' + $nota + ')')
     }
 } else { L 'BitLocker:                      sin discos cifrables, o Windows no lo informa' }
 L ('Cifrado automatico (PreventDeviceEncryption): ' + (Leer 'HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\BitLocker' 'PreventDeviceEncryption') + '   (1 = Windows no cifra solo)')
@@ -3186,9 +3240,12 @@ L ('Chrome de aula (BrowserSignin): ' + (Leer 'HKEY_LOCAL_MACHINE\SOFTWARE\Polic
 
 # --- Apps preinstaladas -------------------------------------------------------
 Titulo 'Apps preinstaladas que la opcion 1 puede quitar (presentes)'
-$apps = 'Microsoft.549981C3F5F10', 'Microsoft.BingNews', 'Microsoft.Copilot', 'Microsoft.GetHelp', 'Microsoft.Getstarted', 'Microsoft.MicrosoftOfficeHub', 'Microsoft.MicrosoftSolitaireCollection', 'Microsoft.MicrosoftStickyNotes', 'Microsoft.Office.OneNote', 'Microsoft.OutlookForWindows', 'Microsoft.People', 'Microsoft.SkypeApp', 'Microsoft.WindowsAlarms', 'Microsoft.WindowsMaps', 'microsoft.windowscommunicationsapps', 'Microsoft.YourPhone', 'Microsoft.ZuneMusic', 'Microsoft.ZuneVideo', 'Microsoft.XboxApp', 'Microsoft.XboxGamingOverlay', 'king.com.*', 'MSTeams', 'Microsoft.Windows.DevHome', 'MicrosoftCorporationII.MicrosoftFamily', 'MicrosoftCorporationII.QuickAssist', 'Microsoft.Edge.GameAssist', 'Microsoft.3DBuilder', '4DF9E0F8.Netflix', 'A278AB0D.*', 'CAF9E577.Plex', '89006A2E.AutodeskSketchBook', 'KeeperSecurityInc.Keeper', 'AD2F1837.HPJumpStart', 'AD2F1837.HPSupportAssistant'
-$hay = foreach ($a in $apps) { Get-AppxPackage -AllUsers -Name $a | Select-Object -ExpandProperty Name -Unique }
-if ($hay) { L (($hay | Sort-Object -Unique) -join ', ') } else { L '(ninguna)' }
+# La lista es la de COMUN, la que usa la opcion 1; Copilot no esta ahi porque se quita
+# aparte. Se listan todas una vez y se comparan: una consulta por app son 55 recorridas
+# del catalogo, y en un disco mecanico cada una tarda.
+$buscadas = $apps + 'Microsoft.Copilot'
+$hay = @(Get-AppxPackage -AllUsers | ForEach-Object Name | Sort-Object -Unique | Where-Object { $n = $_; @($buscadas | Where-Object { $n -like $_ }).Count })
+if ($hay) { L ($hay -join ', ') } else { L '(ninguna)' }
 $cp = (Test-Path -LiteralPath 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Microsoft Copilot') -or (Test-Path -LiteralPath 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\Microsoft Copilot')
 L ('Copilot (programa) instalado:   ' + $cp)
 
@@ -3208,13 +3265,7 @@ foreach ($par in @(@(($U + '\Software\Microsoft\Windows\CurrentVersion\Run'), ($
 }
 L ''
 L 'Corriendo ahora fuera de C:\Windows, en MB privados: lo que arranca solo o quedo abierto.'
-$win = $env:SystemRoot.TrimEnd('\') + '\'
-Get-Process | Where-Object { $_.Path -and -not $_.Path.StartsWith($win, [StringComparison]::OrdinalIgnoreCase) } | Group-Object Name | ForEach-Object {
-    New-Object psobject -Property @{ N = $_.Name; MB = [math]::Round(($_.Group | Measure-Object PrivateMemorySize64 -Sum).Sum / 1MB); C = $_.Count }
-} | Sort-Object MB -Descending | Select-Object -First 20 | ForEach-Object {
-    $x = ''; if ($_.C -gt 1) { $x = ' (x' + $_.C + ')' }
-    L ('  ' + ([string]$_.MB).PadLeft(5) + ' MB  ' + $_.N + $x)
-}
+CorriendoFuera 20 | ForEach-Object { L ('  ' + $_) }
 
 # --- Guardar --------------------------------------------------------------------
 $nombre = 'estado-' + $env:COMPUTERNAME + '-' + (Get-Date -Format 'yyyyMMdd-HHmm') + '.txt'
@@ -3270,7 +3321,9 @@ if ($viejo -and $viejo.Length -gt 20) {
         }
         elseif ($tipo -eq 10) {
             $hm = @(0, 0)
-            while ($viejo[$k] -ne 0) {
+            # Con el dato cortado no hay 0 final: pasado el largo PowerShell da $null, que
+            # tampoco es 0, y sin el tope el bucle no terminaba nunca.
+            while ($k -lt $viejo.Length -and $viejo[$k] -ne 0) {
                 if ($viejo[$k] -eq 0x0E) { $hm[0] = $viejo[$k + 1] } elseif ($viejo[$k] -eq 0x2E) { $hm[1] = $viejo[$k + 1] }
                 $k += 2
             }

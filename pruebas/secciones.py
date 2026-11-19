@@ -4,14 +4,23 @@
 corre lo que hay entre los dos. Si un nombre no coincide, la seccion no corre y
 nada lo avisa: el paso se saltea en silencio. Y si un marcador aparece dos veces,
 IndexOf se queda con el primero, que puede ser una linea de cmd.
+
+De paso, que el archivo siga con finales de linea CRLF: cmd lo lee de a bloques y
+con LF un goto o un call puede no encontrar una etiqueta que existe, segun donde
+caiga el corte. Git no los convierte (.gitattributes), pero un editor si puede.
 """
 import re
 import sys
 from pathlib import Path
 
-BAT = (Path(__file__).resolve().parent.parent / "OptimizarPC.bat").read_text(encoding="ascii")
+RUTA = Path(__file__).resolve().parent.parent / "OptimizarPC.bat"
+BAT = RUTA.read_text(encoding="ascii")
 
 errores = []
+crudo = RUTA.read_bytes()
+sueltos = crudo.count(b"\n") - crudo.count(b"\r\n")
+if sueltos:
+    errores.append("%d lineas terminan en LF y no en CRLF" % sueltos)
 llamadas = set(re.findall(r"^call :ps (\w+)\s*$", BAT, re.M))
 # :detectar corre EQUIPO por su cuenta, porque necesita leer la salida.
 llamadas.add("EQUIPO")

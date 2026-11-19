@@ -10,6 +10,7 @@ on:
       - pruebas/menu.py
       - pruebas/secciones.py
       - pruebas/limpieza.ps1
+      - pruebas/fabrica.ps1
       - pruebas/sintaxis.ps1
       - .github/workflows/publicar.yml
   workflow_dispatch:
@@ -41,6 +42,9 @@ jobs:
       - name: Probar la limpieza
         run: pwsh -NoProfile pruebas/limpieza.ps1
 
+      - name: Probar la lista de programas de fabrica
+        run: pwsh -NoProfile pruebas/fabrica.ps1
+
       - name: Comprobar la sintaxis de PowerShell
         run: pwsh -NoProfile pruebas/sintaxis.ps1
 
@@ -66,3 +70,8 @@ jobs:
             --notes "Descarga OptimizarPC.bat y ejecutalo con doble clic." \
             --latest
           gh release edit ultima --title "OptimizarPC, version $VERSION"
+          # El tag va al commit publicado: sin moverlo, la release y su "Source code"
+          # seguian en un commit viejo, con otro .bat que el que se descarga. Va al final:
+          # si falla, el archivo y el titulo ya son los nuevos y solo el tag queda viejo.
+          git tag -f ultima "$GITHUB_SHA"
+          git push -f origin refs/tags/ultima
